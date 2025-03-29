@@ -93,6 +93,16 @@ class Z80CPU: CPUExecuting {
         interruptEnabled = enabled
     }
     
+    /// CPUをホルト状態にする
+    func halt() {
+        halted = true
+    }
+    
+    /// CPUがホルト状態かどうかを取得
+    func isHalted() -> Bool {
+        return halted
+    }
+    
     // MARK: - Private Methods
     
     /// 命令実行

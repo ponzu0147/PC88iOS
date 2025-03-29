@@ -11,6 +11,18 @@ import Foundation
 struct ANDInstruction: Z80Instruction {
     let source: RegisterSource
     
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var description: String { return "AND A," + sourceDescription() }
+    
+    private func sourceDescription() -> String {
+        switch source {
+        case .register(let reg): return "\(reg)"
+        case .memory: return "(HL)"
+        case .immediate(let value): return String(format: "0x%02X", value)
+        }
+    }
+    
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
         let value: UInt8
         var cycles = 4
@@ -48,19 +60,24 @@ struct ANDInstruction: Z80Instruction {
         return cycles
     }
     
-    // パリティチェック（偶数なら真）
-    private func parityEven(_ value: UInt8) -> Bool {
-        var v = value
-        v ^= v >> 4
-        v ^= v >> 2
-        v ^= v >> 1
-        return (v & 1) == 0
-    }
+
 }
 
 /// OR命令（A |= r）
 struct ORInstruction: Z80Instruction {
     let source: RegisterSource
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var description: String { return "OR A," + sourceDescription() }
+    
+    private func sourceDescription() -> String {
+        switch source {
+        case .register(let reg): return "\(reg)"
+        case .memory: return "(HL)"
+        case .immediate(let value): return String(format: "0x%02X", value)
+        }
+    }
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
         let value: UInt8
@@ -99,19 +116,24 @@ struct ORInstruction: Z80Instruction {
         return cycles
     }
     
-    // パリティチェック（偶数なら真）
-    private func parityEven(_ value: UInt8) -> Bool {
-        var v = value
-        v ^= v >> 4
-        v ^= v >> 2
-        v ^= v >> 1
-        return (v & 1) == 0
-    }
+
 }
 
 /// XOR命令（A ^= r）
 struct XORInstruction: Z80Instruction {
     let source: RegisterSource
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var description: String { return "XOR A," + sourceDescription() }
+    
+    private func sourceDescription() -> String {
+        switch source {
+        case .register(let reg): return "\(reg)"
+        case .memory: return "(HL)"
+        case .immediate(let value): return String(format: "0x%02X", value)
+        }
+    }
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
         let value: UInt8
@@ -150,19 +172,24 @@ struct XORInstruction: Z80Instruction {
         return cycles
     }
     
-    // パリティチェック（偶数なら真）
-    private func parityEven(_ value: UInt8) -> Bool {
-        var v = value
-        v ^= v >> 4
-        v ^= v >> 2
-        v ^= v >> 1
-        return (v & 1) == 0
-    }
+
 }
 
 /// CP命令（A - r、結果は破棄）
 struct CPInstruction: Z80Instruction {
     let source: RegisterSource
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var description: String { return "CP A," + sourceDescription() }
+    
+    private func sourceDescription() -> String {
+        switch source {
+        case .register(let reg): return "\(reg)"
+        case .memory: return "(HL)"
+        case .immediate(let value): return String(format: "0x%02X", value)
+        }
+    }
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
         let value: UInt8
@@ -207,12 +234,5 @@ struct CPInstruction: Z80Instruction {
         return cycles
     }
     
-    // パリティチェック（偶数なら真）
-    private func parityEven(_ value: UInt8) -> Bool {
-        var v = value
-        v ^= v >> 4
-        v ^= v >> 2
-        v ^= v >> 1
-        return (v & 1) == 0
-    }
+
 }

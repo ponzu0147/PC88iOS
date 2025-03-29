@@ -8,7 +8,7 @@
 import Foundation
 
 /// エミュレータの状態を表す列挙型
-enum EmulatorState {
+enum EmulatorState: Equatable {
     /// 初期化前
     case uninitialized
     

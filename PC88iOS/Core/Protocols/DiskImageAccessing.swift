@@ -23,6 +23,9 @@ protocol DiskImageAccessing {
     
     /// ディスクイメージのファイル一覧を取得
     func getFileList() -> [DiskFileInfo]
+    
+    /// トラック上のセクタ ID 一覧を取得
+    func getSectorIDs(track: Int, side: Int) -> [SectorID]
 }
 
 /// ディスク状態
