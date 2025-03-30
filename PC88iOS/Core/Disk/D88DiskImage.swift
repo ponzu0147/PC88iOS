@@ -181,12 +181,15 @@ class D88DiskImage: DiskImageAccessing {
         let nameData = data.subdata(in: 0..<16)
         diskName = String(data: nameData, encoding: .shiftJIS) ?? ""
         diskName = diskName.trimmingCharacters(in: .controlCharacters)
+        print("ディスク名: \(diskName)")
         
         // 書き込み保護フラグ
         writeProtected = data[0x1A] != 0
+        print("書き込み保護: \(writeProtected)")
         
         // ディスクの種類
         diskType = data[0x1B]
+        print("ディスクタイプ: \(diskType)")
         
         // トラックテーブルの読み取り
         for i in 0..<maxTracks {

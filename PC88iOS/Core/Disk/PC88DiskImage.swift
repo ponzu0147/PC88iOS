@@ -131,42 +131,167 @@ class PC88DiskImage: DiskImageAccessing {
     
     /// セクタマップを構築
     private func buildSectorMap() {
-        // 実際のディスクイメージ形式に合わせて実装する必要があります
-        // ここでは簡易的な実装として、N88-BASICディスクフォーマットを想定
-        
+        // D88フォーマットに対応したセクタマップの構築
         sectorMap = [:]
         
         // ディスクイメージがない場合は何もしない
-        guard let _ = diskData else { return }
+        guard let diskData = diskData, diskData.count > 0x2B0 else { return }
         
-        // 各トラックに対して
-        for track in 0..<80 {
-            sectorMap[track] = [:]
+        // D88ヘッダの解析
+        // ディスク名 (0x00-0x0F)
+        // ライトプロテクト (0x1A) - 0:書き込み可能, 0x10:書き込み禁止
+        let writeProtected = diskData[0x1A] == 0x10
+        
+        // ディスクの種類 (0x1B) - 0:2D, 0x10:2DD, 0x20:2HD
+        let diskType = diskData[0x1B]
+        
+        // トラック数の推定
+        var estimatedTracks = 80
+        if diskType == 0x20 { // 2HD
+            estimatedTracks = 77
+        }
+        
+        // ディスク状態の更新
+        diskStatus = DiskStatus(isWriteProtected: writeProtected, trackCount: estimatedTracks, sideCount: 2)
+        
+        // トラックテーブルの解析 (0x20-0x2AF)
+        var trackOffset = 0
+        for track in 0..<164 { // 最大164トラック (0-163)
+            let tableOffset = 0x20 + track * 4
+            if tableOffset + 4 > diskData.count {
+                break
+            }
             
-            // 各サイドに対して
-            for side in 0..<2 {
-                sectorMap[track]![side] = [:]
-                
-                // 各セクタに対して（PC-88は通常1トラックあたり16セクタ）
-                for sector in 1...16 {
-                    // セクタIDを作成（PC-88の標準的なフォーマット）
-                    let sectorID = SectorID(cylinder: UInt8(track), head: UInt8(side), record: UInt8(sector), size: 1)
-                    
-                    // セクタのオフセットを計算（単純化した例）
-                    // 実際には、ディスクイメージ形式によって異なる計算が必要
-                    let offset = (track * 2 * 16 + side * 16 + (sector - 1)) * 256
-                    
-                    // セクタマップに追加
-                    sectorMap[track]![side]![sectorID] = offset
+            // トラックオフセットを取得
+            trackOffset = Int(diskData[tableOffset]) |
+                         (Int(diskData[tableOffset + 1]) << 8) |
+                         (Int(diskData[tableOffset + 2]) << 16) |
+                         (Int(diskData[tableOffset + 3]) << 24)
+            
+            if trackOffset == 0 || trackOffset >= diskData.count {
+                continue // このトラックにはデータがない
+            }
+            
+            // 物理トラック番号とサイド番号を計算
+            let physicalTrack = track / 2
+            let side = track % 2
+            
+            if sectorMap[physicalTrack] == nil {
+                sectorMap[physicalTrack] = [:]
+            }
+            if sectorMap[physicalTrack]![side] == nil {
+                sectorMap[physicalTrack]![side] = [:]
+            }
+            
+            // トラックヘッダの解析
+            var offset = trackOffset
+            if offset + 4 > diskData.count {
+                continue
+            }
+            
+            // セクタ数を取得
+            let sectorCount = Int(diskData[offset + 3])
+            offset += 4
+            
+            // 各セクタの情報を解析
+            for _ in 0..<sectorCount {
+                if offset + 16 > diskData.count {
+                    break
                 }
+                
+                // セクタヘッダの解析
+                let c = diskData[offset] // シリンダ番号
+                let h = diskData[offset + 1] // ヘッド番号
+                let r = diskData[offset + 2] // レコード番号
+                let n = diskData[offset + 3] // セクタサイズ (0:128, 1:256, 2:512, 3:1024...)
+                
+                // セクタIDの作成
+                let sectorID = SectorID(cylinder: c, head: h, record: r, size: n)
+                
+                // セクタサイズの取得
+                let sectorSize = Int(diskData[offset + 14]) |
+                                (Int(diskData[offset + 15]) << 8)
+                
+                // セクタデータのオフセット
+                let sectorDataOffset = offset + 16
+                
+                // セクタマップに追加
+                sectorMap[physicalTrack]![side]![sectorID] = sectorDataOffset
+                
+                // 次のセクタへ
+                offset += 16 + sectorSize
             }
         }
     }
     
-    /// ファイル一覧を解析
+    /// ファイル一覧を解析 - PC-88のディレクトリ構造から
     private func parseFileList() {
-        // 実際のディスクイメージ形式に合わせて実装する必要があります
-        // ここでは簡易的な実装として空のリストを返す
         fileList = []
+        
+        // ディスクイメージがない場合は何もしない
+        guard let diskData = diskData else { return }
+        
+        // PC-88のディレクトリ領域は通常トラック1、セクタ1から
+        guard let track = sectorMap[1],
+              let side = track[0],
+              let dirSectorID = side.keys.first,
+              let dirOffset = side[dirSectorID] else {
+            return
+        }
+        
+        // ディレクトリエントリの処理
+        var offset = dirOffset
+        let entrySize = 32 // 各ディレクトリエントリは32バイト
+        
+        // 最大16エントリまで読み取り（簡易実装）
+        for _ in 0..<16 {
+            if offset + entrySize > diskData.count {
+                break
+            }
+            
+            // 削除されたファイルはスキップ
+            if diskData[offset] == 0xFF {
+                offset += entrySize
+                continue
+            }
+            
+            // ファイル名を取得（最大8文字）
+            var filename = ""
+            for i in 0..<8 {
+                let char = diskData[offset + i]
+                if char == 0 || char == 0x20 {
+                    break
+                }
+                filename.append(Character(UnicodeScalar(char)))
+            }
+            
+            // 拡張子を取得（最大3文字）
+            if diskData[offset + 8] != 0 && diskData[offset + 8] != 0x20 {
+                filename.append(".")
+                for i in 0..<3 {
+                    let char = diskData[offset + 8 + i]
+                    if char == 0 || char == 0x20 {
+                        break
+                    }
+                    filename.append(Character(UnicodeScalar(char)))
+                }
+            }
+            
+            // ファイルサイズを取得
+            let size = diskData.withUnsafeBytes { pointer in
+                pointer.load(fromByteOffset: offset + 16, as: UInt16.self)
+            }
+            
+            // 属性を取得
+            let attributes = diskData[offset + 11]
+            
+            // ファイル情報を追加
+            if !filename.isEmpty {
+                let fileInfo = DiskFileInfo(filename: filename, size: Int(size), attributes: attributes)
+                fileList.append(fileInfo)
+            }
+            
+            offset += entrySize
+        }
     }
 }

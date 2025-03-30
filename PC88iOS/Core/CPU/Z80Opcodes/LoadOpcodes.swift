@@ -150,6 +150,31 @@ struct LDDEAInstruction: Z80Instruction {
     var description: String { return "LD (DE),A" }
 }
 
+/// LD rp,nn命令（レジスタペアに16ビット即値をロード）
+struct LDRegPairImmInstruction: Z80Instruction {
+    let register: RegisterType
+    let value: UInt16
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // 直接レジスタを更新する
+        switch register {
+        case .af: registers.af = value
+        case .bc: registers.bc = value
+        case .de: registers.de = value
+        case .hl: registers.hl = value
+        case .ix: registers.ix = value
+        case .iy: registers.iy = value
+        case .sp: registers.sp = value
+        case .pc: registers.pc = value
+        }
+        return cycles
+    }
+    
+    var size: UInt16 { return 3 }
+    var cycles: Int { return 10 }
+    var description: String { return "LD \(register),\(String(format: "0x%04X", value))" }
+}
+
 /// LD (nn),A命令
 struct LDnnAInstruction: Z80Instruction {
     let address: UInt16

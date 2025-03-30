@@ -9,27 +9,120 @@ import Foundation
 import CoreGraphics
 import UIKit
 
+/// PC-88の画面モード
+enum PC88ScreenMode {
+    /// テキストモードのみ
+    case text
+    /// グラフィックモードのみ
+    case graphics
+    /// テキストとグラフィックの混合モード
+    case mixed
+}
+
+// ScreenMode はプロトコルで定義済み
+
+/// PC-88のテキストモード
+enum PC88TextMode {
+    /// 文字モード
+    case character
+    /// セミグラフィックモード
+    case semiGraphics
+}
+
+/// PC-88のテキスト属性タイプ
+enum PC88AttributeType {
+    /// 色指定
+    case color
+    /// 装飾指定
+    case decoration
+}
+
+/// PC-88の装飾効果
+enum PC88Decoration: UInt8 {
+    /// 通常表示
+    case normal = 0x00
+    /// シークレット（非表示）
+    case secret = 0x01
+    /// 点滅
+    case blink = 0x02
+    /// シークレット（非表示）
+    case secretAlt = 0x03
+    /// 反転
+    case reverse = 0x04
+    /// 反転点滅
+    case reverseBlink = 0x06
+    /// 反転シークレット
+    case reverseSecret = 0x07
+}
+
 /// PC-88の画面描画を担当するクラス
 class PC88Screen: ScreenRendering {
     // MARK: - 定数
     
-    /// テキスト画面の幅（文字数）
-    private let textWidth = 80
+    /// テキスト画面の幅（80桁モード）
+    private let textWidth80 = 80
     
-    /// テキスト画面の高さ（文字数）
-    private let textHeight = 25
+    /// テキスト画面の幅（40桁モード）
+    private let textWidth40 = 40
+    
+    /// テキスト画面の高さ（25行モード）
+    private let textHeight25 = 25
+    
+    /// テキスト画面の高さ（20行モード）
+    private let textHeight20 = 20
     
     /// グラフィック画面の幅（ピクセル）
     private let graphicsWidth = 640
     
-    /// グラフィック画面の高さ（ピクセル）
-    private let graphicsHeight = 400
+    /// グラフィック画面の高さ（400ラインモード）
+    private let graphicsHeight400 = 400
+    
+    /// グラフィック画面の高さ（200ラインモード）
+    private let graphicsHeight200 = 200
+    
+    /// 現在のグラフィックス高さ
+    private var graphicsHeight: Int {
+        return is400LineMode ? graphicsHeight400 : graphicsHeight200
+    }
     
     /// フォントデータの幅（ピクセル）
     private let fontWidth = 8
     
-    /// フォントデータの高さ（ピクセル）
-    private let fontHeight = 16
+    /// フォントデータの高さ（25行モード、ピクセル）
+    private let fontHeight25 = 16
+    
+    /// フォントデータの高さ（20行モード、ピクセル）
+    private let fontHeight20 = 20
+    
+    /// 現在のフォント高さ
+    private var fontHeight: Int {
+        return is20LineMode ? fontHeight20 : fontHeight25
+    }
+    
+    /// セミグラフィックの幅（ピクセル）
+    private let semiGraphicsWidth = 160
+    
+    /// セミグラフィックの高さ（ピクセル）
+    private let semiGraphicsHeight = 100
+    
+    /// テキストVRAMの1行あたりのバイト数（80文字 + 40バイトの属性）
+    private let textVRAMBytesPerLine = 120
+    
+    /// テキストVRAMの開始アドレス（デフォルト: 0xF3C8）
+    private var textVRAMStartAddress: UInt16 = 0xF3C8
+    
+    /// 1行あたりの最大アトリビュート数
+    private let maxAttributesPerLine = 20
+    
+    /// I/Oポート定数
+    private let crtModeControlPort: UInt16 = 0x30    // CRTモード制御ポート
+    private let crtLineControlPort: UInt16 = 0x31    // CRT行数制御ポート
+    private let colorModeControlPort: UInt16 = 0x32  // カラーモード制御ポート
+    private let crtcParameterPort: UInt16 = 0x50     // CRTCパラメータポート
+    private let crtcCommandPort: UInt16 = 0x51       // CRTCコマンドポート
+    private let dmacCh2AddressPort: UInt16 = 0x64    // DMAC Ch.2アドレスポート
+    private let dmacCh2CountPort: UInt16 = 0x65      // DMAC Ch.2カウントポート
+    private let dmacControlPort: UInt16 = 0x68       // DMAC制御ポート
     
     // MARK: - プロパティ
     
@@ -39,20 +132,63 @@ class PC88Screen: ScreenRendering {
     /// I/Oアクセス
     private var io: IOAccessing?
     
-    /// テキストVRAM
-    private var textVRAM = [UInt8](repeating: 0, count: 80 * 25)
+    /// テキストVRAM (1行120バイト: 80文字 + 40バイトの属性)
+    private var textVRAM = [UInt8](repeating: 0, count: 120 * 25)
     
     /// 属性VRAM
-    private var attributeVRAM = [UInt8](repeating: 0, count: 80 * 25)
+    private var attributeVRAM = [UInt8](repeating: 0, count: 120 * 25)
     
     /// グラフィックVRAM（3プレーン: R, G, B）
     private var graphicsVRAM = Array(repeating: [UInt8](repeating: 0, count: 640 * 400 / 8), count: 3)
     
-    /// パレット
-    private var palette = [UInt32](repeating: 0, count: 8)
+    /// デジタルパレット（8色）
+    private var digitalPalette = [UInt32](repeating: 0, count: 8)
+    
+    /// アナログパレット（8色）
+    private var analogPalette = [UInt32](repeating: 0, count: 8)
     
     /// 現在の画面モード
-    private var currentMode: ScreenMode = .text
+    private var currentScreenMode: ScreenMode = .text
+    
+    /// 現在のテキストモード
+    private var currentTextMode: PC88TextMode = .character
+    
+    /// 40桁モードかどうか
+    private var is40ColumnMode = false
+    
+    /// 20行モードかどうか
+    private var is20LineMode = false
+    
+    /// カラーモードかどうか
+    private var isColorMode = true
+    
+    /// 400ラインモードかどうか
+    private var is400LineMode = false
+    
+    /// アナログモードかどうか
+    private var isAnalogMode = false
+    
+    /// デジタルパレットかどうか
+    private var isDigitalPalette: Bool {
+        return !isAnalogMode
+    }
+    
+    /// 現在のパレット（読み取り専用）
+    private var palette: [UInt32] {
+        return isDigitalPalette ? digitalPalette : analogPalette
+    }
+    
+    /// パレットの設定（書き込み用）
+    private func setPaletteColor(index: Int, color: UInt32) {
+        if isDigitalPalette {
+            digitalPalette[index] = color
+        } else {
+            analogPalette[index] = color
+        }
+    }
+    
+    /// 各行のテキストモード（文字/セミグラフィック）
+    private var lineTextModes = [PC88TextMode](repeating: .character, count: 25)
     
     /// フォントデータ
     private var fontData = [UInt8](repeating: 0, count: 256 * 16)
@@ -60,12 +196,102 @@ class PC88Screen: ScreenRendering {
     /// 画面バッファ
     private var screenBuffer: CGContext?
     
+    /// CRTC/DMAC関連
+    private var crtcParameters = [UInt8](repeating: 0, count: 5)
+    private var crtcCommandRegister: UInt8 = 0
+    private var crtcParameterIndex: Int = 0
+    private var dmacAddress: UInt16 = 0
+    private var dmacCount: UInt16 = 0
+    
     // MARK: - 初期化
     
     init() {
-        initializePalette()
+        initializePalettes()
         initializeFontData()
         createScreenBuffer()
+    }
+    
+    /// パレットの初期化
+    private func initializePalettes() {
+        // デジタルパレットの初期化（基本8色）
+        digitalPalette[0] = 0x000000FF  // 黒
+        digitalPalette[1] = 0x0000FFFF  // 青
+        digitalPalette[2] = 0x00FF00FF  // 緑
+        digitalPalette[3] = 0x00FFFFFF  // シアン
+        digitalPalette[4] = 0xFF0000FF  // 赤
+        digitalPalette[5] = 0xFF00FFFF  // マゼンタ
+        digitalPalette[6] = 0xFFFF00FF  // 黄
+        digitalPalette[7] = 0xFFFFFFFF  // 白
+        
+        // アナログパレットの初期化（デジタルパレットと同じ初期値）
+        for i in 0..<8 {
+            analogPalette[i] = digitalPalette[i]
+        }
+    }
+    
+    /// フォントデータの初期化
+    private func initializeFontData() {
+        // 仮のフォントデータ（実際にはROMから読み込むか、リソースから読み込む）
+        // ここでは単純な例として、いくつかの文字だけ定義
+        
+        // スペース (0x20)
+        let spaceIndex = 0x20 * fontHeight25
+        for i in 0..<fontHeight25 {
+            fontData[spaceIndex + i] = 0x00
+        }
+        
+        // 'A' (0x41)
+        let aIndex = 0x41 * fontHeight25
+        fontData[aIndex + 0] = 0b00000000
+        fontData[aIndex + 1] = 0b00011000
+        fontData[aIndex + 2] = 0b00111100
+        fontData[aIndex + 3] = 0b01100110
+        fontData[aIndex + 4] = 0b01100110
+        fontData[aIndex + 5] = 0b01111110
+        fontData[aIndex + 6] = 0b01100110
+        fontData[aIndex + 7] = 0b01100110
+        fontData[aIndex + 8] = 0b01100110
+        fontData[aIndex + 9] = 0b00000000
+        fontData[aIndex + 10] = 0b00000000
+        fontData[aIndex + 11] = 0b00000000
+        fontData[aIndex + 12] = 0b00000000
+        fontData[aIndex + 13] = 0b00000000
+        fontData[aIndex + 14] = 0b00000000
+        fontData[aIndex + 15] = 0b00000000
+    }
+    
+    /// 画面バッファの作成
+    private func createScreenBuffer() {
+        let width = graphicsWidth
+        let height = graphicsHeight400
+        let bitsPerComponent = 8
+        let bytesPerRow = width * 4
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+        
+        screenBuffer = CGContext(data: nil,
+                                 width: width,
+                                 height: height,
+                                 bitsPerComponent: bitsPerComponent,
+                                 bytesPerRow: bytesPerRow,
+                                 space: colorSpace,
+                                 bitmapInfo: bitmapInfo)
+        
+        // Y軸を反転させる（スクリーン座標系に合わせる）
+        screenBuffer?.translateBy(x: 0, y: CGFloat(height))
+        screenBuffer?.scaleBy(x: 1.0, y: -1.0)
+    }
+    
+    /// CRTCとDMACの初期化
+    private func initializeCRTCAndDMAC() {
+        // CRTCパラメータの初期化
+        crtcParameters = [UInt8](repeating: 0, count: 5)
+        crtcCommandRegister = 0
+        crtcParameterIndex = 0
+        
+        // DMACの初期化
+        dmacAddress = 0
+        dmacCount = 0
     }
     
     // MARK: - 公開メソッド
@@ -80,28 +306,393 @@ class PC88Screen: ScreenRendering {
         self.io = io
     }
     
+    /// フォントデータを設定
+    func setFontData(charCode: UInt8, data: [UInt8]) {
+        let offset = Int(charCode) * fontHeight25
+        guard offset + data.count <= fontData.count else { return }
+        
+        // フォントデータをコピー
+        for i in 0..<min(data.count, fontHeight25) {
+            fontData[offset + i] = data[i]
+        }
+    }
+    
+    /// テスト画面を表示（デバッグ用）
+    func displayTestScreen() {
+        // テキストVRAMに文字を書き込む
+        let message = "PC-88 Emulator for iOS"
+        for (i, char) in message.utf8.enumerated() {
+            if i < textWidth80 {
+                textVRAM[i] = char
+            }
+        }
+        
+        // 2行目にカラーテキストを設定
+        let colorMessage = "Color Text Test"
+        for (i, char) in colorMessage.utf8.enumerated() {
+            if i < textWidth80 {
+                textVRAM[textVRAMBytesPerLine + i] = char
+            }
+        }
+        
+        // カラーテキストのアトリビュートを設定
+        setColorAttribute(line: 1, startColumn: 0, color: 0x48) // 赤
+        setColorAttribute(line: 1, startColumn: 6, color: 0x88) // 緑
+        setColorAttribute(line: 1, startColumn: 11, color: 0x28) // 青
+        
+        // 3行目にセミグラフィックを描画
+        setTextMode(.semiGraphics, forLine: 2)
+        for i in 0..<80 {
+            textVRAM[textVRAMBytesPerLine * 2 + i] = UInt8(i % 256)
+        }
+    }
+    
+    /// 指定した行のテキストモードを設定
+    func setTextMode(_ mode: PC88TextMode, forLine line: Int) {
+        guard line >= 0 && line < textHeight25 else { return }
+        
+        lineTextModes[line] = mode
+        
+        // アトリビュートも更新
+        let attributeOffset = line * textVRAMBytesPerLine + textWidth80
+        
+        // 最初のアトリビュートは常に位置0に適用
+        textVRAM[attributeOffset] = 0x00
+        
+        if mode == .semiGraphics {
+            // セミグラフィックモードの場合、bit7を1に設定
+            if isColorMode {
+                // カラーモード: 白色 + セミグラフィック (0xE8 | 0x10 = 0xF8)
+                textVRAM[attributeOffset + 1] = 0xF8
+            } else {
+                // 白黒モード: 通常表示 + セミグラフィック (0x00 | 0x80 = 0x80)
+                textVRAM[attributeOffset + 1] = 0x80
+            }
+        } else {
+            // 文字モードの場合
+            if isColorMode {
+                // カラーモード: 白色 (0xE8)
+                textVRAM[attributeOffset + 1] = 0xE8
+            } else {
+                // 白黒モード: 通常表示 (0x00)
+                textVRAM[attributeOffset + 1] = 0x00
+            }
+        }
+    }
+    
+    /// 色属性を設定
+    func setColorAttribute(line: Int, startColumn: Int, color: UInt8) {
+        guard line >= 0 && line < textHeight25 else { return }
+        guard startColumn >= 0 && startColumn < textWidth80 else { return }
+        guard isColorMode else { return }  // カラーモードのみ有効
+        
+        // アトリビュートの開始位置を計算
+        let attributeOffset = line * textVRAMBytesPerLine + textWidth80
+        
+        // 既存のアトリビュート数をカウント
+        var attributeCount = 0
+        for i in stride(from: 0, to: maxAttributesPerLine * 2, by: 2) {
+            if attributeOffset + i >= textVRAM.count || textVRAM[attributeOffset + i] == 0 {
+                break
+            }
+            attributeCount += 1
+        }
+        
+        // 最大アトリビュート数を超えていないか確認
+        if attributeCount >= maxAttributesPerLine {
+            return
+        }
+        
+        // 適切な位置にアトリビュートを挿入
+        var insertIndex = -1
+        for i in 0..<attributeCount {
+            let positionIndex = attributeOffset + i * 2
+            let currentPosition = Int(textVRAM[positionIndex])
+            
+            if currentPosition > startColumn {
+                // この位置の前に挿入
+                insertIndex = i
+                break
+            }
+        }
+        
+        if insertIndex == -1 {
+            // 末尾に追加
+            insertIndex = attributeCount
+        }
+        
+        // アトリビュートを挿入するために他のアトリビュートを移動
+        for i in stride(from: attributeCount - 1, through: insertIndex, by: -1) {
+            let srcPosIndex = attributeOffset + i * 2
+            let srcAttrIndex = srcPosIndex + 1
+            let dstPosIndex = attributeOffset + (i + 1) * 2
+            let dstAttrIndex = dstPosIndex + 1
+            
+            if dstAttrIndex < textVRAM.count {
+                textVRAM[dstPosIndex] = textVRAM[srcPosIndex]
+                textVRAM[dstAttrIndex] = textVRAM[srcAttrIndex]
+            }
+        }
+        
+        // 新しいアトリビュートを設定
+        let newPosIndex = attributeOffset + insertIndex * 2
+        let newAttrIndex = newPosIndex + 1
+        
+        if newAttrIndex < textVRAM.count {
+            textVRAM[newPosIndex] = UInt8(startColumn)
+            // 色指定: bit3=1, RGB値を設定
+            textVRAM[newAttrIndex] = color | 0x08
+        }
+    }
+    
+    /// 装飾属性を設定
+    func setDecorationAttribute(line: Int, startColumn: Int, decoration: PC88Decoration, underline: Bool = false, upperline: Bool = false) {
+        guard line >= 0 && line < textHeight25 else { return }
+        guard startColumn >= 0 && startColumn < textWidth80 else { return }
+        
+        // アトリビュートの開始位置を計算
+        let attributeOffset = line * textVRAMBytesPerLine + textWidth80
+        
+        // 既存のアトリビュート数をカウント
+        var attributeCount = 0
+        for i in stride(from: 0, to: maxAttributesPerLine * 2, by: 2) {
+            if attributeOffset + i >= textVRAM.count || textVRAM[attributeOffset + i] == 0 {
+                break
+            }
+            attributeCount += 1
+        }
+        
+        // 最大アトリビュート数を超えていないか確認
+        if attributeCount >= maxAttributesPerLine {
+            return
+        }
+        
+        // 適切な位置にアトリビュートを挿入
+        var insertIndex = -1
+        for i in 0..<attributeCount {
+            let positionIndex = attributeOffset + i * 2
+            let currentPosition = Int(textVRAM[positionIndex])
+            
+            if currentPosition > startColumn {
+                // この位置の前に挿入
+                insertIndex = i
+                break
+            }
+        }
+        
+        if insertIndex == -1 {
+            // 末尾に追加
+            insertIndex = attributeCount
+        }
+        
+        // アトリビュートを挿入するために他のアトリビュートを移動
+        for i in stride(from: attributeCount - 1, through: insertIndex, by: -1) {
+            let srcPosIndex = attributeOffset + i * 2
+            let srcAttrIndex = srcPosIndex + 1
+            let dstPosIndex = attributeOffset + (i + 1) * 2
+            let dstAttrIndex = dstPosIndex + 1
+            
+            if dstAttrIndex < textVRAM.count {
+                textVRAM[dstPosIndex] = textVRAM[srcPosIndex]
+                textVRAM[dstAttrIndex] = textVRAM[srcAttrIndex]
+            }
+        }
+        
+        // 新しいアトリビュートを設定
+        let newPosIndex = attributeOffset + insertIndex * 2
+        let newAttrIndex = newPosIndex + 1
+        
+        if newAttrIndex < textVRAM.count {
+            textVRAM[newPosIndex] = UInt8(startColumn)
+            
+            var attr: UInt8 = decoration.rawValue
+            
+            // カラーモードの場合は装飾指定bit3=0
+            if isColorMode {
+                // bit3=0: 装飾指定
+                attr &= 0xF7
+            }
+            
+            // アンダーライン/アッパーライン設定
+            if underline {
+                attr |= 0x20
+            }
+            if upperline {
+                attr |= 0x10
+            }
+            
+            textVRAM[newAttrIndex] = attr
+        }
+    }
+    
+    // MARK: - I/Oポート処理
+    
+    /// I/Oポートからの読み込み
+    func readIO(port: UInt16) -> UInt8 {
+        switch port {
+        case crtModeControlPort: // CRTモード制御ポート (0x30)
+            // bit0: 40/80桁モード (0=80桁, 1=40桁)
+            // bit1: 20/25行モード (0=25行, 1=20行)
+            // bit2: カラー/白黒モード (0=白黒, 1=カラー)
+            // bit3: グラフィックモード (0=オフ, 1=オン)
+            var value: UInt8 = 0
+            if is40ColumnMode { value |= 0x01 }
+            if is20LineMode { value |= 0x02 }
+            if isColorMode { value |= 0x04 }
+            if currentScreenMode == .graphics || currentScreenMode == .mixed { value |= 0x08 }
+            return value
+            
+        case crtLineControlPort: // CRT行数制御ポート (0x31)
+            // bit0: 400ラインモード (0=200ライン, 1=400ライン)
+            // bit1: アナログ/デジタルモード (0=デジタル, 1=アナログ)
+            var value: UInt8 = 0
+            if is400LineMode { value |= 0x01 }
+            if isAnalogMode { value |= 0x02 }
+            return value
+            
+        case colorModeControlPort: // カラーモード制御ポート (0x32)
+            // パレット読み込みは実装されていない
+            return 0
+            
+        case crtcCommandPort: // CRTCコマンドポート (0x51)
+            return crtcCommandRegister
+            
+        case crtcParameterPort: // CRTCパラメータポート (0x50)
+            if crtcParameterIndex < crtcParameters.count {
+                return crtcParameters[crtcParameterIndex]
+            }
+            return 0
+            
+        case dmacCh2AddressPort: // DMACアドレスレジスター (0x64)
+            return UInt8(dmacAddress & 0xFF)
+            
+        case dmacCh2CountPort: // DMACカウントレジスター (0x65)
+            return UInt8(dmacCount & 0xFF)
+            
+        default:
+            return 0
+        }
+    }
+    
+    /// I/Oポートへの書き込み
+    func writeIO(port: UInt16, value: UInt8) {
+        switch port {
+        case crtModeControlPort: // CRTモード制御ポート (0x30)
+            // bit0: 40/80桁モード (0=80桁, 1=40桁)
+            // bit1: 20/25行モード (0=25行, 1=20行)
+            // bit2: カラー/白黒モード (0=白黒, 1=カラー)
+            // bit3: グラフィックモード (0=オフ, 1=オン)
+            is40ColumnMode = (value & 0x01) != 0
+            is20LineMode = (value & 0x02) != 0
+            isColorMode = (value & 0x04) != 0
+            
+            if (value & 0x08) != 0 {
+                // グラフィックモードON
+                if currentScreenMode == .text {
+                    currentScreenMode = .mixed
+                }
+            } else {
+                // グラフィックモードOFF
+                if currentScreenMode == .graphics || currentScreenMode == .mixed {
+                    currentScreenMode = .text
+                }
+            }
+            
+        case crtLineControlPort: // CRT行数制御ポート (0x31)
+            // bit0: 400ラインモード (0=200ライン, 1=400ライン)
+            // bit1: アナログ/デジタルモード (0=デジタル, 1=アナログ)
+            is400LineMode = (value & 0x01) != 0
+            isAnalogMode = (value & 0x02) != 0
+            
+        case colorModeControlPort: // カラーモード制御ポート (0x32)
+            // パレット設定処理を実装予定
+            break
+            
+        case crtcCommandPort: // CRTCコマンドポート (0x51)
+            crtcCommandRegister = value
+            crtcParameterIndex = 0
+            
+        case crtcParameterPort: // CRTCパラメータポート (0x50)
+            if crtcParameterIndex < crtcParameters.count {
+                crtcParameters[crtcParameterIndex] = value
+                crtcParameterIndex += 1
+            }
+            
+        case dmacCh2AddressPort: // DMACアドレスレジスター (0x64)
+            dmacAddress = (dmacAddress & 0xFF00) | UInt16(value)
+            
+        case dmacCh2CountPort: // DMACカウントレジスター (0x65)
+            dmacCount = (dmacCount & 0xFF00) | UInt16(value)
+            
+        default:
+            break
+        }
+    }
+    
+    /// テキストVRAMへの書き込み
+    func writeTextVRAM(address: UInt16, value: UInt8) {
+        let offset = Int(address)
+        if offset < textVRAM.count {
+            textVRAM[offset] = value
+        }
+    }
+    
+    /// テキストVRAMからの読み込み
+    func readTextVRAM(address: UInt16) -> UInt8 {
+        let offset = Int(address)
+        if offset < textVRAM.count {
+            return textVRAM[offset]
+        }
+        return 0
+    }
+    
+    /// グラフィックVRAMへの書き込み
+    func writeGraphicsVRAM(plane: Int, address: UInt16, value: UInt8) {
+        guard plane >= 0 && plane < 3 else { return }
+        
+        let offset = Int(address)
+        if offset < graphicsVRAM[plane].count {
+            graphicsVRAM[plane][offset] = value
+        }
+    }
+    
+    /// グラフィックVRAMからの読み込み
+    func readGraphicsVRAM(plane: Int, address: UInt16) -> UInt8 {
+        guard plane >= 0 && plane < 3 else { return 0 }
+        
+        let offset = Int(address)
+        if offset < graphicsVRAM[plane].count {
+            return graphicsVRAM[plane][offset]
+        }
+        return 0
+    }
+    
     // MARK: - ScreenRendering プロトコル実装
     
     func initialize() {
         // テキストVRAMをクリア
-        textVRAM = [UInt8](repeating: 0x20, count: textWidth * textHeight)  // スペースで埋める
-        
-        // 属性VRAMをクリア
-        attributeVRAM = [UInt8](repeating: 0, count: textWidth * textHeight)
+        textVRAM = [UInt8](repeating: 0x20, count: textVRAMBytesPerLine * textHeight25)  // スペースで埋める
         
         // グラフィックVRAMをクリア
         for i in 0..<3 {
-            graphicsVRAM[i] = [UInt8](repeating: 0, count: graphicsWidth * graphicsHeight / 8)
+            graphicsVRAM[i] = [UInt8](repeating: 0, count: graphicsWidth * graphicsHeight400 / 8)
         }
         
         // パレットを初期化
-        initializePalette()
+        initializePalettes()
         
         // 画面モードをテキストモードに設定
-        currentMode = .text
+        currentScreenMode = .text
+        currentTextMode = .character
+        
+        // 各行のテキストモードを初期化
+        lineTextModes = [PC88TextMode](repeating: .character, count: textHeight25)
         
         // 画面バッファを作成
         createScreenBuffer()
+        
+        // CRTCとDMACを初期化
+        initializeCRTCAndDMAC()
     }
     
     func updateTextVRAM(at address: UInt16, value: UInt8) {
@@ -121,11 +712,11 @@ class PC88Screen: ScreenRendering {
     }
     
     func setScreenMode(_ mode: ScreenMode) {
-        currentMode = mode
+        currentScreenMode = mode
     }
     
     func setPalette(index: Int, color: UInt8) {
-        guard index >= 0 && index < palette.count else { return }
+        guard index >= 0 && index < digitalPalette.count else { return }
         
         // PC-88のパレット値をRGBA値に変換
         let r = (color & 0x04) != 0 ? 255 : 0
@@ -133,25 +724,25 @@ class PC88Screen: ScreenRendering {
         let b = (color & 0x01) != 0 ? 255 : 0
         
         // RGBA値をUInt32に変換（アルファは常に255）
-        palette[index] = (UInt32(r) << 24) | (UInt32(g) << 16) | (UInt32(b) << 8) | 255
+        setPaletteColor(index: index, color: (UInt32(r) << 24) | (UInt32(g) << 16) | (UInt32(b) << 8) | 255)
     }
     
     func render() -> CGImage? {
         guard let context = screenBuffer else { return nil }
         
-        // 画面をクリア
-        context.setFillColor(UIColor.black.cgColor)
-        context.fill(CGRect(x: 0, y: 0, width: graphicsWidth, height: graphicsHeight))
+        // 背景を黒でクリア
+        context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: graphicsWidth, height: graphicsHeight400))
         
         // 現在のモードに応じて描画
-        switch currentMode {
+        switch currentScreenMode {
         case .text:
-            renderTextMode(context)
+            renderTextScreen(context: context)
         case .graphics:
-            renderGraphicsMode(context)
+            renderGraphicsScreen(context: context)
         case .mixed:
-            renderGraphicsMode(context)
-            renderTextMode(context)
+            renderGraphicsScreen(context: context)
+            renderTextScreen(context: context)
         }
         
         return context.makeImage()
@@ -166,105 +757,184 @@ class PC88Screen: ScreenRendering {
     /// パレットの初期化
     private func initializePalette() {
         // 基本8色パレット
-        palette[0] = 0x000000FF  // 黒
-        palette[1] = 0x0000FFFF  // 青
-        palette[2] = 0x00FF00FF  // 緑
-        palette[3] = 0x00FFFFFF  // シアン
-        palette[4] = 0xFF0000FF  // 赤
-        palette[5] = 0xFF00FFFF  // マゼンタ
-        palette[6] = 0xFFFF00FF  // 黄
-        palette[7] = 0xFFFFFFFF  // 白
+        digitalPalette[0] = 0x000000FF  // 黒
+        digitalPalette[1] = 0x0000FFFF  // 青
+        digitalPalette[2] = 0x00FF00FF  // 緑
+        digitalPalette[3] = 0x00FFFFFF  // シアン
+        digitalPalette[4] = 0xFF0000FF  // 赤
+        digitalPalette[5] = 0xFF00FFFF  // マゼンタ
+        digitalPalette[6] = 0xFFFF00FF  // 黄
+        digitalPalette[7] = 0xFFFFFFFF  // 白
     }
     
-    /// フォントデータの初期化
-    private func initializeFontData() {
-        // 仮のフォントデータ（実際にはROMから読み込むか、リソースから読み込む）
-        // ここでは単純な例として、いくつかの文字だけ定義
-        
-        // スペース (0x20)
-        let spaceIndex = 0x20 * fontHeight
-        for i in 0..<fontHeight {
-            fontData[spaceIndex + i] = 0x00
-        }
-        
-        // 'A' (0x41)
-        let aIndex = 0x41 * fontHeight
-        fontData[aIndex + 0] = 0b00001000
-        fontData[aIndex + 1] = 0b00011100
-        fontData[aIndex + 2] = 0b00110110
-        fontData[aIndex + 3] = 0b01100011
-        fontData[aIndex + 4] = 0b01100011
-        fontData[aIndex + 5] = 0b01111111
-        fontData[aIndex + 6] = 0b01100011
-        fontData[aIndex + 7] = 0b01100011
-        fontData[aIndex + 8] = 0b01100011
-        fontData[aIndex + 9] = 0b01100011
-        fontData[aIndex + 10] = 0b00000000
-        fontData[aIndex + 11] = 0b00000000
-        fontData[aIndex + 12] = 0b00000000
-        fontData[aIndex + 13] = 0b00000000
-        fontData[aIndex + 14] = 0b00000000
-        fontData[aIndex + 15] = 0b00000000
-        
-        // 他の文字も同様に定義...
-    }
+    // CRTCとDMACの初期化は上記initialize()メソッド内で実装済み
     
-    /// 画面バッファの作成
-    private func createScreenBuffer() {
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
-        
-        screenBuffer = CGContext(
-            data: nil,
-            width: graphicsWidth,
-            height: graphicsHeight,
-            bitsPerComponent: 8,
-            bytesPerRow: graphicsWidth * 4,
-            space: colorSpace,
-            bitmapInfo: bitmapInfo.rawValue
-        )
-    }
+    // 画面バッファの作成は上記メソッドで実装済み
     
-    /// テキストモードの描画
-    private func renderTextMode(_ context: CGContext) {
+    /// テキスト画面の描画
+    private func renderTextScreen(context: CGContext) {
+        // テキスト画面の描画処理
+        
+        // テキストの行数と桁数を設定
+        let textWidth = is40ColumnMode ? textWidth40 : textWidth80
+        let textHeight = is20LineMode ? textHeight20 : textHeight25
+        let fontHeight = is20LineMode ? fontHeight20 : fontHeight25
+        
+        // 各行ごとに描画
         for y in 0..<textHeight {
+            // 行のテキストモードを取得
+            let lineMode = lineTextModes[y]
+            
+            // 行のアトリビュート開始位置を計算
+            let lineOffset = y * textVRAMBytesPerLine
+            let attributeOffset = lineOffset + textWidth80
+            
+            // アトリビュート情報を取得
+            var attributes: [(position: Int, color: UInt32, decoration: PC88Decoration, underline: Bool, upperline: Bool)] = []
+            
+            // アトリビュートを解析
+            for i in stride(from: 0, to: maxAttributesPerLine * 2, by: 2) {
+                if attributeOffset + i >= textVRAM.count || textVRAM[attributeOffset + i] == 0 {
+                    break
+                }
+                
+                let position = Int(textVRAM[attributeOffset + i])
+                let attrValue = textVRAM[attributeOffset + i + 1]
+                
+                // アトリビュートタイプを判定
+                let isColorAttr = isColorMode && (attrValue & 0x08) != 0
+                
+                if isColorAttr {
+                    // 色指定の場合
+                    let colorIndex = attrValue & 0x07
+                    let color = isAnalogMode ? analogPalette[Int(colorIndex)] : digitalPalette[Int(colorIndex)]
+                    attributes.append((position, color, .normal, false, false))
+                } else {
+                    // 装飾指定の場合
+                    let decorationValue = attrValue & 0x07
+                    let underline = (attrValue & 0x20) != 0
+                    let upperline = (attrValue & 0x10) != 0
+                    
+                    if let decoration = PC88Decoration(rawValue: decorationValue) {
+                        attributes.append((position, 0xFFFFFFFF, decoration, underline, upperline))
+                    }
+                }
+            }
+            
+            // 文字を描画
             for x in 0..<textWidth {
-                let index = y * textWidth + x
-                let char = textVRAM[index]
-                let attr = attributeVRAM[index]
-                
-                // 文字の前景色と背景色を決定
-                let fgColorIndex = (attr & 0x07)
-                let bgColorIndex = (attr >> 3) & 0x07
-                let fgColor = palette[Int(fgColorIndex)]
-                let bgColor = palette[Int(bgColorIndex)]
-                
-                // 背景を描画
-                let rectX = x * fontWidth
-                let rectY = y * fontHeight
-                context.setFillColor(UIColor(
-                    red: CGFloat((bgColor >> 24) & 0xFF) / 255.0,
-                    green: CGFloat((bgColor >> 16) & 0xFF) / 255.0,
-                    blue: CGFloat((bgColor >> 8) & 0xFF) / 255.0,
-                    alpha: CGFloat(bgColor & 0xFF) / 255.0
-                ).cgColor)
-                context.fill(CGRect(x: rectX, y: rectY, width: fontWidth, height: fontHeight))
-                
-                // 文字を描画
-                let fontOffset = Int(char) * fontHeight
-                for cy in 0..<fontHeight {
-                    let fontLine = fontData[fontOffset + cy]
-                    for cx in 0..<fontWidth {
-                        if (fontLine & (0x80 >> cx)) != 0 {
-                            let pixelX = rectX + cx
-                            let pixelY = rectY + cy
-                            context.setFillColor(UIColor(
-                                red: CGFloat((fgColor >> 24) & 0xFF) / 255.0,
-                                green: CGFloat((fgColor >> 16) & 0xFF) / 255.0,
-                                blue: CGFloat((fgColor >> 8) & 0xFF) / 255.0,
-                                alpha: CGFloat(fgColor & 0xFF) / 255.0
-                            ).cgColor)
-                            context.fill(CGRect(x: pixelX, y: pixelY, width: 1, height: 1))
+                let charIndex = lineOffset + x
+                if charIndex < textVRAM.count {
+                    let charCode = textVRAM[charIndex]
+                    
+                    // 描画位置を計算
+                    let posX = x * fontWidth
+                    let posY = y * fontHeight
+                    
+                    // 適用すべきアトリビュートを探す
+                    var currentColor: UInt32 = 0xFFFFFFFF  // デフォルトは白
+                    var currentDecoration: PC88Decoration = .normal
+                    var hasUnderline = false
+                    var hasUpperline = false
+                    
+                    for attr in attributes.reversed() {
+                        if x >= attr.position {
+                            if attr.decoration != .normal {
+                                currentDecoration = attr.decoration
+                                hasUnderline = attr.underline
+                                hasUpperline = attr.upperline
+                            } else {
+                                currentColor = attr.color
+                            }
+                            break
+                        }
+                    }
+                    
+                    // セミグラフィックモードの場合の描画処理
+                    if lineMode == .semiGraphics {
+                        // セミグラフィックモードの描画処理を実装予定
+                        // ここでは簡易的な実装として、文字コードをそのままパターンとして使用
+                        
+                        // 4x2のセミグラフィックブロックを描画
+                        for blockY in 0..<2 {
+                            for blockX in 0..<4 {
+                                let bitPos = blockY * 4 + blockX
+                                let isOn = (charCode & (1 << bitPos)) != 0
+                                
+                                if isOn {
+                                    // セミグラフィックブロックを描画
+                                    context.setFillColor(CGColor(
+                                        red: CGFloat((currentColor >> 24) & 0xFF) / 255.0,
+                                        green: CGFloat((currentColor >> 16) & 0xFF) / 255.0,
+                                        blue: CGFloat((currentColor >> 8) & 0xFF) / 255.0,
+                                        alpha: CGFloat(currentColor & 0xFF) / 255.0
+                                    ))
+                                    
+                                    let blockWidth = fontWidth / 4
+                                    let blockHeight = fontHeight / 2
+                                    context.fill(CGRect(
+                                        x: posX + blockX * blockWidth,
+                                        y: posY + blockY * blockHeight,
+                                        width: blockWidth,
+                                        height: blockHeight
+                                    ))
+                                }
+                            }
+                        }
+                    } else {
+                        // 文字モードの描画処理
+                        
+                        // 装飾に基づいて描画を制御
+                        switch currentDecoration {
+                        case .normal:
+                            // 通常描画
+                            drawCharacter(context: context, charCode: charCode, x: posX, y: posY, color: currentColor)
+                            
+                        case .secret, .secretAlt:
+                            // 非表示（何も描画しない）
+                            break
+                            
+                        case .blink:
+                            // 点滅（実装簡略化のため、ここでは常に表示）
+                            drawCharacter(context: context, charCode: charCode, x: posX, y: posY, color: currentColor)
+                            
+                        case .reverse, .reverseSecret, .reverseBlink:
+                            // 反転表示
+                            // 背景を前景色で描画
+                            context.setFillColor(CGColor(
+                                red: CGFloat((currentColor >> 24) & 0xFF) / 255.0,
+                                green: CGFloat((currentColor >> 16) & 0xFF) / 255.0,
+                                blue: CGFloat((currentColor >> 8) & 0xFF) / 255.0,
+                                alpha: CGFloat(currentColor & 0xFF) / 255.0
+                            ))
+                            context.fill(CGRect(x: posX, y: posY, width: fontWidth, height: fontHeight))
+                            
+                            // 文字を黒で描画（反転）
+                            if currentDecoration != .reverseSecret {
+                                drawCharacter(context: context, charCode: charCode, x: posX, y: posY, color: 0x000000FF)
+                            }
+                        }
+                        
+                        // アンダーラインを描画
+                        if hasUnderline {
+                            context.setFillColor(CGColor(
+                                red: CGFloat((currentColor >> 24) & 0xFF) / 255.0,
+                                green: CGFloat((currentColor >> 16) & 0xFF) / 255.0,
+                                blue: CGFloat((currentColor >> 8) & 0xFF) / 255.0,
+                                alpha: CGFloat(currentColor & 0xFF) / 255.0
+                            ))
+                            context.fill(CGRect(x: posX, y: posY + fontHeight - 1, width: fontWidth, height: 1))
+                        }
+                        
+                        // アッパーラインを描画
+                        if hasUpperline {
+                            context.setFillColor(CGColor(
+                                red: CGFloat((currentColor >> 24) & 0xFF) / 255.0,
+                                green: CGFloat((currentColor >> 16) & 0xFF) / 255.0,
+                                blue: CGFloat((currentColor >> 8) & 0xFF) / 255.0,
+                                alpha: CGFloat(currentColor & 0xFF) / 255.0
+                            ))
+                            context.fill(CGRect(x: posX, y: posY, width: fontWidth, height: 1))
                         }
                     }
                 }
@@ -272,9 +942,269 @@ class PC88Screen: ScreenRendering {
         }
     }
     
+    /// 文字を描画
+    private func drawCharacter(context: CGContext, charCode: UInt8, x: Int, y: Int, color: UInt32) {
+        // フォントデータのオフセットを計算
+        let fontOffset = Int(charCode) * (is20LineMode ? fontHeight20 : fontHeight25)
+        let fontHeight = is20LineMode ? fontHeight20 : fontHeight25
+        
+        // フォントをピクセル単位で描画
+        context.setFillColor(CGColor(
+            red: CGFloat((color >> 24) & 0xFF) / 255.0,
+            green: CGFloat((color >> 16) & 0xFF) / 255.0,
+            blue: CGFloat((color >> 8) & 0xFF) / 255.0,
+            alpha: CGFloat(color & 0xFF) / 255.0
+        ))
+        
+        for fontY in 0..<fontHeight {
+            if fontOffset + fontY < fontData.count {
+                let fontLine = fontData[fontOffset + fontY]
+                
+                for fontX in 0..<fontWidth {
+                    if (fontLine & (0x80 >> fontX)) != 0 {
+                        // ピクセルを描画
+                        context.fill(CGRect(x: x + fontX, y: y + fontY, width: 1, height: 1))
+                    }
+                }
+            }
+        }
+    }
+        
+    /// グラフィック画面の描画
+    private func renderGraphicsScreen(context: CGContext) {
+        // グラフィックモードの描画処理
+        
+        // 描画領域のサイズを設定
+        let width = graphicsWidth
+        let height = is400LineMode ? graphicsHeight400 : graphicsHeight200
+        
+        // 各プレーンのデータを描画
+        for y in 0..<height {
+            for x in 0..<width {
+                // ピクセル位置に対応するバイトとビット位置を計算
+                let bytePos = (y * width + x) / 8
+                let bitPos = 7 - (x % 8)  // MSBが左端
+                
+                // 各プレーンのビット値を取得
+                var r = false
+                var g = false
+                var b = false
+                
+                if bytePos < graphicsVRAM[0].count {
+                    r = (graphicsVRAM[0][bytePos] & (1 << bitPos)) != 0
+                    g = (graphicsVRAM[1][bytePos] & (1 << bitPos)) != 0
+                    b = (graphicsVRAM[2][bytePos] & (1 << bitPos)) != 0
+                }
+                
+                // ピクセルの色を決定
+                if r || g || b {
+                    var colorIndex: UInt8 = 0
+                    if r { colorIndex |= 0x01 }
+                    if g { colorIndex |= 0x02 }
+                    if b { colorIndex |= 0x04 }
+                    
+                    // パレットから色を取得
+                    let color = isAnalogMode ? analogPalette[Int(colorIndex)] : digitalPalette[Int(colorIndex)]
+                    
+                    // ピクセルを描画
+                    context.setFillColor(CGColor(
+                        red: CGFloat((color >> 24) & 0xFF) / 255.0,
+                        green: CGFloat((color >> 16) & 0xFF) / 255.0,
+                        blue: CGFloat((color >> 8) & 0xFF) / 255.0,
+                        alpha: CGFloat(color & 0xFF) / 255.0
+                    ))
+                    
+                    // 400ラインモードでない場合は、Y方向に2倍の高さで描画
+                    let pixelHeight = is400LineMode ? 1 : 2
+                    context.fill(CGRect(x: x, y: y * pixelHeight, width: 1, height: pixelHeight))
+                }
+            }
+        }
+    }
+    
+    // PC88FontLoaderからフォントデータを取得
+    private let fontLoader = PC88FontLoader.shared
+    
+    /// テスト用に文字を表示するメソッド
+    private func displayTestChars(context: CGContext) {
+        // 「PC-88」と表示する
+        let testChars: [UInt8] = [0x50, 0x43, 0x2D, 0x38, 0x38]  // "PC-88"
+        
+        for (i, char) in testChars.enumerated() {
+            // 前景色と背景色を設定
+            let fgColor: UInt32 = 0xFFFFFFFF  // 白
+            let bgColor: UInt32 = 0x000000FF  // 黒
+            
+            // 文字の位置を計算
+            let x = 10 + i * fontWidth
+            let y = 10
+            
+            // 背景を描画
+            context.setFillColor(CGColor(
+                red: CGFloat((bgColor >> 24) & 0xFF) / 255.0,
+                green: CGFloat((bgColor >> 16) & 0xFF) / 255.0,
+                blue: CGFloat((bgColor >> 8) & 0xFF) / 255.0,
+                alpha: CGFloat(bgColor & 0xFF) / 255.0
+            ))
+            context.fill(CGRect(x: x, y: y, width: fontWidth, height: fontHeight))
+            
+            // PC88FontLoaderからフォントデータを取得して描画
+            if let fontBitmap = fontLoader.getFontBitmap8x16(charCode: char) {
+                for cy in 0..<fontHeight {
+                    if cy < fontBitmap.count {
+                        let fontLine = fontBitmap[cy]
+                        for cx in 0..<fontWidth {
+                            if (fontLine & (0x80 >> cx)) != 0 {
+                                let pixelX = x + cx
+                                let pixelY = y + cy
+                                context.setFillColor(CGColor(
+                                    red: CGFloat((fgColor >> 24) & 0xFF) / 255.0,
+                                    green: CGFloat((fgColor >> 16) & 0xFF) / 255.0,
+                                    blue: CGFloat((fgColor >> 8) & 0xFF) / 255.0,
+                                    alpha: CGFloat(fgColor & 0xFF) / 255.0
+                                ))
+                                context.fill(CGRect(x: pixelX, y: pixelY, width: 1, height: 1))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - テスト画面表示
+    
+    /// シンプルなテスト画面を表示するメソッド
+    func displaySimpleTestScreen() {
+        // テキストVRAMに文字を書き込む
+        let message = "PC-88 Emulator for iOS"
+        for (i, char) in message.utf8.enumerated() {
+            if i < textWidth80 {
+                textVRAM[i] = char
+            }
+        }
+        
+        // テキスト属性を設定
+        setColorAttribute(line: 0, startColumn: 0, color: 1)  // 青
+        setColorAttribute(line: 0, startColumn: 5, color: 2)  // 緑
+        setDecorationAttribute(line: 0, startColumn: 14, decoration: .reverse)  // 反転
+        setDecorationAttribute(line: 0, startColumn: 20, decoration: .blink, underline: true)  // 点滅+アンダーライン
+    }
+    
+    // MARK: - デバッグ用メソッド
+    
+    /// デバッグ用にテキストVRAMの内容を表示する
+    func debugPrintTextVRAM() {
+        print("\n--- テキストVRAMの内容 ---")
+        let textWidth = is40ColumnMode ? textWidth40 : textWidth80
+        let textHeight = is20LineMode ? textHeight20 : textHeight25
+        
+        for y in 0..<textHeight {
+            var line = ""
+            for x in 0..<textWidth {
+                let index = y * textWidth + x
+                if index < textVRAM.count {
+                    let char = textVRAM[index]
+                    // 制御文字はピリオドに置き換えて表示
+                    if char < 0x20 || char >= 0x7F {
+                        line += "."
+                    } else {
+                        line += String(UnicodeScalar(char))
+                    }
+                }
+            }
+            print("\(y): \(line)")
+        }
+        print("------------------------\n")
+    }
+    
+    // MARK: - テキスト描画メソッド
+    
+    /// テキストVRAMの内容を描画するメソッド
+    private func drawTextVRAMContent(context: CGContext) {
+        // テキストの行数と桁数を設定
+        let textWidth = is40ColumnMode ? textWidth40 : textWidth80
+        let textHeight = is20LineMode ? textHeight20 : textHeight25
+        
+        for y in 0..<textHeight {
+            for x in 0..<textWidth {
+                let index = y * textWidth + x
+                if index < textVRAM.count && index < attributeVRAM.count {
+                    let char = textVRAM[index]
+                    let attr = attributeVRAM[index]
+                    
+                    // 文字の前景色と背景色を決定
+                    let fgColorIndex = (attr & 0x07)
+                    let bgColorIndex = (attr >> 3) & 0x07
+                    let fgColor = palette[Int(fgColorIndex)]
+                    let bgColor = palette[Int(bgColorIndex)]
+                    
+                    // 背景を描画
+                    let rectX = x * fontWidth
+                    let rectY = y * fontHeight + 50  // テスト文字の下に表示
+                    context.setFillColor(CGColor(
+                        red: CGFloat((bgColor >> 24) & 0xFF) / 255.0,
+                        green: CGFloat((bgColor >> 16) & 0xFF) / 255.0,
+                        blue: CGFloat((bgColor >> 8) & 0xFF) / 255.0,
+                        alpha: CGFloat(bgColor & 0xFF) / 255.0
+                    ))
+                    context.fill(CGRect(x: rectX, y: rectY, width: fontWidth, height: fontHeight))
+                    
+                    // PC88FontLoaderからフォントデータを取得して描画
+                    if let fontBitmap = fontLoader.getFontBitmap8x16(charCode: char) {
+                        for cy in 0..<fontHeight {
+                            if cy < fontBitmap.count {
+                                let fontLine = fontBitmap[cy]
+                                for cx in 0..<fontWidth {
+                                    if (fontLine & (0x80 >> cx)) != 0 {
+                                        let pixelX = rectX + cx
+                                        let pixelY = rectY + cy
+                                        context.setFillColor(CGColor(
+                                            red: CGFloat((fgColor >> 24) & 0xFF) / 255.0,
+                                            green: CGFloat((fgColor >> 16) & 0xFF) / 255.0,
+                                            blue: CGFloat((fgColor >> 8) & 0xFF) / 255.0,
+                                            alpha: CGFloat(fgColor & 0xFF) / 255.0
+                                        ))
+                                        context.fill(CGRect(x: pixelX, y: pixelY, width: 1, height: 1))
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // フォントデータが取得できない場合は内部フォントデータを使用
+                        let fontOffset = Int(char) * fontHeight
+                        if fontOffset + fontHeight <= fontData.count {
+                            for cy in 0..<fontHeight {
+                                let fontLine = fontData[fontOffset + cy]
+                                for cx in 0..<fontWidth {
+                                    if (fontLine & (0x80 >> cx)) != 0 {
+                                        let pixelX = rectX + cx
+                                        let pixelY = rectY + cy
+                                        context.setFillColor(CGColor(
+                                            red: CGFloat((fgColor >> 24) & 0xFF) / 255.0,
+                                            green: CGFloat((fgColor >> 16) & 0xFF) / 255.0,
+                                            blue: CGFloat((fgColor >> 8) & 0xFF) / 255.0,
+                                            alpha: CGFloat(fgColor & 0xFF) / 255.0
+                                        ))
+                                        context.fill(CGRect(x: pixelX, y: pixelY, width: 1, height: 1))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 保存した状態を復元
+        context.restoreGState()
+    }
+    
     /// グラフィックモードの描画
     private func renderGraphicsMode(_ context: CGContext) {
-        for y in 0..<graphicsHeight {
+        let height = is400LineMode ? graphicsHeight400 : graphicsHeight200
+        
+        for y in 0..<height {
             for x in 0..<graphicsWidth {
                 // ピクセルの色を決定
                 let byteOffset = (y * graphicsWidth + x) / 8
@@ -303,5 +1233,95 @@ class PC88Screen: ScreenRendering {
     /// 画面の描画（EmulatorCoreManaging用）
     func renderScreen() -> CGImage? {
         return render()
+    }
+    
+    /// 指定された文字コードのフォントデータを取得
+    /// - Parameter charCode: 文字コード
+    /// - Returns: フォントデータ
+    func getFontData(charCode: UInt8) -> [UInt8] {
+        let fontOffset = Int(charCode) * fontHeight
+        
+        // フォントデータの境界チェック
+        if fontOffset + fontHeight <= fontData.count {
+            return Array(fontData[fontOffset..<fontOffset+fontHeight])
+        } else {
+            print("フォントデータの範囲外アクセス: 文字コード \(charCode), オフセット \(fontOffset)")
+            return [UInt8](repeating: 0, count: fontHeight)
+        }
+    }
+    
+    /// テキストVRAMに文字列を書き込む
+    /// - Parameters:
+    ///   - text: 表示する文字列
+    ///   - x: X座標（文字単位）
+    ///   - y: Y座標（文字単位）
+    ///   - attribute: 属性（色など）
+    func writeText(_ text: String, x: Int, y: Int, attribute: UInt8 = 0x07) {
+        // 現在のテキスト幅と高さを取得
+        let textWidth = is40ColumnMode ? textWidth40 : textWidth80
+        let textHeight = is20LineMode ? textHeight20 : textHeight25
+        
+        // 座標のチェック
+        guard x >= 0 && x < textWidth && y >= 0 && y < textHeight else {
+            print("テキスト表示範囲外: (\(x), \(y))")
+            return
+        }
+        
+        var currentX = x
+        for char in text {
+            if currentX >= textWidth {
+                break
+            }
+            
+            let index = y * textWidth + currentX
+            if index < textVRAM.count {
+                // ASCIIコードに変換して書き込む
+                if let asciiValue = char.asciiValue {
+                    textVRAM[index] = asciiValue
+                    attributeVRAM[index] = attribute
+                    print("文字設定: '\(char)' (\(asciiValue)) at (\(currentX), \(y))")
+                } else {
+                    // ASCII以外の文字はスペースに
+                    textVRAM[index] = 0x20 // スペース
+                    attributeVRAM[index] = attribute
+                }
+            }
+            
+            currentX += 1
+        }
+    }
+    
+    /// 詳細なテスト表示用のスタブプログラム
+    func displayDetailedTestScreen() {
+        let textWidth = is40ColumnMode ? textWidth40 : textWidth80
+        let textHeight = is20LineMode ? textHeight20 : textHeight25
+        
+        // 画面をクリア
+        for i in 0..<min(textWidth * textHeight, textVRAM.count) {
+            textVRAM[i] = 0x20 // スペース
+            if i < attributeVRAM.count {
+                attributeVRAM[i] = 0x07 // 白地に黒文字
+            }
+        }
+        
+        // タイトルを表示 (中央上部)
+        writeText("PC-88 Emulator", x: 30, y: 1, attribute: 0x17) // 高輝度白地に黒文字
+        
+        // メニューライン (左上)
+        writeText("1:BASIC 2:DISK 3:MONITOR", x: 0, y: 3, attribute: 0x07)
+        
+        // ステータス表示 (左上)
+        writeText("PC-88 READY", x: 0, y: 5, attribute: 0x02) // 緑色
+        
+        // テストパターン (画面中央)
+        for i in 0..<10 {
+            writeText(String(format: "Line %02d: ABCDEFGHIJKLMNOPQRSTUVWXYZ", i), x: 2, y: 7 + i, attribute: UInt8(i % 7 + 1))
+        }
+        
+        // カーソル位置に文字を表示
+        writeText("_", x: 10, y: 5, attribute: 0x02) // カーソル
+        
+        // サンプル文字を表示 (右上)
+        writeText("88-Cb", x: 70, y: 0, attribute: 0x04) // 赤色
     }
 }

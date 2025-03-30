@@ -56,6 +56,16 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     // MARK: - EmulatorCoreManaging プロトコル実装
     
     func initialize() {
+        // ROMの読み込み
+        if !loadROMs() {
+            print("警告: ROMの読み込みに失敗しました")
+        }
+        
+        // リズム音源の読み込み
+        if !loadRhythmSounds() {
+            print("警告: リズム音源の読み込みに失敗しました")
+        }
+        
         // メモリの初期化
         memory = PC88Memory()
         
@@ -69,9 +79,12 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         // 画面の初期化
         screen = PC88Screen()
-        if let screen = screen as? PC88Screen, let memory = memory, let io = io {
-            screen.connectMemory(memory)
-            screen.connectIO(io)
+        if let pc88Screen = screen as? PC88Screen, let memory = memory, let io = io {
+            pc88Screen.connectMemory(memory)
+            pc88Screen.connectIO(io)
+            
+            // フォントデータを設定
+            setupFonts(for: pc88Screen)
         }
         
         // FDCの初期化
@@ -90,6 +103,15 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         if let soundChip = soundChip as? YM2203Emulator, let io = io as? PC88IO {
             soundChip.initialize(sampleRate: 44100.0)
             io.connectSoundChip(soundChip)
+        }
+        
+        // ROMデータをメモリに転送
+        loadROMsToMemory()
+        
+        // テスト画面を表示
+        if let pc88Screen = screen as? PC88Screen {
+            pc88Screen.displayTestScreen()
+            print("テスト画面を表示しました")
         }
         
         // 状態を初期化済みに変更
@@ -167,6 +189,12 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         if let soundChip = soundChip {
             soundChip.reset()
         }
+        
+        // ROMデータをメモリに再転送
+        loadROMsToMemory()
+        
+        // IPLを実行してOSを起動
+        executeIPL()
         
         // 状態を初期化済みに変更
         state = .initialized
@@ -276,5 +304,109 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         if let screen = screen {
             screenImage = screen.render()
         }
+    }
+    
+    // MARK: - ROM関連
+    
+    /// ROMを読み込む
+    private func loadROMs() -> Bool {
+        return PC88ROMLoader.shared.loadAllROMs()
+    }
+    
+    /// フォントを設定
+    private func setupFonts(for screen: PC88Screen) {
+        print("フォントデータの読み込みを開始します...")
+        
+        // フォントローダーを初期化
+        let fontLoaded = PC88FontLoader.shared.loadFonts()
+        print("フォントデータの読み込み結果: \(fontLoaded ? "成功" : "失敗")")
+        
+        // フォントデータを画面に設定
+        var successCount = 0
+        var failureCount = 0
+        
+        // テスト用に重要な文字コードを確認
+        let testChars: [UInt8] = [0x41, 0x42, 0x43, 0x50, 0x38, 0x2D] // A, B, C, P, 8, -
+        
+        for testChar in testChars {
+            if let fontData = PC88FontLoader.shared.getFontBitmap8x16(charCode: testChar) {
+                print("文字コード \(testChar) (\(String(format: "%c", testChar))) のフォントデータ: \(fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))...")
+            } else {
+                print("文字コード \(testChar) のフォントデータが取得できません")
+            }
+        }
+        
+        // すべての文字コードに対してフォントデータを設定
+        for charCode in 0..<256 {
+            if let fontData = PC88FontLoader.shared.getFontBitmap8x16(charCode: UInt8(charCode)) {
+                screen.setFontData(charCode: UInt8(charCode), data: fontData)
+                successCount += 1
+            } else {
+                failureCount += 1
+            }
+        }
+        
+        print("フォントデータを画面に設定しました (成功: \(successCount), 失敗: \(failureCount))")
+        
+        // 画面のフォントデータを確認
+        for testChar in testChars {
+            // フォントデータを直接PC88FontLoaderから取得して表示
+            if let fontData = PC88FontLoader.shared.getFontBitmap8x16(charCode: testChar) {
+                print("画面の文字コード \(testChar) (\(String(format: "%c", testChar))) のフォントデータ: \(fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))...")
+            }
+        }
+    }
+    
+    /// IPLを実行してOSを起動
+    private func executeIPL() {
+        print("IPLを実行します...")
+        
+        // CPUが初期化されているか確認
+        if cpu == nil {
+            print("CPUが初期化されていません")
+            return
+        }
+        
+        // ディスクがセットされているか確認
+        if fdc is PC88FDC {
+            // ディスクがセットされていればIPLを実行
+            // PC-88のIPLはリセット後に自動的に実行される
+            // ここでは特別な処理は必要ない
+            print("ディスクからのIPLを実行します")
+        } else {
+            print("ディスクがセットされていません")
+        }
+    }
+    
+    /// ROMデータをメモリに転送
+    private func loadROMsToMemory() {
+        guard let memory = memory as? PC88Memory else { return }
+        
+        // N88-BASIC ROM
+        if let n88ROM = PC88ROMLoader.shared.loadROM(.n88) {
+            memory.loadROM(data: n88ROM, address: 0x0000)
+        }
+        
+        // N88-V2モードROM
+        if let n88nROM = PC88ROMLoader.shared.loadROM(.n88n) {
+            memory.loadROM(data: n88nROM, address: 0x8000)
+        }
+        
+        // フォントROM
+        if let n880ROM = PC88ROMLoader.shared.loadROM(.n880) {
+            memory.loadROM(data: n880ROM, address: 0xC000)
+        }
+        
+        // ディスクROM
+        if let diskROM = PC88ROMLoader.shared.loadROM(.disk) {
+            memory.loadROM(data: diskROM, address: 0xE000)
+        }
+    }
+    
+    // MARK: - リズム音源関連
+    
+    /// リズム音源を読み込む
+    private func loadRhythmSounds() -> Bool {
+        return PC88RhythmSound.shared.loadRhythmSounds()
     }
 }

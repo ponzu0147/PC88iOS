@@ -337,7 +337,8 @@ class PC88FDC: FDCEmulating {
         let cylinder = Int(dataBuffer[1])
         let _ = Int(dataBuffer[2]) // head2
         let sector = Int(dataBuffer[3])
-        let sizeCode = Int(dataBuffer[4])
+        // sizeCodeは後で使用するかもしれないが、現在は使用していないため_に変更
+        let _ = Int(dataBuffer[4]) // sizeCode
         let _ = Int(dataBuffer[5]) // endSector
         let _ = Int(dataBuffer[6]) // gapLength
         let _ = Int(dataBuffer[7]) // dataLength

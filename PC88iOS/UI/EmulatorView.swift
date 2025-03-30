@@ -122,6 +122,24 @@ class EmulatorViewInternalModel: ObservableObject {
         if let core = emulatorCore {
             if core.loadDiskImage(url: url, drive: drive) {
                 diskImagePath = url.lastPathComponent
+                print("ディスクイメージをロードしました: \(url.lastPathComponent)")
+                
+                // ディスクイメージがロードされたら自動的にリセットを行う
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    print("エミュレータをリセットします...")
+                    
+                    // 一時停止中なら再開
+                    if self?.isPaused == true {
+                        self?.emulatorCore?.resume()
+                        self?.isPaused = false
+                    }
+                    
+                    // リセット実行
+                    self?.emulatorCore?.reset()
+                    
+                    // リセット後にメッセージを表示
+                    print("IPLを実行してOSを起動します...")
+                }
             } else {
                 print("ディスクイメージのロードに失敗しました: \(url.path)")
             }

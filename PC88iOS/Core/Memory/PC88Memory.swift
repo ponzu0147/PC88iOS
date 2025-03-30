@@ -224,9 +224,37 @@ class PC88Memory: MemoryAccessing {
         return graphicVRAM[plane]
     }
     
+    // MARK: - パブリックメソッド
+    
+    /// ROMデータをメモリに読み込む
+    /// - Parameters:
+    ///   - data: ROMデータ
+    ///   - address: 読み込み先のアドレス
+    func loadROM(data: Data, address: UInt16) {
+        let addr = Int(address)
+        let size = data.count
+        
+        // アドレス範囲のチェック
+        guard addr + size <= memorySize else {
+            print("ROMデータがメモリ範囲を超えています")
+            return
+        }
+        
+        // ROMデータをメモリにコピー
+        for i in 0..<size {
+            if addr + i < romSize {
+                // ROM領域の場合は、romDataにもコピー
+                romData[addr + i] = data[i]
+            }
+            mainMemory[addr + i] = data[i]
+        }
+        
+        print("ROMを読み込みました: アドレス 0x\(String(format: "%04X", address)), サイズ \(size) バイト")
+    }
+    
     // MARK: - プライベートメソッド
     
-    /// ROMデータをロード
+    /// デフォルトのROMデータをロード
     private func loadROM() {
         // 実際の実装では、リソースからROMデータをロードする
         // ここでは仮のROMデータを生成

@@ -63,7 +63,7 @@ class Z80CPU: CPUExecuting {
         
         // 命令フェッチ
         let opcode = memory.readByte(at: registers.pc)
-        registers.pc &+= 1
+        registers.pc = registers.pc &+ 1 // 安全な加算を使用
         
         // 命令実行
         return executeInstruction(opcode)
@@ -71,13 +71,31 @@ class Z80CPU: CPUExecuting {
     
     /// 指定サイクル数実行
     func executeCycles(_ cycles: Int) -> Int {
+        // サイクル数が負の場合は0を返す
+        guard cycles > 0 else { return 0 }
+        
         var remainingCycles = cycles
         var executedCycles = 0
         
-        while remainingCycles > 0 {
+        // 無限ループを防止するためのカウンタ
+        var safetyCounter = 0
+        let maxIterations = 1_000_000 // 安全な上限値
+        
+        while remainingCycles > 0 && safetyCounter < maxIterations {
             let cyclesUsed = executeStep()
-            executedCycles += cyclesUsed
-            remainingCycles -= cyclesUsed
+            // 安全な整数演算
+            executedCycles = executedCycles &+ cyclesUsed
+            
+            // cyclesUsedが0以下の場合は最小値を1にする
+            let cyclesDeduct = cyclesUsed > 0 ? cyclesUsed : 1
+            remainingCycles = remainingCycles &- cyclesDeduct
+            
+            safetyCounter += 1
+        }
+        
+        // 安全カウンタが上限に達した場合は警告を出す
+        if safetyCounter >= maxIterations {
+            print("警告: CPU実行の安全上限に達しました")
         }
         
         return executedCycles
@@ -93,6 +111,11 @@ class Z80CPU: CPUExecuting {
         interruptEnabled = enabled
     }
     
+    /// 割り込み禁止
+    func disableInterrupts() {
+        interruptEnabled = false
+    }
+    
     /// CPUをホルト状態にする
     func halt() {
         halted = true
@@ -103,6 +126,12 @@ class Z80CPU: CPUExecuting {
         return halted
     }
     
+    /// 相対ジャンプ
+    func jump(by offset: Int8) {
+        // PCにオフセットを加算
+        registers.pc = UInt16(Int(registers.pc) + Int(offset))
+    }
+    
     // MARK: - Private Methods
     
     /// 命令実行
@@ -110,9 +139,17 @@ class Z80CPU: CPUExecuting {
         // デコード
         let instruction = decoder.decode(opcode, memory: memory, pc: registers.pc)
         
+        // 未実装命令の場合は特別処理
+        if let unimplemented = instruction as? UnimplementedInstruction {
+            // 安全なPCの計算
+            let previousPC = registers.pc > 0 ? registers.pc - 1 : 0
+            print("警告: 未実装の命令 0x\(String(opcode, radix: 16, uppercase: true)) at PC=0x\(String(previousPC, radix: 16, uppercase: true))")
+            // PCを進めて次の命令に進む
+            return unimplemented.cycles
+        }
+        
         // 実行
         let cycles = instruction.execute(cpu: self, registers: &registers, memory: memory, io: io)
-        
         return cycles
     }
     
@@ -141,8 +178,28 @@ class Z80CPU: CPUExecuting {
     }
     
     /// スタックにワード値をプッシュ
+    func pushWord(_ value: UInt16, to registers: inout Z80Registers, memory: MemoryAccessing) {
+        // 安全な減算処理
+        if registers.sp >= 2 {
+            registers.sp = registers.sp &- 2
+        } else {
+            // オーバーフローを防止するため、スタックポインタをメモリの最上部に設定
+            registers.sp = 0xFFFF
+            print("警告: スタックポインタがオーバーフローしました")
+        }
+        memory.writeWord(value, at: registers.sp)
+    }
+    
+    /// スタックにワード値をプッシュ (内部用)
     private func pushWord(_ value: UInt16) {
-        registers.sp &-= 2
+        // 安全な減算処理
+        if registers.sp >= 2 {
+            registers.sp = registers.sp &- 2
+        } else {
+            // オーバーフローを防止するため、スタックポインタをメモリの最上部に設定
+            registers.sp = 0xFFFF
+            print("警告: スタックポインタがオーバーフローしました")
+        }
         memory.writeWord(value, at: registers.sp)
     }
 }
