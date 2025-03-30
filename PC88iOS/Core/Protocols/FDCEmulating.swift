@@ -27,6 +27,9 @@ protocol FDCEmulating {
     /// ディスクイメージをセット
     func setDiskImage(_ disk: DiskImageAccessing?, drive: Int)
     
+    /// URLからディスクイメージをロード
+    func loadDiskImage(url: URL, drive: Int) -> Bool
+    
     /// FDCの更新処理
     func update(cycles: Int)
     

@@ -86,6 +86,12 @@ class PC88FDC: FDCEmulating {
     
     // MARK: - 公開メソッド
     
+    /// FDCの初期化
+    func initialize() {
+        // 初期化処理
+        reset()
+    }
+    
     /// I/Oアクセスを接続
     func connectIO(_ io: IOAccessing) {
         self.io = io
@@ -95,9 +101,9 @@ class PC88FDC: FDCEmulating {
     func loadDiskImage(url: URL, drive: Int) -> Bool {
         guard drive >= 0 && drive < 2 else { return false }
         
-        // D88ディスクイメージを作成
-        let diskImage = D88DiskImage()
-        if diskImage.load(from: url) {
+        // ディスクイメージをロード
+        let diskImage = PC88DiskImage()
+        if diskImage.loadDiskImage(from: url) {
             diskImages[drive] = diskImage
             return true
         }
@@ -105,11 +111,13 @@ class PC88FDC: FDCEmulating {
         return false
     }
     
-    // MARK: - FDCEmulating プロトコル実装
-    
-    func initialize() {
-        reset()
+    /// ディスクイメージをセット
+    func setDiskImage(_ disk: DiskImageAccessing?, drive: Int) {
+        guard drive >= 0 && drive < diskImages.count else { return }
+        diskImages[drive] = disk
     }
+    
+
     
     func sendCommand(_ command: UInt8) {
         // コマンドフェーズの開始
@@ -235,10 +243,7 @@ class PC88FDC: FDCEmulating {
         return 0
     }
     
-    func setDiskImage(_ disk: DiskImageAccessing?, drive: Int) {
-        guard drive >= 0 && drive < 2 else { return }
-        diskImages[drive] = disk
-    }
+
     
     func update(cycles: Int) {
         // FDCの定期更新処理
@@ -282,12 +287,12 @@ class PC88FDC: FDCEmulating {
         let drive = Int(dataBuffer[0] & 0x03)
         let head = Int((dataBuffer[0] >> 2) & 0x01)
         let cylinder = Int(dataBuffer[1])
-        let head2 = Int(dataBuffer[2])
+        let _ = Int(dataBuffer[2]) // head2
         let sector = Int(dataBuffer[3])
         let sizeCode = Int(dataBuffer[4])
-        let endSector = Int(dataBuffer[5])
-        let gapLength = Int(dataBuffer[6])
-        let dataLength = Int(dataBuffer[7])
+        let _ = Int(dataBuffer[5]) // endSector
+        let _ = Int(dataBuffer[6]) // gapLength
+        let _ = Int(dataBuffer[7]) // dataLength
         
         // 現在の状態を更新
         currentDrive = drive
@@ -330,12 +335,12 @@ class PC88FDC: FDCEmulating {
         let drive = Int(dataBuffer[0] & 0x03)
         let head = Int((dataBuffer[0] >> 2) & 0x01)
         let cylinder = Int(dataBuffer[1])
-        let head2 = Int(dataBuffer[2])
+        let _ = Int(dataBuffer[2]) // head2
         let sector = Int(dataBuffer[3])
         let sizeCode = Int(dataBuffer[4])
-        let endSector = Int(dataBuffer[5])
-        let gapLength = Int(dataBuffer[6])
-        let dataLength = Int(dataBuffer[7])
+        let _ = Int(dataBuffer[5]) // endSector
+        let _ = Int(dataBuffer[6]) // gapLength
+        let _ = Int(dataBuffer[7]) // dataLength
         
         // 現在の状態を更新
         currentDrive = drive
@@ -344,7 +349,7 @@ class PC88FDC: FDCEmulating {
         currentSector[drive] = sector
         
         // ディスクイメージが存在するか確認
-        guard let disk = diskImages[drive] else {
+        guard diskImages[drive] != nil else {
             // ディスクなしエラー
             resultBuffer = [0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
             statusRegister = FDCStatus.dataRequest | FDCStatus.dataTransferComplete
@@ -397,17 +402,17 @@ class PC88FDC: FDCEmulating {
         // パラメータの取得
         let drive = Int(dataBuffer[0] & 0x03)
         let head = Int((dataBuffer[0] >> 2) & 0x01)
-        let sizeCode = Int(dataBuffer[1])
-        let sectorsPerTrack = Int(dataBuffer[2])
-        let gapLength = Int(dataBuffer[3])
-        let fillByte = dataBuffer[4]
+        let _ = Int(dataBuffer[1]) // sizeCode
+        let _ = Int(dataBuffer[2]) // sectorsPerTrack
+        let _ = Int(dataBuffer[3]) // gapLength
+        let _ = dataBuffer[4] // fillByte
         
         // 現在の状態を更新
         currentDrive = drive
         currentHead[drive] = head
         
         // ディスクイメージが存在するか確認
-        guard let disk = diskImages[drive] else {
+        guard diskImages[drive] != nil else {
             // ディスクなしエラー
             resultBuffer = [0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
             statusRegister = FDCStatus.dataRequest | FDCStatus.dataTransferComplete
@@ -454,7 +459,7 @@ class PC88FDC: FDCEmulating {
         
         // パラメータの取得
         let drive = Int(dataBuffer[0] & 0x03)
-        let head = Int((dataBuffer[0] >> 2) & 0x01)
+        let _ = Int((dataBuffer[0] >> 2) & 0x01) // head
         
         // ドライブ状態を返す
         var status: UInt8 = 0

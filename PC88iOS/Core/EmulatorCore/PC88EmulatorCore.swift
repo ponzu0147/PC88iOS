@@ -8,6 +8,7 @@
 import Foundation
 import CoreGraphics
 import UIKit
+import SwiftUI
 
 /// PC-88エミュレータのコア実装
 class PC88EmulatorCore: EmulatorCoreManaging {
@@ -171,9 +172,28 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         state = .initialized
     }
     
+    // MARK: - EmulatorCoreManagingプロトコルの実装
+    
+    /// ディスクイメージのロード
     func loadDiskImage(url: URL, drive: Int) -> Bool {
-        guard let fdc = fdc as? PC88FDC else { return false }
+        guard drive >= 0 && drive < 2 else { return false }
+        guard let fdc = fdc else { return false }
         return fdc.loadDiskImage(url: url, drive: drive)
+    }
+    
+    /// 画面の取得
+    func getScreen() -> CGImage? {
+        return screenImage
+    }
+    
+    /// エミュレーション速度の設定
+    func setEmulationSpeed(_ speed: Float) {
+        emulationSpeed = max(0.1, min(10.0, speed))
+    }
+    
+    /// 現在のエミュレータの状態を取得
+    func getState() -> EmulatorState {
+        return state
     }
     
     func handleInputEvent(_ event: InputEvent) {
@@ -220,17 +240,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         }
     }
     
-    func getScreen() -> CGImage? {
-        return screenImage
-    }
-    
-    func setEmulationSpeed(_ speed: Float) {
-        emulationSpeed = max(0.1, min(10.0, speed))
-    }
-    
-    func getState() -> EmulatorState {
-        return state
-    }
+
     
     // MARK: - プライベートメソッド
     
@@ -248,7 +258,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             
             // 1フレーム分のCPUサイクルを実行
             let adjustedCycles = Int(Float(cyclesPerFrame) * emulationSpeed)
-            cpu?.executeCycles(adjustedCycles)
+            _ = cpu?.executeCycles(adjustedCycles)
             
             // フレームレート調整
             let targetFrameTime = 1.0 / (60.0 * Double(emulationSpeed))

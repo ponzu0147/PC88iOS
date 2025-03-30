@@ -7,10 +7,13 @@
 
 import SwiftUI
 import CoreGraphics
+import Foundation
+
+// 必要なクラスをインポート
 
 /// エミュレータのメイン画面
 struct EmulatorView: View {
-    @StateObject private var viewModel = EmulatorViewModel()
+    @StateObject private var viewModel = EmulatorViewInternalModel()
     
     var body: some View {
         VStack {
@@ -57,23 +60,31 @@ struct EmulatorView: View {
         .onDisappear {
             viewModel.stopEmulator()
         }
+        .sheet(isPresented: $viewModel.showDocumentPicker) {
+            // ドキュメントピッカーを表示
+            DocumentPicker { url in
+                // 選択されたディスクイメージをロード
+                viewModel.loadDiskImageFromDevice(url: url, drive: 0)
+            }
+        }
     }
 }
 
-/// エミュレータのビューモデル
-class EmulatorViewModel: ObservableObject {
+/// エミュレータのビュー内部モデル
+class EmulatorViewInternalModel: ObservableObject {
     @Published var screenImage: CGImage?
     @Published var isPaused: Bool = false
+    @Published var showDocumentPicker = false
+    @Published var diskImagePath: String = ""
     
     private var emulatorCore: EmulatorCoreManaging?
     private var timer: Timer?
     
     func startEmulator() {
         // エミュレータコアの初期化
-        // 実際の実装では、依存性注入などを使用してエミュレータコアを取得
-        // emulatorCore = EmulatorCoreFactory.createEmulatorCore()
-        // emulatorCore?.initialize()
-        // emulatorCore?.start()
+        emulatorCore = PC88EmulatorCore()
+        emulatorCore?.initialize()
+        emulatorCore?.start()
         
         // 画面更新タイマーの開始
         timer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
@@ -101,8 +112,20 @@ class EmulatorViewModel: ObservableObject {
     }
     
     func loadDisk() {
-        // ディスク選択UIを表示
-        // 実際の実装では、ファイルピッカーを表示してディスクイメージを選択
+        // ドキュメントピッカーを表示するためのフラグをセット
+        showDocumentPicker = true
+    }
+    
+    /// 端末からディスクイメージをロード
+    func loadDiskImageFromDevice(url: URL, drive: Int) {
+        // ディスクイメージのロードはエミュレータコアに委任
+        if let core = emulatorCore {
+            if core.loadDiskImage(url: url, drive: drive) {
+                diskImagePath = url.lastPathComponent
+            } else {
+                print("ディスクイメージのロードに失敗しました: \(url.path)")
+            }
+        }
     }
     
     func showKeyboard() {

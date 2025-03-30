@@ -28,9 +28,6 @@ protocol EmulatorCoreManaging {
     /// エミュレーションのリセット
     func reset()
     
-    /// ディスクイメージのロード
-    func loadDiskImage(url: URL, drive: Int) -> Bool
-    
     /// 入力イベントの処理
     func handleInputEvent(_ event: InputEvent)
     
@@ -42,4 +39,7 @@ protocol EmulatorCoreManaging {
     
     /// 現在のエミュレータの状態を取得
     func getState() -> EmulatorState
+    
+    /// ディスクイメージのロード
+    func loadDiskImage(url: URL, drive: Int) -> Bool
 }

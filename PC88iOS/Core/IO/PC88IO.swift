@@ -111,7 +111,8 @@ class PC88IO: IOAccessing {
     /// ジョイスティックボタン状態変更
     func joystickButtonChanged(_ button: JoystickButton, isPressed: Bool) {
         // ジョイスティックボタンの処理
-        let buttonValue = button.rawValue
+        // ボタン値は実際には使用しない
+        _ = button.rawValue
         // 実装は省略
     }
     
@@ -136,7 +137,8 @@ class PC88IO: IOAccessing {
     /// マウスボタン状態変更
     func mouseButtonChanged(_ button: MouseButton, isPressed: Bool) {
         // マウスボタンの処理
-        let buttonValue = button.rawValue
+        // ボタン値は実際には使用しない
+        _ = button.rawValue
         // 実装は省略
     }
     

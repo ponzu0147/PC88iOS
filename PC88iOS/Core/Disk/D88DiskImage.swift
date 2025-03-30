@@ -66,7 +66,8 @@ class D88DiskImage: DiskImageAccessing {
     
     func readSector(track: Int, side: Int, sectorID: SectorID) -> Data? {
         // トラック内のセクタを検索
-        let trackIndex = track * 2 + side
+        // トラックインデックスは実際には使用しない
+        _ = track * 2 + side
         
         for trackData in sectorData {
             if trackData.track == track && trackData.side == side {
@@ -90,7 +91,8 @@ class D88DiskImage: DiskImageAccessing {
         }
         
         // トラック内のセクタを検索して書き込み
-        let trackIndex = track * 2 + side
+        // トラックインデックスは実際には使用しない
+        _ = track * 2 + side
         
         for trackIndex in 0..<sectorData.count {
             let trackData = sectorData[trackIndex]
