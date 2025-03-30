@@ -147,6 +147,12 @@ class PC88Screen: ScreenRendering {
     /// アナログパレット（8色）
     private var analogPalette = [UInt32](repeating: 0, count: 8)
     
+    /// 点滅状態を管理するフラグ（trueの場合、点滅テキストを表示）
+    private var blinkState = true
+    
+    /// 点滅タイマー
+    private var blinkTimer: Timer?
+    
     /// 現在の画面モード
     private var currentScreenMode: ScreenMode = .text
     
@@ -160,7 +166,7 @@ class PC88Screen: ScreenRendering {
     private var is20LineMode = false
     
     /// カラーモードかどうか
-    private var isColorMode = true
+    var isColorMode = true
     
     /// 400ラインモードかどうか
     private var is400LineMode = false
@@ -213,7 +219,7 @@ class PC88Screen: ScreenRendering {
     
     /// パレットの初期化
     private func initializePalettes() {
-        // デジタルパレットの初期化（基本8色）
+        // デジタルパレットの初期化（基本8色）（RGBA形式: 0xRRGGBBAA）
         digitalPalette[0] = 0x000000FF  // 黒
         digitalPalette[1] = 0x0000FFFF  // 青
         digitalPalette[2] = 0x00FF00FF  // 緑
@@ -319,31 +325,47 @@ class PC88Screen: ScreenRendering {
     
     /// テスト画面を表示（デバッグ用）
     func displayTestScreen() {
-        // テキストVRAMに文字を書き込む
-        let message = "PC-88 Emulator for iOS"
-        for (i, char) in message.utf8.enumerated() {
-            if i < textWidth80 {
-                textVRAM[i] = char
-            }
+        // 新しいテストクラスを使用してテスト画面を表示
+        let screenTest = PC88ScreenTest(screen: self)
+        screenTest.displayTestScreen()
+    }
+    
+    /// 画面をクリア
+    private func clearScreen() {
+        // テキストVRAMをクリア
+        for i in 0..<textVRAM.count {
+            textVRAM[i] = 0x20 // スペース文字
         }
         
-        // 2行目にカラーテキストを設定
-        let colorMessage = "Color Text Test"
-        for (i, char) in colorMessage.utf8.enumerated() {
-            if i < textWidth80 {
-                textVRAM[textVRAMBytesPerLine + i] = char
+        // 全行を文字モードに設定
+        for line in 0..<textHeight25 {
+            setTextMode(.character, forLine: line)
+        }
+    }
+    
+    /// テキストを指定位置に書き込む
+    private func writeText(_ text: String, atLine line: Int, column: Int) {
+        guard line >= 0 && line < textHeight25 else { return }
+        guard column >= 0 && column < textWidth80 else { return }
+        
+        let offset = line * textVRAMBytesPerLine + column
+        
+        for (i, char) in text.utf8.enumerated() {
+            let pos = offset + i
+            if pos < textVRAM.count && i + column < textWidth80 {
+                textVRAM[pos] = char
             }
         }
+    }
+    
+    /// 1文字を指定位置に書き込む（テスト用）
+    func writeCharacter(_ char: UInt8, atLine line: Int, column: Int) {
+        guard line >= 0 && line < textHeight25 else { return }
+        guard column >= 0 && column < textWidth80 else { return }
         
-        // カラーテキストのアトリビュートを設定
-        setColorAttribute(line: 1, startColumn: 0, color: 0x48) // 赤
-        setColorAttribute(line: 1, startColumn: 6, color: 0x88) // 緑
-        setColorAttribute(line: 1, startColumn: 11, color: 0x28) // 青
-        
-        // 3行目にセミグラフィックを描画
-        setTextMode(.semiGraphics, forLine: 2)
-        for i in 0..<80 {
-            textVRAM[textVRAMBytesPerLine * 2 + i] = UInt8(i % 256)
+        let offset = line * textVRAMBytesPerLine + column
+        if offset < textVRAM.count {
+            textVRAM[offset] = char
         }
     }
     
@@ -392,7 +414,7 @@ class PC88Screen: ScreenRendering {
         // 既存のアトリビュート数をカウント
         var attributeCount = 0
         for i in stride(from: 0, to: maxAttributesPerLine * 2, by: 2) {
-            if attributeOffset + i >= textVRAM.count || textVRAM[attributeOffset + i] == 0 {
+            if attributeOffset + i >= textVRAM.count || attributeOffset + i + 1 >= textVRAM.count || textVRAM[attributeOffset + i] == 0 {
                 break
             }
             attributeCount += 1
@@ -400,10 +422,62 @@ class PC88Screen: ScreenRendering {
         
         // 最大アトリビュート数を超えていないか確認
         if attributeCount >= maxAttributesPerLine {
+            // 既存の色属性を探して更新する
+            for i in 0..<attributeCount {
+                let posIndex = attributeOffset + i * 2
+                let attrIndex = posIndex + 1
+                
+                if posIndex < textVRAM.count && attrIndex < textVRAM.count {
+                    let pos = Int(textVRAM[posIndex])
+                    let attr = textVRAM[attrIndex]
+                    
+                    if pos == startColumn && (attr & 0x08) != 0 {
+                        // 同じ位置に色属性がある場合は更新
+                        textVRAM[attrIndex] = 0x08 | (color & 0x07)
+                        return
+                    }
+                }
+            }
+            return // 更新できない場合は終了
+        }
+        
+        // 同じ位置に色属性が既にあるか確認
+        var existingColorAttrIndex = -1
+        for i in 0..<attributeCount {
+            let posIndex = attributeOffset + i * 2
+            let attrIndex = posIndex + 1
+            
+            if posIndex < textVRAM.count && attrIndex < textVRAM.count {
+                let pos = Int(textVRAM[posIndex])
+                let attr = textVRAM[attrIndex]
+                
+                if pos == startColumn && (attr & 0x08) != 0 {
+                    // 同じ位置に色属性がある
+                    existingColorAttrIndex = i
+                    break
+                }
+            }
+        }
+        
+        if existingColorAttrIndex != -1 {
+            // 既存の色属性を更新
+            let attrIndex = attributeOffset + existingColorAttrIndex * 2 + 1
+            
+            // PC-88のカラーコード（カラーモード色指定）: bit7=G, bit6=R, bit5=B
+            // bit3=1は色属性を示す
+            // 色コードをビットに変換
+            let r = (color & 0x04) != 0 ? 0x40 : 0
+            let g = (color & 0x02) != 0 ? 0x80 : 0
+            let b = (color & 0x01) != 0 ? 0x20 : 0
+            
+            // bit3=1（色属性）、bit7,6,5に色情報を設定
+            let newAttr = 0x08 | r | g | b
+            
+            textVRAM[attrIndex] = UInt8(newAttr)
             return
         }
         
-        // 適切な位置にアトリビュートを挿入
+        // 適切な位置に新しい色属性を挿入
         var insertIndex = -1
         for i in 0..<attributeCount {
             let positionIndex = attributeOffset + i * 2
@@ -428,20 +502,30 @@ class PC88Screen: ScreenRendering {
             let dstPosIndex = attributeOffset + (i + 1) * 2
             let dstAttrIndex = dstPosIndex + 1
             
-            if dstAttrIndex < textVRAM.count {
+            if dstAttrIndex < textVRAM.count && srcAttrIndex < textVRAM.count {
                 textVRAM[dstPosIndex] = textVRAM[srcPosIndex]
                 textVRAM[dstAttrIndex] = textVRAM[srcAttrIndex]
             }
         }
         
-        // 新しいアトリビュートを設定
+        // 新しい色属性を設定
         let newPosIndex = attributeOffset + insertIndex * 2
         let newAttrIndex = newPosIndex + 1
         
         if newAttrIndex < textVRAM.count {
             textVRAM[newPosIndex] = UInt8(startColumn)
+            
             // 色指定: bit3=1, RGB値を設定
-            textVRAM[newAttrIndex] = color | 0x08
+            // PC-88のカラーコード（カラーモード色指定）: bit7=G, bit6=R, bit5=B
+            // 色コードをビットに変換
+            let r = (color & 0x04) != 0 ? 0x40 : 0
+            let g = (color & 0x02) != 0 ? 0x80 : 0
+            let b = (color & 0x01) != 0 ? 0x20 : 0
+            
+            // bit3=1（色属性）、bit7,6,5に色情報を設定
+            let attr: UInt8 = UInt8(0x08 | r | g | b)
+            
+            textVRAM[newAttrIndex] = attr
         }
     }
     
@@ -456,7 +540,7 @@ class PC88Screen: ScreenRendering {
         // 既存のアトリビュート数をカウント
         var attributeCount = 0
         for i in stride(from: 0, to: maxAttributesPerLine * 2, by: 2) {
-            if attributeOffset + i >= textVRAM.count || textVRAM[attributeOffset + i] == 0 {
+            if attributeOffset + i >= textVRAM.count || attributeOffset + i + 1 >= textVRAM.count || textVRAM[attributeOffset + i] == 0 {
                 break
             }
             attributeCount += 1
@@ -464,10 +548,107 @@ class PC88Screen: ScreenRendering {
         
         // 最大アトリビュート数を超えていないか確認
         if attributeCount >= maxAttributesPerLine {
+            // 既存の装飾属性を探して更新する
+            for i in 0..<attributeCount {
+                let posIndex = attributeOffset + i * 2
+                let attrIndex = posIndex + 1
+                
+                if posIndex < textVRAM.count && attrIndex < textVRAM.count {
+                    let pos = Int(textVRAM[posIndex])
+                    let attr = textVRAM[attrIndex]
+                    
+                    if pos == startColumn && (attr & 0x08) == 0 {
+                        // 同じ位置に装飾属性がある場合は更新
+                        var newAttr: UInt8 = 0
+                        
+                        // 装飾タイプに基づいて属性を設定
+                        switch decoration {
+                        case .normal:
+                            newAttr = 0x00
+                        case .reverse:
+                            newAttr = 0x04 // bit2=1
+                        case .blink:
+                            newAttr = 0x02 // bit1=1
+                        case .reverseBlink:
+                            newAttr = 0x06 // bit2=1, bit1=1
+                        case .secret:
+                            newAttr = 0x01 // bit0=1
+                        case .secretAlt:
+                            newAttr = 0x03 // bit1=1, bit0=1
+                        case .reverseSecret:
+                            newAttr = 0x05 // bit2=1, bit0=1
+                        }
+                        
+                        // アンダーライン/アッパーライン設定
+                        if underline {
+                            newAttr |= 0x20
+                        }
+                        if upperline {
+                            newAttr |= 0x10
+                        }
+                        
+                        textVRAM[attrIndex] = newAttr
+                        return
+                    }
+                }
+            }
+            return // 更新できない場合は終了
+        }
+        
+        // 同じ位置に装飾属性が既にあるか確認
+        var existingDecorationAttrIndex = -1
+        for i in 0..<attributeCount {
+            let posIndex = attributeOffset + i * 2
+            let attrIndex = posIndex + 1
+            
+            if posIndex < textVRAM.count && attrIndex < textVRAM.count {
+                let pos = Int(textVRAM[posIndex])
+                let attr = textVRAM[attrIndex]
+                
+                if pos == startColumn && (attr & 0x08) == 0 {
+                    // 同じ位置に装飾属性がある (bit3=0は装飾属性)
+                    existingDecorationAttrIndex = i
+                    break
+                }
+            }
+        }
+        
+        if existingDecorationAttrIndex != -1 {
+            // 既存の装飾属性を更新
+            let attrIndex = attributeOffset + existingDecorationAttrIndex * 2 + 1
+            var attr: UInt8 = 0
+            
+            // 装飾タイプに基づいて属性を設定
+            switch decoration {
+            case .normal:
+                attr = 0x00
+            case .reverse:
+                attr = 0x04 // bit2=1
+            case .blink:
+                attr = 0x02 // bit1=1
+            case .reverseBlink:
+                attr = 0x06 // bit2=1, bit1=1
+            case .secret:
+                attr = 0x01 // bit0=1
+            case .secretAlt:
+                attr = 0x03 // bit1=1, bit0=1
+            case .reverseSecret:
+                attr = 0x05 // bit2=1, bit0=1
+            }
+            
+            // アンダーライン/アッパーライン設定
+            if underline {
+                attr |= 0x20
+            }
+            if upperline {
+                attr |= 0x10
+            }
+            
+            textVRAM[attrIndex] = attr
             return
         }
         
-        // 適切な位置にアトリビュートを挿入
+        // 適切な位置に新しい装飾属性を挿入
         var insertIndex = -1
         for i in 0..<attributeCount {
             let positionIndex = attributeOffset + i * 2
@@ -492,25 +673,38 @@ class PC88Screen: ScreenRendering {
             let dstPosIndex = attributeOffset + (i + 1) * 2
             let dstAttrIndex = dstPosIndex + 1
             
-            if dstAttrIndex < textVRAM.count {
+            if dstAttrIndex < textVRAM.count && srcAttrIndex < textVRAM.count {
                 textVRAM[dstPosIndex] = textVRAM[srcPosIndex]
                 textVRAM[dstAttrIndex] = textVRAM[srcAttrIndex]
             }
         }
         
-        // 新しいアトリビュートを設定
+        // 新しい装飾属性を設定
         let newPosIndex = attributeOffset + insertIndex * 2
         let newAttrIndex = newPosIndex + 1
         
         if newAttrIndex < textVRAM.count {
             textVRAM[newPosIndex] = UInt8(startColumn)
             
-            var attr: UInt8 = decoration.rawValue
+            var attr: UInt8 = 0
             
-            // カラーモードの場合は装飾指定bit3=0
-            if isColorMode {
-                // bit3=0: 装飾指定
-                attr &= 0xF7
+            // 装飾タイプに基づいて属性を設定
+            // PC-88の装飾コード: bit2=反転, bit1=点滅, bit0=消去
+            switch decoration {
+            case .normal:
+                attr = 0x00
+            case .reverse:
+                attr = 0x04 // bit2=1
+            case .blink:
+                attr = 0x02 // bit1=1
+            case .reverseBlink:
+                attr = 0x06 // bit2=1, bit1=1
+            case .secret:
+                attr = 0x01 // bit0=1
+            case .secretAlt:
+                attr = 0x03 // bit1=1, bit0=1
+            case .reverseSecret:
+                attr = 0x05 // bit2=1, bit0=1
             }
             
             // アンダーライン/アッパーライン設定
@@ -693,6 +887,30 @@ class PC88Screen: ScreenRendering {
         
         // CRTCとDMACを初期化
         initializeCRTCAndDMAC()
+        
+        // 点滅タイマーを設定
+        setupBlinkTimer()
+    }
+    
+    func deinitialize() {
+        // リソースの解放処理
+        blinkTimer?.invalidate()
+        blinkTimer = nil
+    }
+    
+    /// 点滅タイマーをセットアップ
+    private func setupBlinkTimer() {
+        // 既存のタイマーを停止
+        blinkTimer?.invalidate()
+        
+        // 新しいタイマーを作成（0.5秒ごとに点滅状態を切り替え）
+        blinkTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.blinkState.toggle()
+            
+            // 画面の再描画をリクエスト
+            NotificationCenter.default.post(name: Notification.Name("PC88ScreenNeedsDisplay"), object: nil)
+        }
     }
     
     func updateTextVRAM(at address: UInt16, value: UInt8) {
@@ -719,11 +937,13 @@ class PC88Screen: ScreenRendering {
         guard index >= 0 && index < digitalPalette.count else { return }
         
         // PC-88のパレット値をRGBA値に変換
+        // PC-88のカラーコード: bit2=R, bit1=G, bit0=B
         let r = (color & 0x04) != 0 ? 255 : 0
         let g = (color & 0x02) != 0 ? 255 : 0
         let b = (color & 0x01) != 0 ? 255 : 0
         
         // RGBA値をUInt32に変換（アルファは常に255）
+        // CGContextのピクセルフォーマットに合わせる (RGBA)
         setPaletteColor(index: index, color: (UInt32(r) << 24) | (UInt32(g) << 16) | (UInt32(b) << 8) | 255)
     }
     
@@ -756,15 +976,17 @@ class PC88Screen: ScreenRendering {
     
     /// パレットの初期化
     private func initializePalette() {
-        // 基本8色パレット
-        digitalPalette[0] = 0x000000FF  // 黒
-        digitalPalette[1] = 0x0000FFFF  // 青
-        digitalPalette[2] = 0x00FF00FF  // 緑
-        digitalPalette[3] = 0x00FFFFFF  // シアン
-        digitalPalette[4] = 0xFF0000FF  // 赤
-        digitalPalette[5] = 0xFF00FFFF  // マゼンタ
-        digitalPalette[6] = 0xFFFF00FF  // 黄
-        digitalPalette[7] = 0xFFFFFFFF  // 白
+        // 基本8色パレット（RGBA形式: 0xRRGGBBAA）
+        // PC-88の色コードに合わせてパレットを配置する
+        // bit2=R(4), bit1=G(2), bit0=B(1)
+        digitalPalette[0] = 0x000000FF  // 000: 黒
+        digitalPalette[1] = 0x0000FFFF  // 001: 青
+        digitalPalette[2] = 0x00FF00FF  // 010: 緑
+        digitalPalette[3] = 0x00FFFFFF  // 011: シアン (G+B)
+        digitalPalette[4] = 0xFF0000FF  // 100: 赤
+        digitalPalette[5] = 0xFF00FFFF  // 101: マゼンタ (R+B)
+        digitalPalette[6] = 0xFFFF00FF  // 110: 黄 (R+G)
+        digitalPalette[7] = 0xFFFFFFFF  // 111: 白 (R+G+B)
     }
     
     // CRTCとDMACの初期化は上記initialize()メソッド内で実装済み
@@ -802,22 +1024,52 @@ class PC88Screen: ScreenRendering {
                 let attrValue = textVRAM[attributeOffset + i + 1]
                 
                 // アトリビュートタイプを判定
-                let isColorAttr = isColorMode && (attrValue & 0x08) != 0
+                let isColorAttr = (attrValue & 0x08) != 0
                 
                 if isColorAttr {
                     // 色指定の場合
-                    let colorIndex = attrValue & 0x07
+                    // PC-88の色コード（カラーモード色指定）: bit7=G, bit6=R, bit5=B
+                    let g = (attrValue & 0x80) != 0 ? 1 : 0
+                    let r = (attrValue & 0x40) != 0 ? 1 : 0
+                    let b = (attrValue & 0x20) != 0 ? 1 : 0
+                    let colorIndex = UInt8((g << 2) | (r << 1) | b)
                     let color = isAnalogMode ? analogPalette[Int(colorIndex)] : digitalPalette[Int(colorIndex)]
+                    
                     attributes.append((position, color, .normal, false, false))
                 } else {
                     // 装飾指定の場合
-                    let decorationValue = attrValue & 0x07
+                    // カラーモード（装飾指定）: bit5=アンダーライン, bit4=アッパーライン
                     let underline = (attrValue & 0x20) != 0
                     let upperline = (attrValue & 0x10) != 0
                     
-                    if let decoration = PC88Decoration(rawValue: decorationValue) {
-                        attributes.append((position, 0xFFFFFFFF, decoration, underline, upperline))
+                    // PC-88の装飾コード: bit2=反転, bit1=点滅, bit0=消去
+                    var decoration: PC88Decoration = .normal
+                    
+                    // bit2: 反転
+                    let isReverse = (attrValue & 0x04) != 0
+                    // bit1: 点滅
+                    let isBlink = (attrValue & 0x02) != 0
+                    // bit0: 消去（シークレット）
+                    let isSecret = (attrValue & 0x01) != 0
+                    
+                    if isReverse && isBlink && isSecret {
+                        decoration = .reverseSecret
+                    } else if isReverse && isBlink {
+                        decoration = .reverseBlink
+                    } else if isReverse && isSecret {
+                        decoration = .reverseSecret
+                    } else if isBlink && isSecret {
+                        decoration = .secretAlt
+                    } else if isReverse {
+                        decoration = .reverse
+                    } else if isBlink {
+                        decoration = .blink
+                    } else if isSecret {
+                        decoration = .secret
                     }
+                    
+                    // デフォルトの色（白）を使用
+                    attributes.append((position, 0xFFFFFFFF, decoration, underline, upperline))
                 }
             }
             
@@ -837,15 +1089,24 @@ class PC88Screen: ScreenRendering {
                     var hasUnderline = false
                     var hasUpperline = false
                     
+                    // 色属性と装飾属性を個別に探す
                     for attr in attributes.reversed() {
                         if x >= attr.position {
                             if attr.decoration != .normal {
+                                // 装飾属性の場合
                                 currentDecoration = attr.decoration
                                 hasUnderline = attr.underline
                                 hasUpperline = attr.upperline
-                            } else {
-                                currentColor = attr.color
                             }
+                            break
+                        }
+                    }
+                    
+                    // 色属性を探す
+                    for attr in attributes.reversed() {
+                        if x >= attr.position && attr.decoration == .normal {
+                            // 色属性の場合
+                            currentColor = attr.color
                             break
                         }
                     }
@@ -892,14 +1153,20 @@ class PC88Screen: ScreenRendering {
                             
                         case .secret, .secretAlt:
                             // 非表示（何も描画しない）
+                            // シークレットモードでは文字を表示しない
                             break
                             
                         case .blink:
-                            // 点滅（実装簡略化のため、ここでは常に表示）
-                            drawCharacter(context: context, charCode: charCode, x: posX, y: posY, color: currentColor)
+                            // 点滅状態に応じて表示/非表示を切り替え
+                            if blinkState {
+                                // 点滅ONの場合は文字を表示
+                                drawCharacter(context: context, charCode: charCode, x: posX, y: posY, color: currentColor)
+                            } else {
+                                // 点滅OFFの場合は何も表示しない
+                            }
                             
-                        case .reverse, .reverseSecret, .reverseBlink:
-                            // 反転表示
+                        case .reverse:
+                            // 反転表示 - 背景を前景色で描画
                             // 背景を前景色で描画
                             context.setFillColor(CGColor(
                                 red: CGFloat((currentColor >> 24) & 0xFF) / 255.0,
@@ -910,9 +1177,37 @@ class PC88Screen: ScreenRendering {
                             context.fill(CGRect(x: posX, y: posY, width: fontWidth, height: fontHeight))
                             
                             // 文字を黒で描画（反転）
-                            if currentDecoration != .reverseSecret {
+                            drawCharacter(context: context, charCode: charCode, x: posX, y: posY, color: 0x000000FF)
+                            
+                        case .reverseBlink:
+                            // 点滅状態に応じて反転表示を切り替え
+                            if blinkState {
+                                // 点滅ONの場合は反転表示
+                                // 背景を前景色で描画
+                                context.setFillColor(CGColor(
+                                    red: CGFloat((currentColor >> 24) & 0xFF) / 255.0,
+                                    green: CGFloat((currentColor >> 16) & 0xFF) / 255.0,
+                                    blue: CGFloat((currentColor >> 8) & 0xFF) / 255.0,
+                                    alpha: CGFloat(currentColor & 0xFF) / 255.0
+                                ))
+                                context.fill(CGRect(x: posX, y: posY, width: fontWidth, height: fontHeight))
+                                
+                                // 文字を黒で描画（反転）
                                 drawCharacter(context: context, charCode: charCode, x: posX, y: posY, color: 0x000000FF)
+                            } else {
+                                // 点滅OFFの場合は通常描画
+                                drawCharacter(context: context, charCode: charCode, x: posX, y: posY, color: currentColor)
                             }
+                            
+                        case .reverseSecret:
+                            // 反転シークレット - 背景のみ描画（文字は表示しない）
+                            context.setFillColor(CGColor(
+                                red: CGFloat((currentColor >> 24) & 0xFF) / 255.0,
+                                green: CGFloat((currentColor >> 16) & 0xFF) / 255.0,
+                                blue: CGFloat((currentColor >> 8) & 0xFF) / 255.0,
+                                alpha: CGFloat(currentColor & 0xFF) / 255.0
+                            ))
+                            context.fill(CGRect(x: posX, y: posY, width: fontWidth, height: fontHeight))
                         }
                         
                         // アンダーラインを描画
