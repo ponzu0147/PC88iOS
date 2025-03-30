@@ -49,7 +49,7 @@ class PC88ScreenTest {
         screen.setColorAttribute(line: 8, startColumn: 0, color: 0x07) // 白色
         
         // 各色のサンプルを表示（PC-88の色コードに合わせる）
-        let colorLabels = ["K", "B", "G", "C", "R", "M", "Y", "W"]
+        let colorLabels = ["K", "B", "R", "C", "G", "M", "Y", "W"]
         let colorCodes: [UInt8] = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]
         
         for (i, label) in colorLabels.enumerated() {
@@ -59,7 +59,7 @@ class PC88ScreenTest {
         }
         
         // 9行目に色コードの説明
-        writeText("Color Codes: 000=K, 001=B, 010=G, 011=C, 100=R, 101=M, 110=Y, 111=W", line: 9, column: 0)
+        writeText("Color Codes: 000=K, 001=B, 010=R, 011=C, 100=G, 101=M, 110=Y, 111=W", line: 9, column: 0)
         screen.setColorAttribute(line: 9, startColumn: 0, color: 0x07) // 白色
         
         // 11行目に装飾テスト
