@@ -45,6 +45,12 @@ class PC88FDC: FDCEmulating {
     /// ディスクイメージ（最大2ドライブ）
     private var diskImages: [DiskImageAccessing?] = [nil, nil]
     
+    /// 指定されたドライブにディスクイメージがセットされているかを確認
+    func hasDiskImage(drive: Int) -> Bool {
+        guard drive >= 0 && drive < diskImages.count else { return false }
+        return diskImages[drive] != nil
+    }
+    
     /// 現在のドライブ
     private var currentDrive: Int = 0
     
@@ -499,5 +505,29 @@ class PC88FDC: FDCEmulating {
         
         // 完了
         completeCommand()
+    }
+    
+    /// セクタデータを直接読み込む（IPL用）
+    func readSector(drive: Int, track: Int, sector: Int) -> [UInt8]? {
+        guard drive >= 0 && drive < diskImages.count,
+              let diskImage = diskImages[drive] as? D88DiskImage else {
+            return nil
+        }
+        
+        print("FDC: トラック\(track)、セクタ\(sector)を読み込みます")
+        
+        // セクタデータを読み込む
+        return diskImage.readSector(track: track, sector: sector)
+    }
+    
+    /// DiskImageAccessingプロトコルに準拠したセクタ読み込みメソッド
+    func readSector(drive: Int, track: Int, side: Int, sectorID: SectorID) -> Data? {
+        guard drive >= 0 && drive < diskImages.count,
+              let diskImage = diskImages[drive] else {
+            return nil
+        }
+        
+        // セクタデータを読み込む
+        return diskImage.readSector(track: track, side: side, sectorID: sectorID)
     }
 }

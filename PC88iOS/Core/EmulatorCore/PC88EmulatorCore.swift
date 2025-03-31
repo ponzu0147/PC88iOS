@@ -20,6 +20,9 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// ターゲットフレームレート
     private var targetFPS: Double = 30.0 // デフォルトは30fpsに設定
     
+    /// FDDブートが有効かどうか
+    private var fddBootEnabled: Bool = false
+    
     /// CPUエミュレーション
     private var cpu: CPUExecuting?
     
@@ -178,6 +181,15 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             pc88Screen.displayTestScreen()
             print("テスト画面を表示しました")
         }
+        
+        // ALPHA-MINI-DOSディスクイメージを読み込む
+        loadDefaultDiskImage()
+        
+        // FDDブートを有効化
+        setFDDBootEnabled(true)
+        
+        // ブートセクタをロード
+        loadBootSector()
         
         // 状態を初期化済みに変更
         state = .initialized
@@ -722,6 +734,130 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     // MARK: - プライベートメソッド
     
+    /// ブートセクタをメモリにロード
+    private func loadBootSector() {
+        guard let pc88FDC = fdc as? PC88FDC,
+              let pc88Memory = memory as? PC88Memory else {
+            print("FDCまたはメモリが初期化されていません")
+            return
+        }
+        
+        // FDDブートが有効でない場合は何もしない
+        if !fddBootEnabled {
+            print("FDDブートが無効です")
+            return
+        }
+        
+        // ドライブ1にディスクイメージがセットされているか確認
+        if !pc88FDC.hasDiskImage(drive: 0) {
+            print("ドライブ1にディスクイメージがセットされていません")
+            return
+        }
+        
+        print("IPLをロード中: ドライブ1、トラック0、セクタ1")
+        
+        // ブートセクタを読み込む (トラック0、セクタ1)
+        if let sectorData = pc88FDC.readSector(drive: 0, track: 0, sector: 1) {
+            // メモリの0xC000にIPLをロード (256バイト)
+            for (offset, byte) in sectorData.enumerated() {
+                pc88Memory.writeByte(byte, at: 0xC000 + UInt16(offset))
+            }
+            print("IPLをメモリにロードしました: 0xC000-0xC0FF")
+            
+            // IPLの実行を開始するためにPCを0xC000に設定
+            if let z80 = cpu as? Z80CPU {
+                z80.setProgramCounter(0xC000)
+                print("プログラムカウンタを0xC000に設定しました")
+            }
+        } else {
+            print("IPLの読み込みに失敗しました")
+        }
+    }
+    
+    /// ALPHA-MINI-DOSディスクイメージを自動的に読み込む
+    private func loadDefaultDiskImage() {
+        guard let fdc = fdc as? PC88FDC else { return }
+        
+        // リソースからALPHA-MINI-DOSディスクイメージを取得
+        if let diskImageURL = Bundle.main.url(forResource: "ALPHA-MINI-DOS", withExtension: "d88") {
+            do {
+                let diskImageData = try Data(contentsOf: diskImageURL)
+                let diskImage = D88DiskImage()
+                
+                // ディスクイメージデータを一時ファイルに保存してからロード
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_disk.d88")
+                try diskImageData.write(to: tempURL)
+                
+                if diskImage.loadDiskImage(from: tempURL) {
+                    // ドライブ0にディスクイメージをセット
+                    fdc.setDiskImage(diskImage, drive: 0)
+                    print("ALPHA-MINI-DOSディスクイメージを読み込みました")
+                    
+                    // 一時ファイルを削除
+                    try? FileManager.default.removeItem(at: tempURL)
+                } else {
+                    print("ALPHA-MINI-DOSディスクイメージの読み込みに失敗しました")
+                }
+            } catch {
+                print("ディスクイメージの読み込みエラー: \(error.localizedDescription)")
+            }
+        } else {
+            print("ALPHA-MINI-DOSディスクイメージが見つかりません")
+        }
+    }
+    
+    /// 外部からディスクイメージをロード
+    func loadDiskImage(from url: URL, drive: Int) -> Bool {
+        guard let fdc = fdc as? PC88FDC else { return false }
+        
+        do {
+            let diskImageData = try Data(contentsOf: url)
+            let diskImage = D88DiskImage()
+            
+            // ディスクイメージデータを一時ファイルに保存してからロード
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("user_disk.d88")
+            try diskImageData.write(to: tempURL)
+            
+            if diskImage.loadDiskImage(from: tempURL) {
+                // 指定されたドライブにディスクイメージをセット
+                fdc.setDiskImage(diskImage, drive: drive)
+                print("ディスクイメージをドライブ\(drive + 1)に読み込みました: \(url.lastPathComponent)")
+                
+                // 一時ファイルを削除
+                try? FileManager.default.removeItem(at: tempURL)
+                
+                // FDDブートが有効な場合、ブートセクタを再ロード
+                if fddBootEnabled && drive == 0 {
+                    loadBootSector()
+                }
+                
+                return true
+            } else {
+                print("ディスクイメージの読み込みに失敗しました: \(url.lastPathComponent)")
+            }
+        } catch {
+            print("ディスクイメージの読み込みエラー: \(error.localizedDescription)")
+        }
+        
+        return false
+    }
+    
+    /// FDDブートの有効/無効を設定
+    func setFDDBootEnabled(_ enabled: Bool) {
+        fddBootEnabled = enabled
+        print("FDDブートを\(enabled ? "有効" : "無効")にしました")
+        
+        // 設定が変更された場合、ブートセクタを再ロード
+        if enabled {
+            loadBootSector()
+        }
+    }
+    
+    /// FDDブートが有効かどうかを取得
+    func isFDDBootEnabled() -> Bool {
+        return fddBootEnabled
+    }
+    
     /// ログタイマーを停止
     private func stopLogTimer() {
         // タイマーが存在する場合のみ停止する
@@ -1105,11 +1241,20 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         }
         
         // ディスクがセットされているか確認
-        if fdc is PC88FDC {
+        if let pc88FDC = fdc as? PC88FDC, pc88FDC.hasDiskImage(drive: 0) {
             // ディスクがセットされていればIPLを実行
             print("ディスクからのIPLを実行します")
+            
+            // ブートセクタをメモリにロード (通常0x8000にロード)
+            loadBootSector()
+            
+            // CPUのPCを0x8000に設定してブートセクタから実行開始
+            if let z80 = cpu as? Z80CPU {
+                z80.setPC(0x8000)
+                print("ブートセクタから実行を開始します: PC=0x8000")
+            }
         } else {
-            print("ディスクがセットされていません")
+            print("ディスクがセットされていないか、読み込みに失敗しました")
         }
     }
     

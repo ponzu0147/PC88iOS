@@ -277,6 +277,12 @@ class Z80CPU: CPUExecuting {
         return currentTState
     }
     
+    /// プログラムカウンタを設定
+    func setProgramCounter(_ address: UInt16) {
+        registers.pc = address
+        print("プログラムカウンタを設定: 0x\(String(format: "%04X", address))")
+    }
+    
     /// クロックモードに基づいてサイクル数を調整
     private func adjustCyclesForClockMode(_ cycles: Int) -> Int {
         // PC88CPUClockのメソッドを使用して適切に調整
