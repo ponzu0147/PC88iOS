@@ -53,6 +53,9 @@ class PC88BeepSound: SoundChipEmulating {
     /// 波形生成用のフェーズ増分
     private var phaseIncrement: Double = 0.0
     
+    /// 前回の最後のサンプル値（ノイズ防止用）
+    private var lastSampleValue: Float = 0.0
+    
     /// オーディオエンジン
     private var audioEngine: AVAudioEngine?
     
@@ -78,9 +81,24 @@ class PC88BeepSound: SoundChipEmulating {
         // 初期化時は必ず無音状態から始める
         self.isRunning = false
         self.speakerEnabled = false
+        self.frequencyValue = 0
+        self.phase = 0.0
+        self.phaseIncrement = 0.0
+        self.lastSampleValue = 0.0
+        self.isFirstByte = true  // データポートの初期状態をリセット
+        self.lowByte = 0         // 下位バイトも初期化
         
         // オーディオエンジンをセットアップ
         setupAudioEngine()
+        
+        // 初期状態では音量をユーザー設定値に設定
+        // PC88BeepSound.volumeは別途設定される
+        
+        // 起動直後に音が鳴らないようにするための処理
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            // 起動直後にスピーカーを無効化
+            self.writeRegister(0x61, value: 0x00)
+        }
     }
     
     // MARK: - SoundChipEmulating プロトコル実装
@@ -114,7 +132,39 @@ class PC88BeepSound: SoundChipEmulating {
             // スピーカー制御ポート
             // ビット0と1が1の場合、スピーカーが有効
             let newState = (value & 0x03) == 0x03
+            
+            // 周波数値が0の場合はスピーカーを有効にしない
+            // これにより8秒おきのプツっという音を防止
+            if frequencyValue == 0 && newState {
+                print("周波数値が0のためスピーカーを有効にしません")
+                return
+            }
+            
             if speakerEnabled != newState {
+                // 状態変更時にノイズ防止のための処理
+                if newState {
+                    // オンになる場合は位相を0からスタート
+                    phase = 0.0
+                    lastSampleValue = 0.0 // 最初は無音から開始
+                    
+                    // フェードインのためにボリュームを一時的に下げる
+                    let originalVolume = PC88BeepSound.volume
+                    PC88BeepSound.volume = 0.0
+                    // 徐々に音量を上げる
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                        PC88BeepSound.volume = originalVolume * 0.3
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                            PC88BeepSound.volume = originalVolume * 0.6
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                                PC88BeepSound.volume = originalVolume
+                            }
+                        }
+                    }
+                } else {
+                    // オフになる場合はフェードアウトは自動的に行われる
+                    // generateSamplesメソッド内で処理される
+                }
+                
                 speakerEnabled = newState
                 print("スピーカー状態変更: \(speakerEnabled ? "有効" : "無効")")
             }
@@ -138,10 +188,15 @@ class PC88BeepSound: SoundChipEmulating {
     
     /// オーディオサンプルを生成
     func generateSamples(into buffer: UnsafeMutablePointer<Float>, count: Int) {
-        // スピーカーが無効な場合や再生中でない場合は無音を出力（冗長チェックだが安全のため）
-        if !speakerEnabled || !isRunning {
+        // スピーカーが無効な場合、再生中でない場合、または周波数値が0の場合は徐々に音量を下げる
+        if !speakerEnabled || !isRunning || frequencyValue == 0 {
             for i in 0..<count {
-                buffer[i] = 0.0
+                // 徐々に音量を下げる（ポップノイズ防止）
+                lastSampleValue *= 0.95 // フェードアウト係数
+                buffer[i] = lastSampleValue
+                if abs(lastSampleValue) < 0.001 {
+                    lastSampleValue = 0.0 // 十分小さくなったらゼロに
+                }
             }
             return
         }
@@ -149,11 +204,14 @@ class PC88BeepSound: SoundChipEmulating {
         // 現在の音量を取得
         let currentVolume = PC88BeepSound.volume
         
-        // 矩形波を生成
+        // 矩形波を生成（スムージング処理を追加）
         for i in 0..<count {
             // 矩形波生成（フェーズに基づく）
-            let value: Float = phase < 0.5 ? volume : -volume
-            buffer[i] = value * currentVolume // 音量を適用
+            let targetValue: Float = phase < 0.5 ? volume : -volume
+            
+            // 急激な変化を避けるためのスムージング
+            lastSampleValue = lastSampleValue * 0.9 + targetValue * 0.1
+            buffer[i] = lastSampleValue * currentVolume // 音量を適用
             
             // フェーズを更新
             phase += phaseIncrement
@@ -276,6 +334,10 @@ class PC88BeepSound: SoundChipEmulating {
     private func setupAudioEngine() {
         audioEngine = AVAudioEngine()
         
+        // 初期化時は必ず無音状態から始める
+        lastSampleValue = 0.0
+        phase = 0.0
+        
         // オーディオフォーマットの設定
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)
         
@@ -286,15 +348,20 @@ class PC88BeepSound: SoundChipEmulating {
             // デフォルトは無音を出力
             let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
             if let buffer = ablPointer.first, let ptr = buffer.mData?.assumingMemoryBound(to: Float.self) {
-                // 再生中でない場合は無音を出力
+                // 再生中でない場合はフェードアウトを適用
                 if !self.isRunning || !self.speakerEnabled {
                     for frame in 0..<Int(frameCount) {
-                        ptr[frame] = 0.0 // 無音を出力
+                        // 徐々に音量を下げる（ポップノイズ防止）
+                        self.lastSampleValue *= 0.95
+                        ptr[frame] = self.lastSampleValue
+                        if abs(self.lastSampleValue) < 0.001 {
+                            self.lastSampleValue = 0.0
+                        }
                     }
                     return noErr
                 }
                 
-                // 再生中の場合のみサンプル生成
+                // 再生中の場合はスムージングを適用したサンプル生成
                 for frame in 0..<Int(frameCount) {
                     self.generateSamples(into: ptr.advanced(by: frame), count: 1)
                 }
@@ -307,29 +374,32 @@ class PC88BeepSound: SoundChipEmulating {
             audioEngine.attach(sourceNode)
             audioEngine.connect(sourceNode, to: audioEngine.mainMixerNode, format: format)
             
-            // 初期音量を設定
-            audioEngine.mainMixerNode.outputVolume = PC88BeepSound.volume
+            // 初期音量を0に設定（ノイズ防止）
+            audioEngine.mainMixerNode.outputVolume = 0.0
             
             // エンジンの準備
             do {
-                // マニュアルレンダリングモードを無効化
-                // try audioEngine.enableManualRenderingMode(.realtime, format: format, maximumFrameCount: 4096)
-                
                 // オーディオセッションの設定
                 let audioSession = AVAudioSession.sharedInstance()
-                try audioSession.setCategory(.playback, mode: .default, options: .mixWithOthers)
+                try audioSession.setCategory(.playback, mode: .default, options: [.mixWithOthers, .duckOthers])
+                try audioSession.setPreferredIOBufferDuration(0.005) // バッファサイズを大きめに設定
                 try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-                
-                // 初期音量を0に設定してからエンジンを開始（ノイズ防止）
-                audioEngine.mainMixerNode.outputVolume = 0.0
                 
                 // エンジンを開始
                 try audioEngine.start()
                 
-                // エンジン起動後に徐々に音量を上げる（0.5秒かけて目標音量まで）
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    // 遅延後に音量を設定
-                    audioEngine.mainMixerNode.outputVolume = PC88BeepSound.volume
+                // エンジン起動後に徐々に音量を上げる（より慢く、段階的に）
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    audioEngine.mainMixerNode.outputVolume = PC88BeepSound.volume * 0.1
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        audioEngine.mainMixerNode.outputVolume = PC88BeepSound.volume * 0.3
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            audioEngine.mainMixerNode.outputVolume = PC88BeepSound.volume * 0.6
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                audioEngine.mainMixerNode.outputVolume = PC88BeepSound.volume
+                            }
+                        }
+                    }
                 }
                 
                 print("オーディオエンジンが正常に起動しました")

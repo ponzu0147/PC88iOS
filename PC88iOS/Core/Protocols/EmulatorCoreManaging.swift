@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreGraphics
+import AVFoundation
 
 /// エミュレータコア全体の管理を担当するプロトコル
 protocol EmulatorCoreManaging {
@@ -42,4 +43,10 @@ protocol EmulatorCoreManaging {
     
     /// ディスクイメージのロード
     func loadDiskImage(url: URL, drive: Int) -> Bool
+    
+    /// ビープ音生成機能へのアクセサ
+    func getBeepSound() -> Any?
+    
+    /// ビープ音テスト機能へのアクセサ
+    func getBeepTest() -> Any?
 }

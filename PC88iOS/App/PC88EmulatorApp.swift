@@ -7,22 +7,88 @@
 
 import SwiftUI
 import Foundation
+import Combine
+
+/// エミュレータアプリの状態管理クラス
+class EmulatorAppState: ObservableObject {
+    @Published var scenePhase: ScenePhase = .active
+    @Published var isInBackground: Bool = false
+}
+
+// 通知名の拡張
+extension Notification.Name {
+    static let emulatorPauseNotification = Notification.Name("EmulatorPauseNotification")
+    static let emulatorResumeNotification = Notification.Name("EmulatorResumeNotification")
+}
 
 @main
 struct PC88EmulatorApp: App {
     // 初期化済みフラグ
     @State private var isInitialized = false
     
+    // エミュレータ状態管理用
+    @StateObject private var appState = EmulatorAppState()
+    
+    // シーンフェーズを環境変数から取得
+    @Environment(\.scenePhase) private var scenePhase
+    
     var body: some Scene {
         WindowGroup {
             EmulatorView()
+                .environmentObject(appState)
                 .onAppear {
                     if !isInitialized {
                         // アプリ起動時にリソースファイルをコピー
                         copyResourceFilesToDocuments()
+                        
+                        // エミュレータの画面表示を確実に初期化するための処理
+                        // 複数回の通知を送信して確実に画面を更新する
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            // 最初の画面更新を通知
+                            NotificationCenter.default.post(name: .init("ForceScreenUpdateNotification"), object: nil)
+                        }
+                        
+                        // 少し遅らせて再度更新
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            NotificationCenter.default.post(name: .init("ForceScreenUpdateNotification"), object: nil)
+                        }
+                        
+                        // さらに遅らせて再度更新
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                            NotificationCenter.default.post(name: .init("ForceScreenUpdateNotification"), object: nil)
+                        }
+                        
                         isInitialized = true
                     }
                 }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            appState.scenePhase = newPhase
+            handleScenePhaseChange(newPhase)
+        }
+    }
+    
+    /// シーンフェーズ変更時の処理
+    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
+        switch newPhase {
+        case .active:
+            // フォアグラウンドに戻ったとき
+            print("アプリがフォアグラウンドに戻りました")
+            appState.isInBackground = false
+            NotificationCenter.default.post(name: .emulatorResumeNotification, object: nil)
+            
+        case .background:
+            // バックグラウンドに移行したとき
+            print("アプリがバックグラウンドに移行しました")
+            appState.isInBackground = true
+            NotificationCenter.default.post(name: .emulatorPauseNotification, object: nil)
+            
+        case .inactive:
+            // 非アクティブ状態（例：マルチタスク画面表示中）
+            print("アプリが非アクティブになりました")
+            
+        @unknown default:
+            break
         }
     }
     

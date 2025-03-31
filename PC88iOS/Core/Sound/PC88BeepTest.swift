@@ -52,6 +52,31 @@ class PC88BeepTest {
     
     // MARK: - 公開メソッド
     
+    /// ビープテストを初期化する
+    func initialize() {
+        // スピーカーを無効化
+        let speakerControl = io.readPort(0x42)
+        io.writePort(0x42, value: speakerControl & ~0x03)
+        
+        // 8253 PITを初期化（チャネル2、モード3、バイナリカウント）
+        io.writePort(0x77, value: 0xB6)
+        
+        // 分周値を0に設定
+        io.writePort(0x75, value: 0x00)
+        io.writePort(0x75, value: 0x00)
+        
+        print("ビープテストを初期化しました")
+    }
+    
+    /// ビープテストを停止する
+    func stop() {
+        // スピーカーを無効化
+        let speakerControl = io.readPort(0x42)
+        io.writePort(0x42, value: speakerControl & ~0x03)
+        
+        print("ビープテストを停止しました")
+    }
+    
     /// ドレミファソラシドの音階を鳴らす
     func playScale() {
         // 再生中なら何もしない

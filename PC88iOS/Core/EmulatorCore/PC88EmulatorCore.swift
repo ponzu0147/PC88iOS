@@ -43,6 +43,18 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// ビープ音テスト用クラス
     private var beepTest: PC88BeepTest?
     
+    /// ビープ音生成機能へのアクセサ
+    func getBeepSound() -> Any? {
+        return beepSound
+    }
+    
+    /// ビープ音テスト機能へのアクセサ
+    func getBeepTest() -> Any? {
+        return beepTest
+    }
+    
+
+    
     /// エミュレータの状態
     private var state: EmulatorState = .initialized
     
@@ -276,6 +288,38 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         // 状態を実行中に変更
         state = .running
+    }
+    
+    /// オーディオをミュート（バックグラウンド移行時に呼び出される）
+    func muteAudio() {
+        // ビープ音をミュート
+        if beepSound != nil {
+            // 現在の音量を0に設定
+            PC88BeepSound.volume = 0.0
+        }
+        
+        // サウンドチップをミュート
+        if let soundChip = soundChip {
+            soundChip.setVolume(0.0)
+        }
+        
+        print("バックグラウンド移行によりオーディオをミュートしました")
+    }
+    
+    /// オーディオのミュート解除（フォアグラウンド復帰時に呼び出される）
+    func unmuteAudio() {
+        // ビープ音のミュート解除
+        if beepSound != nil {
+            // 音量を元に戻す（デフォルト値または保存されていた値）
+            PC88BeepSound.volume = 0.5 // デフォルト値
+        }
+        
+        // サウンドチップのミュート解除
+        if let soundChip = soundChip {
+            soundChip.setVolume(1.0) // デフォルト音量
+        }
+        
+        print("フォアグラウンド復帰によりオーディオのミュートを解除しました")
     }
     
     func reset() {
