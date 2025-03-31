@@ -27,4 +27,19 @@ protocol SoundChipEmulating {
     
     /// リセット
     func reset()
+    
+    /// サウンドチップを開始
+    func start()
+    
+    /// サウンドチップを停止
+    func stop()
+    
+    /// サウンドチップを一時停止
+    func pause()
+    
+    /// サウンドチップを再開
+    func resume()
+    
+    /// サウンドチップの更新
+    func update(_ cycles: Int)
 }

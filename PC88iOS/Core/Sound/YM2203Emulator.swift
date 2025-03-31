@@ -134,6 +134,65 @@ class YM2203Emulator: SoundChipEmulating {
         return registers[Int(register)]
     }
     
+    // MARK: - SoundChipEmulatingプロトコルの追加メソッド
+    
+    /// サウンドチップを開始
+    func start() {
+        // オーディオエンジンが実行中でなければ開始
+        if let audioEngine = audioEngine, !audioEngine.isRunning {
+            startAudio()
+        }
+        print("YM2203サウンドチップを開始しました")
+    }
+    
+    /// サウンドチップを停止
+    func stop() {
+        // オーディオエンジンを停止
+        stopAudio()
+        
+        // レジスタをリセット
+        for i in 0..<registers.count {
+            registers[i] = 0
+        }
+        
+        // チャンネル状態をリセット
+        for i in 0..<fmChannels.count {
+            fmChannels[i] = FMChannelState()
+        }
+        
+        for i in 0..<ssgChannels.count {
+            ssgChannels[i] = SSGChannelState()
+        }
+        
+        print("YM2203サウンドチップを停止しました")
+    }
+    
+    /// サウンドチップを一時停止
+    func pause() {
+        // オーディオエンジンを一時停止
+        if let audioEngine = audioEngine, audioEngine.isRunning {
+            audioEngine.pause()
+        }
+        print("YM2203サウンドチップを一時停止しました")
+    }
+    
+    /// サウンドチップを再開
+    func resume() {
+        // オーディオエンジンが一時停止中なら再開
+        if let audioEngine = audioEngine, !audioEngine.isRunning {
+            startAudio()
+        }
+        print("YM2203サウンドチップを再開しました")
+    }
+    
+    /// サウンドチップの更新
+    func update(_ cycles: Int) {
+        // サイクル数に基づいてサウンドチップの状態を更新
+        // 実際の実装では、タイミングに基づいてエンベロープやLFOなどを更新
+        
+        // ここでは簡易的な実装として、サイクル数は無視
+    }
+    
     // MARK: - 内部メソッド
     
     /// オーディオセットアップ

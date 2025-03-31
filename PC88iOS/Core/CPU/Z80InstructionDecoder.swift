@@ -443,7 +443,8 @@ struct HALTInstruction: Z80Instruction {
 /// DI命令（割り込み禁止）
 struct DISInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
-        cpu.setInterruptEnabled(false)
+        // 割り込み禁止（CPUExecutingプロトコルのメソッドを使用）
+        (cpu as CPUExecuting).setInterruptEnabled(false)
         return cycles
     }
     
@@ -456,7 +457,8 @@ struct DISInstruction: Z80Instruction {
 /// EI命令（割り込み許可）
 struct EIInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
-        cpu.setInterruptEnabled(true)
+        // 割り込み許可（CPUExecutingプロトコルのメソッドを使用）
+        (cpu as CPUExecuting).setInterruptEnabled(true)
         return cycles
     }
     

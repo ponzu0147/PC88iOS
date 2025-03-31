@@ -50,6 +50,102 @@ class PC88SoundChip: SoundChipEmulating {
     /// マスター音量
     private var masterVolume: Float = 1.0
     
+    /// オーディオエンジン
+    private var audioEngine: AVAudioEngine?
+    
+    /// オーディオソースノード
+    private var audioNode: AVAudioSourceNode?
+    
+    // MARK: - 内部メソッド
+    
+    /// オーディオセットアップ
+    private func setupAudio() {
+        audioEngine = AVAudioEngine()
+        
+        guard let audioEngine = audioEngine else { return }
+        
+        // オーディオノードの作成
+        audioNode = AVAudioSourceNode { [weak self] _, _, frameCount, audioBufferList -> OSStatus in
+            let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
+            
+            if let self = self {
+                // サンプルを生成するバッファを作成
+                var samples = [Float](repeating: 0.0, count: Int(frameCount))
+                self.generateSamples(into: &samples, count: Int(frameCount))
+                
+                // 生成したサンプルをオーディオバッファにコピー
+                for i in 0..<Int(frameCount) {
+                    for buffer in ablPointer {
+                        let bufferPointer = UnsafeMutableBufferPointer<Float>(
+                            start: buffer.mData?.assumingMemoryBound(to: Float.self),
+                            count: Int(buffer.mDataByteSize) / MemoryLayout<Float>.size
+                        )
+                        if i < bufferPointer.count {
+                            bufferPointer[i] = samples[i]
+                        }
+                    }
+                }
+            }
+            
+            return noErr
+        }
+        
+        // オーディオノードを接続
+        if let audioNode = audioNode {
+            let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)
+            audioEngine.attach(audioNode)
+            audioEngine.connect(audioNode, to: audioEngine.mainMixerNode, format: format)
+        }
+    }
+    
+    /// オーディオ開始
+    private func startAudio() {
+        guard let audioEngine = audioEngine else { return }
+        
+        do {
+            try audioEngine.start()
+        } catch {
+            print("オーディオエンジンの開始に失敗: \(error)")
+        }
+    }
+    
+    /// サウンドチップを開始
+    func start() {
+        // オーディオエンジンが実行中でなければ開始
+        if let audioEngine = audioEngine, !audioEngine.isRunning {
+            startAudio()
+        }
+    }
+    
+    /// サウンドチップを停止
+    func stop() {
+        // オーディオエンジンを停止
+        audioEngine?.stop()
+        reset()
+    }
+    
+    /// サウンドチップを一時停止
+    func pause() {
+        // オーディオエンジンを一時停止
+        if let audioEngine = audioEngine, audioEngine.isRunning {
+            audioEngine.pause()
+        }
+    }
+    
+    /// サウンドチップを再開
+    func resume() {
+        // オーディオエンジンが一時停止中なら再開
+        if let audioEngine = audioEngine, !audioEngine.isRunning {
+            startAudio()
+        }
+    }
+    
+    /// サウンドチップの更新
+    func update(_ cycles: Int) {
+        // サイクル数に基づいた更新処理
+        // 実際の実装では、タイミングに基づいてエンベロープや周波数を更新
+    }
+    
     /// チャンネルカウンター
     private var counter = [Double](repeating: 0, count: 3)
     
@@ -79,6 +175,7 @@ class PC88SoundChip: SoundChipEmulating {
     func initialize(sampleRate: Double) {
         self.sampleRate = sampleRate
         reset()
+        setupAudio()
     }
     
     func writeRegister(_ register: UInt8, value: UInt8) {

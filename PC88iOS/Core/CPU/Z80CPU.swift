@@ -339,6 +339,31 @@ extension Z80CPU {
         case .pc: registers.pc = value
         }
     }
+    
+    /// プログラムカウンタ（PC）を設定
+    func setPC(_ value: UInt16) {
+        registers.pc = value
+    }
+    
+    /// スタックポインタ（SP）を設定
+    func setSP(_ value: UInt16) {
+        registers.sp = value
+    }
+    
+    /// ホルト状態を設定
+    func setHalted(_ state: Bool) {
+        halted = state
+    }
+    
+    /// 現在のプログラムカウンタ（PC）を取得
+    func getPC() -> UInt16 {
+        return registers.pc
+    }
+    
+    /// 現在のスタックポインタ（SP）を取得
+    func getSP() -> UInt16 {
+        return registers.sp
+    }
 }
 
 /// レジスタタイプ

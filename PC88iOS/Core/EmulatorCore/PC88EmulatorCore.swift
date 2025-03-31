@@ -134,17 +134,35 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     func start() {
         guard state == .initialized || state == .paused else { return }
         
+        // 一時停止中なら再開するだけ
+        if state == .paused {
+            state = .running
+            return
+        }
+        
+        // IPLを実行してOSを起動
+        executeIPL()
+        
         // エミュレーションスレッドの開始
         emulationThread = Thread { [weak self] in
             self?.emulationLoop()
         }
         emulationThread?.name = "PC88EmulationThread"
+        emulationThread?.qualityOfService = .userInteractive
         emulationThread?.start()
         
         // 画面更新タイマーの開始
+        // メインスレッドで画面更新を行う
         emulationTimer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
             self?.updateScreen()
         }
+        
+        // サウンドチップを有効化
+        if let soundChip = soundChip {
+            soundChip.start()
+        }
+        
+        print("PC-88エミュレーションを開始しました")
         
         // 状態を実行中に変更
         state = .running
@@ -161,6 +179,18 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         emulationTimer?.invalidate()
         emulationTimer = nil
         
+        // サウンドチップの停止
+        if let soundChip = soundChip {
+            soundChip.stop()
+        }
+        
+        // CPUをリセット状態に戻す
+        if let cpu = cpu {
+            cpu.reset()
+        }
+        
+        print("PC-88エミュレーションを停止しました")
+        
         // 状態を停止に変更
         state = .initialized
     }
@@ -168,12 +198,26 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     func pause() {
         guard state == .running else { return }
         
+        // サウンドチップを一時停止
+        if let soundChip = soundChip {
+            soundChip.pause()
+        }
+        
+        print("PC-88エミュレーションを一時停止しました")
+        
         // 状態を一時停止に変更
         state = .paused
     }
     
     func resume() {
         guard state == .paused else { return }
+        
+        // サウンドチップを再開
+        if let soundChip = soundChip {
+            soundChip.resume()
+        }
+        
+        print("PC-88エミュレーションを再開しました")
         
         // 状態を実行中に変更
         state = .running
@@ -234,14 +278,41 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     /// CPUクロックモードを設定
     func setCPUClockMode(_ mode: PC88CPUClock.ClockMode) {
+        // 現在のモードと同じ場合は何もしない
+        if currentClockMode == mode {
+            return
+        }
+        
+        // 現在の状態を保存
+        let wasRunning = state == .running
+        
+        // 実行中なら一時停止
+        if wasRunning {
+            pause()
+        }
+        
+        // クロックモードを変更
         currentClockMode = mode
+        
+        // CPUをリセット
+        if let cpu = cpu {
+            cpu.reset()
+        }
         
         // Z80 CPUのクロックモードを設定
         if let z80 = cpu as? Z80CPU {
             z80.setClockMode(mode)
         }
         
-        print("CPUクロックモードを変更: \(mode == .mode4MHz ? "4MHz" : "8MHz")")
+        // エミュレーションループのメトリクスをリセットするためのフラグを設定
+        shouldResetMetrics = true
+        
+        // 元の状態が実行中だった場合は再開
+        if wasRunning {
+            resume()
+        }
+        
+        print("CPUクロックモードを変更し、リセットしました: \(mode == .mode4MHz ? "4MHz" : "8MHz")")
     }
     
     /// 現在のCPUクロックモードを取得
@@ -307,37 +378,143 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     // MARK: - プライベートメソッド
     
+    // メトリクスリセットフラグ
+    private var shouldResetMetrics = false
+    
     /// エミュレーションのメインループ
     private func emulationLoop() {
-        let cyclesPerFrame = 4_000_000 / 60  // Z80 4MHz, 60fps
-        var lastTime = Date()
+        // 定数定義
+        let targetFPS: Double = 60.0
+        
+        // 高精度なタイミング用の変数
+        var lastFrameTime = CACurrentMediaTime()
+        var frameCounter: UInt = 0
+        var cyclesRemainder: Int = 0
+        
+        // パフォーマンスメトリクス
+        var frameTimeAccumulator: Double = 0
+        var frameCount: Int = 0
+        var lastMetricsTime = CACurrentMediaTime()
+        
+        // クロックモードに基づくサイクル数を記録
+        var currentMode = currentClockMode // 現在のモードを記録
+        
+        // クロックモードに基づく1フレームあたりのサイクル数を計算
+        var baseCyclesPerSecond: Int = currentMode == .mode4MHz ? 4_000_000 : 8_000_000
+        var cyclesPerFrame: Int = Int(Double(baseCyclesPerSecond) / targetFPS)
+        
+        print("クロックモード: \(currentMode), サイクル数/フレーム: \(cyclesPerFrame)")
         
         while !Thread.current.isCancelled {
             // 一時停止中は処理をスキップ
             if state == .paused {
                 Thread.sleep(forTimeInterval: 0.01)
+                lastFrameTime = CACurrentMediaTime() // 再開時にタイミングをリセット
                 continue
             }
             
-            // 1フレーム分のCPUサイクルを実行
-            let adjustedCycles = Int(Float(cyclesPerFrame) * emulationSpeed)
-            _ = cpu?.executeCycles(adjustedCycles)
+            // クロックモードが変更された場合、サイクル数を再計算
+            if currentMode != currentClockMode || shouldResetMetrics {
+                currentMode = currentClockMode
+                baseCyclesPerSecond = currentMode == .mode4MHz ? 4_000_000 : 8_000_000
+                cyclesPerFrame = Int(Double(baseCyclesPerSecond) / targetFPS)
+                
+                // メトリクスをリセット
+                frameTimeAccumulator = 0
+                frameCount = 0
+                lastMetricsTime = CACurrentMediaTime()
+                lastFrameTime = CACurrentMediaTime()
+                cyclesRemainder = 0
+                shouldResetMetrics = false
+                
+                print("クロックモード変更検出: \(currentMode), サイクル数/フレーム: \(cyclesPerFrame)")
+            }
             
-            // フレームレート調整
-            let targetFrameTime = 1.0 / (60.0 * Double(emulationSpeed))
-            let elapsed = Date().timeIntervalSince(lastTime)
-            if elapsed < targetFrameTime {
-                let sleepTime = targetFrameTime - elapsed
+            // 1フレーム分のCPUサイクルを実行
+            let adjustedCycles = Int(Double(cyclesPerFrame) * Double(emulationSpeed)) + cyclesRemainder
+            var executedCycles = 0
+            
+            // サイクル単位で実行し、割り込みを適切に処理
+            if let cpu = cpu {
+                // 大きなサイクル数を小分けして実行
+                let chunkSize = 1000 // 一度に実行するサイクル数
+                var remainingCycles = adjustedCycles
+                
+                while remainingCycles > 0 && !Thread.current.isCancelled && state == .running {
+                    let cyclesToExecute = min(remainingCycles, chunkSize)
+                    let executed = cpu.executeCycles(cyclesToExecute)
+                    executedCycles += executed
+                    remainingCycles -= executed
+                    
+                    // FDCの定期更新
+                    if let fdc = fdc {
+                        fdc.update(cycles: executed)
+                    }
+                    
+                    // サウンドチップの定期更新
+                    if let soundChip = soundChip {
+                        soundChip.update(executed)
+                    }
+                }
+            }
+            
+            // 実行されたサイクル数と目標サイクル数の差を次のフレームに持ち越す
+            cyclesRemainder = adjustedCycles - executedCycles
+            
+            // 垂直同期割り込みの処理（60Hz）
+            frameCounter += 1
+            if frameCounter % 1 == 0 { // 毎フレーム
+                // 垂直同期割り込みを発生させる
+                cpu?.requestInterrupt(.int)
+                
+                // 垂直同期割り込みをIOに通知
+                if let io = io as? PC88IO {
+                    io.requestInterrupt(from: .vblank)
+                }
+            }
+            
+            // パフォーマンスメトリクスの収集
+            let now = CACurrentMediaTime()
+            let frameTime = now - lastFrameTime
+            
+            // フレームレート調整（エミュレーション速度を考慮）
+            let targetFrameTime = 1.0 / (targetFPS * Double(emulationSpeed))
+            if frameTime < targetFrameTime {
+                let sleepTime = targetFrameTime - frameTime
                 Thread.sleep(forTimeInterval: sleepTime)
             }
-            lastTime = Date()
+            
+            // 次のフレームの測定のために時間を更新
+            let actualFrameTime = CACurrentMediaTime() - lastFrameTime
+            lastFrameTime = CACurrentMediaTime()
+            
+            // メトリクスに実際のフレーム時間を追加
+            frameTimeAccumulator += actualFrameTime
+            frameCount += 1
+            
+            // 5秒ごとにパフォーマンスメトリクスを表示
+            if now - lastMetricsTime > 5.0 && frameCount > 0 {
+                let avgFrameTime = frameTimeAccumulator / Double(frameCount)
+                let fps = 1.0 / avgFrameTime
+                let clockMode = currentClockMode == .mode4MHz ? "4MHz" : "8MHz"
+                print("[クロックモード: \(clockMode)] FPS: \(String(format: "%.2f", fps)), 平均フレーム時間: \(String(format: "%.2f", avgFrameTime * 1000)) ms, サイクル数/フレーム: \(cyclesPerFrame)")
+                
+                // メトリクスをリセット
+                frameTimeAccumulator = 0
+                frameCount = 0
+                lastMetricsTime = now
+            }
         }
     }
     
     /// 画面の更新
     private func updateScreen() {
         if let screen = screen {
+            // 画面の描画処理
             screenImage = screen.render()
+            
+            // メモリとI/Oの状態を画面に反映
+            // 画面の更新処理は、PC88Screenのrender()メソッド内で行われる
         }
     }
     
@@ -402,11 +579,40 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             return
         }
         
+        // Z80 CPUのレジスタを初期化
+        if let z80 = cpu as? Z80CPU {
+            // PCを0x0000に設定（BIOSのエントリーポイント）
+            z80.setPC(0x0000)
+            
+            // スタックポインタを初期化
+            z80.setSP(0xF380) // PC-88の一般的なスタック初期値
+            
+            // 割り込みを有効化
+            z80.setInterruptEnabled(true)
+            
+            print("Z80 CPUレジスタを初期化しました: PC=0x0000, SP=0xF380")
+        }
+        
+        // I/Oポートの初期化
+        if let pc88IO = io as? PC88IO {
+            // 割り込みコントローラの初期化
+            pc88IO.writePort(0xE4, value: 0x00) // 割り込みコントロールレジスタ
+            pc88IO.writePort(0xE6, value: 0x00) // 割り込みマスクレジスタ
+            
+            // CRTCの初期化（必要に応じて実装）
+            print("I/Oポートを初期化しました")
+        }
+        
+        // 画面モードの初期化
+        if let pc88Screen = screen as? PC88Screen {
+            // テキストモードを設定
+            pc88Screen.writeIO(port: 0x30, value: 0x00) // テキストモード有効、グラフィックモード無効
+            print("画面モードを初期化しました: テキストモード有効")
+        }
+        
         // ディスクがセットされているか確認
         if fdc is PC88FDC {
             // ディスクがセットされていればIPLを実行
-            // PC-88のIPLはリセット後に自動的に実行される
-            // ここでは特別な処理は必要ない
             print("ディスクからのIPLを実行します")
         } else {
             print("ディスクがセットされていません")
