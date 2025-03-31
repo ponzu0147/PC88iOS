@@ -30,6 +30,11 @@ class PC88IO: IOAccessing {
         case psgRegister = 0x44
         case psgData = 0x45
         
+        // 8253 PIT関連ポート（初期モデル用ビープ音）
+        case pitChannel2Data = 0x75  // チャネル2データポート
+        case pitControl = 0x77       // PIT制御レジスタ
+        case speakerControl = 0x42   // スピーカー制御ポート
+        
         // 割り込み関連ポート
         case interruptControl = 0xE4
         case interruptMask = 0xE6
@@ -50,6 +55,9 @@ class PC88IO: IOAccessing {
     
     /// サウンドチップエミュレーション
     private var soundChip: SoundChipEmulating?
+    
+    /// 初期モデル用ビープ音生成
+    private var beepSound: PC88BeepSound?
     
     /// キーボード状態
     private var keyboardState = [UInt8](repeating: 0, count: 16)
@@ -85,6 +93,11 @@ class PC88IO: IOAccessing {
     /// サウンドチップを接続
     func connectSoundChip(_ soundChip: SoundChipEmulating) {
         self.soundChip = soundChip
+    }
+    
+    /// 初期モデル用ビープ音生成を接続
+    func connectBeepSound(_ beepSound: PC88BeepSound) {
+        self.beepSound = beepSound
     }
     
     /// キーボード入力（キーダウン）
@@ -212,6 +225,10 @@ class PC88IO: IOAccessing {
             // 割り込みマスク
             return interruptMask
             
+        case IOPort.speakerControl.rawValue:
+            // スピーカー制御ポート
+            return beepSound?.readRegister(port) ?? 0
+            
         default:
             // 未実装ポート
             return 0
@@ -258,6 +275,18 @@ class PC88IO: IOAccessing {
         case IOPort.interruptMask.rawValue:
             // 割り込みマスク
             interruptMask = value
+            
+        case IOPort.pitControl.rawValue:
+            // 8253 PIT制御レジスタ
+            beepSound?.writeRegister(port, value: value)
+            
+        case IOPort.pitChannel2Data.rawValue:
+            // 8253 PITチャネル2データポート
+            beepSound?.writeRegister(port, value: value)
+            
+        case IOPort.speakerControl.rawValue:
+            // スピーカー制御ポート
+            beepSound?.writeRegister(port, value: value)
             
         default:
             // 未実装ポート

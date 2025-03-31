@@ -37,14 +37,17 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// サウンドチップエミュレーション
     private var soundChip: SoundChipEmulating?
     
+    /// 初期モデル用ビープ音生成
+    private var beepSound: PC88BeepSound?
+    
+    /// ビープ音テスト用クラス
+    private var beepTest: PC88BeepTest?
+    
     /// エミュレータの状態
     private var state: EmulatorState = .initialized
     
     /// エミュレーション速度（1.0 = 通常速度）
     private var emulationSpeed: Float = 1.0
-    
-    /// ビープ音サンプル
-    private var beepSample: PC88BeepSample?
     
     /// CPUクロック
     private var cpuClock = PC88CPUClock()
@@ -141,9 +144,14 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             io.connectSoundChip(soundChip)
         }
         
-        // ビープ音サンプルの初期化
-        if let io = io {
-            beepSample = PC88BeepSample(io: io, cpuClock: cpuClock)
+        // 初期モデル用ビープ音生成の初期化
+        beepSound = PC88BeepSound()
+        if let beepSound = beepSound, let io = io as? PC88IO {
+            beepSound.initialize(sampleRate: 44100.0)
+            io.connectBeepSound(beepSound)
+            
+            // ビープ音テスト機能の初期化
+            beepTest = PC88BeepTest(io: io, cpuClock: cpuClock)
         }
         
         // ROMデータをメモリに転送
@@ -196,6 +204,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             soundChip.start()
             // サウンド品質を中品質に設定
             soundChip.setQualityMode(SoundQualityMode.medium)
+        }
+        
+        // 初期モデル用ビープ音生成を有効化
+        if let beepSound = beepSound {
+            beepSound.start()
         }
         
         // 省電力モードを有効化
@@ -742,11 +755,23 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     }
     
     /// ビープ音でドレミファソラシドを演奏
-    /// 4MHzモードを基準に各音1秒ずつ鳴らす
+    /// 8MHzモードでは各音0.25秒、4MHzモードでは各音0.5秒ずつ鳴らす
     func playBeepScale() {
-        // ビープ音サンプルが初期化されているか確認
-        guard let beepSample = beepSample else {
-            print("ビープ音サンプルが初期化されていません")
+        // ビープ音テストが初期化されているか確認
+        guard let beepTest = beepTest else {
+            print("ビープ音テストが初期化されていません")
+            return
+        }
+        
+        // ビープ音が初期化されているか確認
+        guard beepSound != nil else {
+            print("ビープ音生成機能が初期化されていません")
+            return
+        }
+        
+        // すでに再生中なら何もしない
+        if beepTest.isPlaying {
+            print("すでにビープ音が再生中です")
             return
         }
         
@@ -758,10 +783,28 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             pause()
         }
         
+        // CPUクロックモードを確認して表示
+        let clockModeText = cpuClock.currentMode == .mode4MHz ? "4MHz" : "8MHz"
+        print("現在のクロックモード: \(clockModeText)")
+        
+        // クロックモードが正しく設定されているか確認
+        if let z80 = cpu as? Z80CPU {
+            let cpuMode = z80.getClockMode()
+            if cpuMode != cpuClock.currentMode {
+                print("警告: CPUクロックモードが不一致しています。修正します。")
+                cpuClock.setClockMode(cpuMode)
+            }
+        }
+        
+        // ビープ音を有効化
+        if let beepSound = beepSound {
+            beepSound.start()
+        }
+        
         // 別スレッドで演奏を実行
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             // ドレミファソラシドを演奏
-            beepSample.playScale()
+            beepTest.playScale()
             
             // メインスレッドに戻ってエミュレーションを再開
             DispatchQueue.main.async {
@@ -769,8 +812,6 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                 if wasRunning {
                     self?.resume()
                 }
-                
-                print("ビープ音の演奏が完了しました")
             }
         }
         

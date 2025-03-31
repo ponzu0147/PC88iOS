@@ -87,6 +87,11 @@ class Z80CPU: CPUExecuting {
         resetInstructionTiming()
     }
     
+    /// 現在のCPUクロックモードを取得
+    func getClockMode() -> PC88CPUClock.ClockMode {
+        return self.cpuClock.currentMode
+    }
+    
     /// CPUクロックを設定
     func setCPUClock(_ clock: PC88CPUClock) {
         // 外部からCPUクロックを設定する場合の処理
