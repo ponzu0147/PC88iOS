@@ -30,10 +30,54 @@ class Z80CPU: CPUExecuting {
     // ホルトフラグ
     private var halted = false
     
+    // CPUクロック管理
+    private let cpuClock: PC88CPUClock
+    
+    // 実行した累積サイクル数
+    private var totalCycles: UInt64 = 0
+    
+    // 現在のマシンサイクル
+    private var currentMCycle: Int = 0
+    
+    // 現在のTステート
+    private var currentTState: Int = 0
+    
+    // 現在実行中の命令のサイクル情報
+    private var currentInstructionCycles: InstructionCycles?
+    
     /// 初期化
-    init(memory: MemoryAccessing, io: IOAccessing) {
+    init(memory: MemoryAccessing, io: IOAccessing, cpuClock: PC88CPUClock = PC88CPUClock()) {
         self.memory = memory
         self.io = io
+        self.cpuClock = cpuClock
+        
+        // クロックモード変更時の処理を設定
+        self.cpuClock.onModeChanged = { [weak self] newMode in
+            self?.handleClockModeChanged(newMode)
+        }
+    }
+    
+    /// 現在のCPUクロックモードを取得
+    func getCurrentClockMode() -> PC88CPUClock.ClockMode {
+        return cpuClock.currentMode
+    }
+    
+    /// CPUクロックモードを設定
+    func setClockMode(_ mode: PC88CPUClock.ClockMode) {
+        // 明示的にPC88CPUClockのメソッドを呼び出す
+        self.cpuClock.setClockMode(mode)
+    }
+    
+    /// CPUクロックを設定
+    func setCPUClock(_ clock: PC88CPUClock) {
+        // 外部からCPUクロックを設定する場合の処理
+        // 現在は特に何もしないが、必要に応じて実装を追加する
+    }
+    
+    /// クロックモード変更時の処理
+    private func handleClockModeChanged(_ mode: PC88CPUClock.ClockMode) {
+        // 必要な処理があればここに追加
+        print("CPUがクロックモード変更を検出: \(mode == .mode4MHz ? "4MHz" : "8MHz")")
     }
     
     /// CPUの初期化
@@ -47,18 +91,27 @@ class Z80CPU: CPUExecuting {
         interruptEnabled = false
         pendingInterrupt = nil
         halted = false
+        totalCycles = 0
+        currentMCycle = 0
+        currentTState = 0
+        currentInstructionCycles = nil
     }
     
     /// 1ステップ実行
     func executeStep() -> Int {
         // 割り込み処理
         if let interrupt = pendingInterrupt, interruptEnabled {
-            return handleInterrupt(interrupt)
+            let cycles = handleInterrupt(interrupt)
+            totalCycles = totalCycles &+ UInt64(cycles)
+            return cycles
         }
         
         // ホルト状態の場合
         if halted {
-            return 4 // ホルト中は4Tステート消費
+            // ホルト中はオペコードフェッチサイクルと同じサイクル数を消費
+            let haltCycles = MachineCycleType.opcodeFetch.tStates
+            totalCycles = totalCycles &+ UInt64(haltCycles)
+            return haltCycles
         }
         
         // 命令フェッチ
@@ -66,7 +119,9 @@ class Z80CPU: CPUExecuting {
         registers.pc = registers.pc &+ 1 // 安全な加算を使用
         
         // 命令実行
-        return executeInstruction(opcode)
+        let cycles = executeInstruction(opcode)
+        totalCycles = totalCycles &+ UInt64(cycles)
+        return cycles
     }
     
     /// 指定サイクル数実行
@@ -74,7 +129,10 @@ class Z80CPU: CPUExecuting {
         // サイクル数が負の場合は0を返す
         guard cycles > 0 else { return 0 }
         
-        var remainingCycles = cycles
+        // クロックモードに基づいてサイクル数を調整
+        let adjustedCycles = adjustCyclesForClockMode(cycles)
+        
+        var remainingCycles = adjustedCycles
         var executedCycles = 0
         
         // 無限ループを防止するためのカウンタ
@@ -86,7 +144,7 @@ class Z80CPU: CPUExecuting {
             // 安全な整数演算
             executedCycles = executedCycles &+ cyclesUsed
             
-            // cyclesUsedが0以下の場合は最小値を1にする
+            // cyclesUsed、0以下の場合は最小値を1にする
             let cyclesDeduct = cyclesUsed > 0 ? cyclesUsed : 1
             remainingCycles = remainingCycles &- cyclesDeduct
             
@@ -99,6 +157,30 @@ class Z80CPU: CPUExecuting {
         }
         
         return executedCycles
+    }
+    
+    /// 累積サイクル数を取得
+    func getTotalCycles() -> UInt64 {
+        return totalCycles
+    }
+    
+    /// 現在のマシンサイクルを取得
+    func getCurrentMCycle() -> Int {
+        return currentMCycle
+    }
+    
+    /// 現在のTステートを取得
+    func getCurrentTState() -> Int {
+        return currentTState
+    }
+    
+    /// クロックモードに基づいてサイクル数を調整
+    private func adjustCyclesForClockMode(_ cycles: Int) -> Int {
+        // 8MHzモードの場合は実行サイクル数を2倍にする
+        if cpuClock.currentMode == .mode8MHz {
+            return cycles * 2
+        }
+        return cycles
     }
     
     /// 割り込み要求
@@ -148,8 +230,18 @@ class Z80CPU: CPUExecuting {
             return unimplemented.cycles
         }
         
+        // 命令の詳細なサイクル情報を取得
+        currentInstructionCycles = instruction.cycleInfo
+        currentMCycle = 0
+        
         // 実行
         let cycles = instruction.execute(cpu: self, registers: &registers, memory: memory, io: io)
+        
+        // サイクル情報をリセット
+        currentInstructionCycles = nil
+        currentMCycle = 0
+        currentTState = 0
+        
         return cycles
     }
     
@@ -161,17 +253,31 @@ class Z80CPU: CPUExecuting {
         switch type {
         case .nmi:
             // NMI処理
+            // NMIは割り込み応答サイクルとメモリ書き込みサイクルを2回
+            let cycles = InstructionCycles.standard(
+                opcodeFetch: false,
+                memoryWrites: 2,
+                internalCycles: 1,
+                interruptAcknowledge: true
+            )
             pushWord(registers.pc)
             registers.pc = 0x0066
-            return 11
+            return cycles.tStates
             
         case .int:
             // INT処理（モード1）
             if interruptEnabled {
                 interruptEnabled = false
+                // INTは割り込み応答サイクルとメモリ書き込みサイクルを2回、内部処理サイクル
+                let cycles = InstructionCycles.standard(
+                    opcodeFetch: false,
+                    memoryWrites: 2,
+                    internalCycles: 2,
+                    interruptAcknowledge: true
+                )
                 pushWord(registers.pc)
                 registers.pc = 0x0038
-                return 13
+                return cycles.tStates
             }
             return 0
         }

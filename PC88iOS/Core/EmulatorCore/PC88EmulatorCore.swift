@@ -10,6 +10,8 @@ import CoreGraphics
 import UIKit
 import SwiftUI
 
+// インポートはプロジェクト全体で共有されているので、明示的なインポートは不要
+
 /// PC-88エミュレータのコア実装
 class PC88EmulatorCore: EmulatorCoreManaging {
     // MARK: - プロパティ
@@ -37,6 +39,12 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     /// エミュレーション速度（1.0 = 通常速度）
     private var emulationSpeed: Float = 1.0
+    
+    /// CPUクロック
+    private var cpuClock = PC88CPUClock()
+    
+    /// 現在のCPUクロックモード
+    private var currentClockMode: PC88CPUClock.ClockMode = .mode4MHz
     
     /// エミュレーションスレッド
     private var emulationThread: Thread?
@@ -75,6 +83,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         // CPUの初期化
         if let memory = memory, let io = io {
             cpu = Z80CPU(memory: memory, io: io)
+            
+            // CPUクロックモードを設定
+            if let z80 = cpu as? Z80CPU {
+                z80.setClockMode(currentClockMode)
+            }
         }
         
         // 画面の初期化
@@ -170,6 +183,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         // CPUのリセット
         cpu?.reset()
         
+        // 現在のクロックモードを再設定
+        if let z80 = cpu as? Z80CPU {
+            z80.setClockMode(currentClockMode)
+        }
+        
         // メモリのリセット
         if let memory = memory as? PC88Memory {
             memory.reset()
@@ -212,6 +230,23 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// 画面の取得
     func getScreen() -> CGImage? {
         return screenImage
+    }
+    
+    /// CPUクロックモードを設定
+    func setCPUClockMode(_ mode: PC88CPUClock.ClockMode) {
+        currentClockMode = mode
+        
+        // Z80 CPUのクロックモードを設定
+        if let z80 = cpu as? Z80CPU {
+            z80.setClockMode(mode)
+        }
+        
+        print("CPUクロックモードを変更: \(mode == .mode4MHz ? "4MHz" : "8MHz")")
+    }
+    
+    /// 現在のCPUクロックモードを取得
+    func getCurrentClockMode() -> PC88CPUClock.ClockMode {
+        return currentClockMode
     }
     
     /// エミュレーション速度の設定

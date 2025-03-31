@@ -8,14 +8,31 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State private var selectedTab = 0
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        TabView(selection: $selectedTab) {
+            // エミュレータ画面
+            EmulatorView()
+                .tabItem {
+                    Label("エミュレータ", systemImage: "desktopcomputer")
+                }
+                .tag(0)
+            
+            // テキスト表示テスト画面
+            PC88TextEmulatorView()
+                .tabItem {
+                    Label("テキスト表示", systemImage: "text.cursor")
+                }
+                .tag(1)
+            
+            // テキスト速度テスト画面
+            PC88TextSpeedTestView()
+                .tabItem {
+                    Label("速度テスト", systemImage: "speedometer")
+                }
+                .tag(2)
         }
-        .padding()
     }
 }
 

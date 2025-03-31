@@ -20,6 +20,7 @@ struct LDRegRegInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_r_r }
     var description: String { return "LD \(destination),\(source)" }
 }
 
@@ -35,6 +36,7 @@ struct LDRegImmInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 7 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_r_n }
     var description: String { return "LD \(destination),\(String(format: "0x%02X", value))" }
 }
 
@@ -52,6 +54,7 @@ struct LDRegMemInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 7 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_r_HL }
     var description: String { return "LD \(destination),(\(address))" }
 }
 
@@ -69,6 +72,7 @@ struct LDMemRegInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 7 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_HL_r }
     var description: String { return "LD (\(address)),\(source)" }
 }
 
@@ -85,6 +89,7 @@ struct LDMemImmInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 10 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_HL_n }
     var description: String { return "LD (\(address)),\(String(format: "0x%02X", value))" }
 }
 
@@ -97,6 +102,7 @@ struct LDABCInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 7 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_A_BC }
     var description: String { return "LD A,(BC)" }
 }
 
@@ -109,6 +115,7 @@ struct LDADEInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 7 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_A_DE }
     var description: String { return "LD A,(DE)" }
 }
 
@@ -123,6 +130,7 @@ struct LDAnnInstruction: Z80Instruction {
     
     var size: UInt16 { return 3 }
     var cycles: Int { return 13 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_A_nn }
     var description: String { return "LD A,(\(String(format: "0x%04X", address)))" }
 }
 
@@ -135,6 +143,7 @@ struct LDBCAInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 7 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_BC_A }
     var description: String { return "LD (BC),A" }
 }
 
@@ -147,6 +156,7 @@ struct LDDEAInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 7 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_DE_A }
     var description: String { return "LD (DE),A" }
 }
 
@@ -172,6 +182,7 @@ struct LDRegPairImmInstruction: Z80Instruction {
     
     var size: UInt16 { return 3 }
     var cycles: Int { return 10 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_rr_nn }
     var description: String { return "LD \(register),\(String(format: "0x%04X", value))" }
 }
 
@@ -186,5 +197,6 @@ struct LDnnAInstruction: Z80Instruction {
     
     var size: UInt16 { return 3 }
     var cycles: Int { return 13 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_nn_A }
     var description: String { return "LD (\(String(format: "0x%04X", address))),A" }
 }

@@ -150,6 +150,9 @@ class PC88Screen: ScreenRendering {
     /// 点滅状態を管理するフラグ（trueの場合、点滅テキストを表示）
     private var blinkState = true
     
+    /// 点滅カウンター（60FPSでのカウント用）
+    private var blinkCounter = 0
+    
     /// 点滅タイマー
     private var blinkTimer: Timer?
     
@@ -719,6 +722,56 @@ class PC88Screen: ScreenRendering {
         }
     }
     
+    // MARK: - テキストVRAMアクセス
+    
+    /// テキストVRAMから読み込む
+    func readTextVRAM(offset: Int) -> UInt8 {
+        guard offset >= 0 && offset < textVRAM.count else { return 0x20 } // 範囲外の場合はスペース
+        return textVRAM[offset]
+    }
+    
+    /// テキストVRAMに書き込む
+    func writeTextVRAM(offset: Int, value: UInt8) {
+        guard offset >= 0 && offset < textVRAM.count else { return }
+        textVRAM[offset] = value
+    }
+    
+    // MARK: - 拡張機能
+    
+    /// 画面を描画する
+    /// - Parameter context: 描画先のグラフィックスコンテキスト
+    func render(to context: CGContext) {
+        switch currentScreenMode {
+        case .text:
+            renderTextScreen(context: context)
+        case .graphics:
+            renderGraphicsScreen(context: context)
+        case .mixed:
+            renderGraphicsScreen(context: context)
+            renderTextScreen(context: context)
+        }
+    }
+    
+    /// 画面をクリアする
+    func clear() {
+        clearScreen()
+    }
+    
+    /// 画面の更新が必要かどうか
+    var needsUpdate: Bool {
+        return true // 常に更新が必要と仮定
+    }
+    
+    /// 画面の幅（ピクセル単位）
+    var screenWidth: Int {
+        return graphicsWidth
+    }
+    
+    /// 画面の高さ（ピクセル単位）
+    var screenHeight: Int {
+        return is400LineMode ? graphicsHeight400 : graphicsHeight200
+    }
+    
     // MARK: - I/Oポート処理
     
     /// I/Oポートからの読み込み
@@ -898,19 +951,24 @@ class PC88Screen: ScreenRendering {
         blinkTimer = nil
     }
     
+    /// 点滅状態を更新（60FPSに対応）
+    func updateBlinkState() {
+        // 60FPSでの点滅処理（約30フレームごとに切り替え）
+        blinkCounter += 1
+        if blinkCounter >= 30 { // 0.5秒相当（60FPSの場合）
+            blinkState.toggle()
+            blinkCounter = 0
+        }
+    }
+    
     /// 点滅タイマーをセットアップ
     private func setupBlinkTimer() {
         // 既存のタイマーを停止
         blinkTimer?.invalidate()
         
-        // 新しいタイマーを作成（0.5秒ごとに点滅状態を切り替え）
-        blinkTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            self.blinkState.toggle()
-            
-            // 画面の再描画をリクエスト
-            NotificationCenter.default.post(name: Notification.Name("PC88ScreenNeedsDisplay"), object: nil)
-        }
+        // 点滅処理はフレーム更新時に行うため、タイマーは不要
+        blinkCounter = 0
+        blinkState = true
     }
     
     func updateTextVRAM(at address: UInt16, value: UInt8) {
@@ -949,6 +1007,9 @@ class PC88Screen: ScreenRendering {
     
     func render() -> CGImage? {
         guard let context = screenBuffer else { return nil }
+        
+        // 点滅状態を更新（60FPSに対応）
+        updateBlinkState()
         
         // 背景を黒でクリア
         context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))

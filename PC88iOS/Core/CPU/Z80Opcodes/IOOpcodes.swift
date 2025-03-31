@@ -19,6 +19,7 @@ struct OUTInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 11 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.OUT_n_A }
     var description: String { return "OUT (\(String(format: "0x%02X", port))),A" }
 }
 
@@ -34,5 +35,6 @@ struct INInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 11 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.IN_A_n }
     var description: String { return "IN A,(\(String(format: "0x%02X", port)))" }
 }

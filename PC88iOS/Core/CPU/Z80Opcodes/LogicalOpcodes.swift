@@ -13,6 +13,7 @@ struct ANDInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.AND_r }
     var description: String { return "AND A," + sourceDescription() }
     
     private func sourceDescription() -> String {
@@ -69,6 +70,7 @@ struct ORInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.OR_r }
     var description: String { return "OR A," + sourceDescription() }
     
     private func sourceDescription() -> String {
@@ -125,6 +127,7 @@ struct XORInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.XOR_r }
     var description: String { return "XOR A," + sourceDescription() }
     
     private func sourceDescription() -> String {
@@ -181,6 +184,7 @@ struct CPInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.CP_r }
     var description: String { return "CP A," + sourceDescription() }
     
     private func sourceDescription() -> String {

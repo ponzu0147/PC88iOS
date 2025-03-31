@@ -407,6 +407,9 @@ protocol Z80Instruction {
     /// 命令の実行に必要なサイクル数
     var cycles: Int { get }
     
+    /// 命令の詳細なサイクル情報
+    var cycleInfo: InstructionCycles { get }
+    
     /// 命令の文字列表現
     var description: String { get }
 }
@@ -419,6 +422,7 @@ struct NOPInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP }
     var description: String { return "NOP" }
 }
 
@@ -432,6 +436,7 @@ struct HALTInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.HALT }
     var description: String { return "HALT" }
 }
 
@@ -444,6 +449,7 @@ struct DISInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.DI }
     var description: String { return "DI" }
 }
 
@@ -456,6 +462,7 @@ struct EIInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.EI }
     var description: String { return "EI" }
 }
 
@@ -472,6 +479,7 @@ struct UnimplementedInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP } // 未実装命令はNOPと同じサイクル情報を使用
     var description: String { return "UNIMPLEMENTED \(String(format: "0x%02X", opcode))" }
 }
 
@@ -500,6 +508,7 @@ struct POPInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 10 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.RET } // POPはRETと同じサイクル情報
     var description: String { return "POP \(register)" }
 }
 
@@ -527,6 +536,7 @@ struct RLCAInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP } // RLCAはNOPと同じサイクル情報
     var description: String { return "RLCA" }
 }
 
@@ -574,6 +584,7 @@ struct SBCInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.SBC_A_r }
     var description: String { return "SBC A,\(source)" }
 }
 
@@ -599,6 +610,7 @@ struct RRCAInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP } // RRCAはNOPと同じサイクル情報
     var description: String { return "RRCA" }
 }
 
@@ -618,6 +630,7 @@ struct EXAFInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP } // EX AF,AF'はNOPと同じサイクル情報
     var description: String { return "EX AF,AF'" }
 }
 
@@ -641,6 +654,7 @@ struct PUSHInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 11 }
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryWrites: 2) }
     var description: String { return "PUSH \(register)" }
 }
 
@@ -658,6 +672,7 @@ struct INCRegPairInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 6 }
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) }
     var description: String { return "INC \(register)" }
 }
 
@@ -676,6 +691,7 @@ struct LDDirectMemRegInstruction: Z80Instruction {
     
     var size: UInt16 { return 3 } // オペコード + アドレス(2バイト)
     var cycles: Int { return 13 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_nn_A } // 直接メモリアドレスへの書き込み
     var description: String { return "LD (\(String(format: "0x%04X", address))),\(source)" }
 }
 
@@ -704,6 +720,7 @@ struct ADDHLInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 11 }
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, internalCycles: 7) }
     var description: String { return "ADD HL,\(source)" }
 }
 
@@ -727,6 +744,7 @@ struct DJNZInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 } // オペコード + オフセット
     var cycles: Int { return 8 } // 非ジャンプ時のサイクル数
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 5) }
     var description: String { return "DJNZ \(String(format: "%+d", offset))" }
 }
 
@@ -746,6 +764,7 @@ struct CPLInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true) }
     var description: String { return "CPL" }
 }
 
@@ -768,6 +787,7 @@ struct IYPrefixedInstruction: Z80Instruction {
     
     var size: UInt16 { return instruction.size + 1 } // プレフィックスバイトを追加
     var cycles: Int { return instruction.cycles + 4 } // プレフィックス命令は通常の命令より4サイクル多く消費する
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true) }
     var description: String { return "IY: \(instruction.description)" }
 }
 
@@ -782,5 +802,6 @@ struct LDIYInstruction: Z80Instruction {
     
     var size: UInt16 { return 4 } // FD + 21 + nn (2バイト)
     var cycles: Int { return 14 } // LD HL,nnの10サイクル + プレフィックスの4サイクル
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) }
     var description: String { return "LD IY,\(String(format: "0x%04X", value))" }
 }
