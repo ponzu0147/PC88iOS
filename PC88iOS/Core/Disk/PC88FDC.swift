@@ -51,6 +51,21 @@ class PC88FDC: FDCEmulating {
         return diskImages[drive] != nil
     }
     
+    /// 指定されたドライブのディスク名を取得
+    func getDiskName(drive: Int) -> String? {
+        guard drive >= 0 && drive < diskImages.count else { return nil }
+        if let diskImage = diskImages[drive] as? D88DiskImage {
+            return diskImage.getDiskName()
+        }
+        return nil
+    }
+    
+    /// 指定されたドライブのディスクイメージを取得
+    func getDiskImage(drive: Int) -> DiskImageAccessing? {
+        guard drive >= 0 && drive < diskImages.count else { return nil }
+        return diskImages[drive]
+    }
+    
     /// 現在のドライブ
     private var currentDrive: Int = 0
     

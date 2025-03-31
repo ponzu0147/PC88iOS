@@ -39,12 +39,27 @@ class Z80CPU: CPUExecuting {
     private var idleLoopCycles: Int = 0
     private var idleLoopCounter: Int = 0
     private var instructionHistory: [(pc: UInt16, opcode: UInt8)] = []
+    private var idleLoopStartTime: Date? = nil
+    private var idleLoopDuration: TimeInterval = 0
+    private var idleLoopLastReportTime: Date? = nil
+    private var idleLoopReportInterval: TimeInterval = 5.0 // 5秒ごとにレポート
+    
+    // 命令トレース用プロパティ
+    private var instructionTraceFilter: ((UInt16) -> Bool)? = nil
     
     // アイドル検出の閾値（小さいほど検出しやすい）
     private var idleDetectionThreshold: Int = 5
     
     // アイドル状態でのスリープ時間（デフォルトは1ms）
     private var idleSleepTime: TimeInterval = 0.001
+    
+    // アイドルループの詳細情報
+    private var idleLoopContext: [String: Any] = [:]
+    
+    // 命令トレース機能
+    private var instructionTraceEnabled = false
+    private var instructionTraceCount = 0
+    private let maxInstructionTraceCount = 100 // 最大トレース数
     
     // CPUクロック管理
     let cpuClock: PC88CPUClock
@@ -169,10 +184,33 @@ class Z80CPU: CPUExecuting {
             totalCycles = totalCycles &+ UInt64(idleLoopCycles)
             idleLoopCounter += 1
             
-            // 定期的にアイドルループから抜け出して実際の状態を確認（100回に1回）
-            if idleLoopCounter >= 100 {
+            // 定期的にアイドルループの状態を報告
+            if idleLoopCounter % 1000 == 0 {
+                printIdleLoopInfo()
+            }
+            
+            // 定期的にアイドルループから抜け出して実際の状態を確認（500回に1回）
+            if idleLoopCounter >= 500 {
+                print("アイドルループから一時的に抜け出して状態を確認します (\(idleLoopCounter)回実行後)")
                 idleLoopDetected = false
                 idleLoopCounter = 0
+                
+                // 命令トレースを一時的に有効化して状態を確認
+                let wasTraceEnabled = instructionTraceEnabled
+                instructionTraceEnabled = true
+                instructionTraceCount = 0
+                
+                // 20命令後に自動的にトレースを元の状態に戻すフィルタを設定
+                let originalFilter = instructionTraceFilter
+                instructionTraceFilter = { _ in
+                    self.instructionTraceCount += 1
+                    if self.instructionTraceCount >= 20 {
+                        self.instructionTraceEnabled = wasTraceEnabled
+                        self.instructionTraceFilter = originalFilter
+                        return false
+                    }
+                    return true
+                }
             } else if idleLoopCounter > 10 {
                 // アイドル状態では設定された時間だけスリープしてCPU負荷を下げる
                 Thread.sleep(forTimeInterval: idleSleepTime)
@@ -277,6 +315,19 @@ class Z80CPU: CPUExecuting {
         return currentTState
     }
     
+    /// 命令トレースを有効化
+    func enableInstructionTrace() {
+        instructionTraceEnabled = true
+        instructionTraceCount = 0
+        print("\n*** 命令トレースを開始します (PC=\(String(format: "%04X", registers.pc))) ***\n")
+    }
+    
+    /// 命令トレースを無効化
+    func disableInstructionTrace() {
+        instructionTraceEnabled = false
+        print("\n*** 命令トレースを停止しました ***\n")
+    }
+    
     /// プログラムカウンタを設定
     func setProgramCounter(_ address: UInt16) {
         registers.pc = address
@@ -367,12 +418,67 @@ class Z80CPU: CPUExecuting {
     private func executeInstruction(_ opcode: UInt8) -> Int {
         // デコード
         let instruction = decoder.decode(opcode, memory: memory, pc: registers.pc)
+                // 命令トレース機能
+        if instructionTraceEnabled && instructionTraceCount < maxInstructionTraceCount {
+            // フィルタが設定されている場合はそれを適用
+            let shouldTrace = instructionTraceFilter?(registers.pc) ?? true
+            
+            if shouldTrace {
+                // 命令の詳細を表示
+                let pc = registers.pc
+                let opcodeStr = String(format: "%02X", opcode)
+                let instructionDesc = instruction.description
+                let regA = String(format: "%02X", registers.a)
+                let regBC = String(format: "%04X", registers.bc)
+                let regDE = String(format: "%04X", registers.de)
+                let regHL = String(format: "%04X", registers.hl)
+                let regSP = String(format: "%04X", registers.sp)
+                let regF = String(format: "%02X", registers.f)
+                
+                // メモリ内容も表示（PC周辺の数バイト）
+                var memoryDump = ""
+                for offset in 0..<4 {
+                    let addr = pc &+ UInt16(offset)
+                    if addr < 0xFFFF {
+                        let byte = memory.readByte(at: addr)
+                        memoryDump += String(format: "%02X ", byte)
+                    }
+                }
+                
+                print("TRACE[\(instructionTraceCount)]: PC=\(String(format: "%04X", pc)) OP=\(opcodeStr) \(instructionDesc) | A=\(regA) F=\(regF) BC=\(regBC) DE=\(regDE) HL=\(regHL) SP=\(regSP) | MEM=[\(memoryDump)]")
+                
+                instructionTraceCount += 1
+                
+                // トレース数が最大に達したら無効化
+                if instructionTraceCount >= maxInstructionTraceCount {
+                    print("\n命令トレースを終了しました（最大数に達しました）\n")
+                    instructionTraceEnabled = false
+                }
+            }
+        }
         
         // 未実装命令の場合は特別処理
         if let unimplemented = instruction as? UnimplementedInstruction {
             // 安全なPCの計算
             let previousPC = registers.pc > 0 ? registers.pc - 1 : 0
+            
+            // 詳細なデバッグ情報を出力
             print("警告: 未実装の命令 0x\(String(opcode, radix: 16, uppercase: true)) at PC=0x\(String(previousPC, radix: 16, uppercase: true))")
+            
+            // 周辺のメモリ内容を表示（命令列を確認するため）
+            let startAddr = max(0, Int(previousPC) - 5)
+            let endAddr = min(0xFFFF, Int(previousPC) + 10)
+            var memoryDump = "メモリダンプ ["
+            for addr in startAddr...endAddr {
+                let byte = memory.readByte(at: UInt16(addr))
+                memoryDump += "\(addr == Int(previousPC) ? "[" : "")0x\(String(byte, radix: 16, uppercase: true))\(addr == Int(previousPC) ? "]" : "") "
+            }
+            memoryDump += "]" 
+            print(memoryDump)
+            
+            // レジスタ状態も表示
+            print("レジスタ状態: A=0x\(String(registers.a, radix: 16)) BC=0x\(String(UInt16(registers.b) << 8 | UInt16(registers.c), radix: 16)) DE=0x\(String(UInt16(registers.d) << 8 | UInt16(registers.e), radix: 16)) HL=0x\(String(registers.hl, radix: 16)) SP=0x\(String(registers.sp, radix: 16))")
+            
             // PCを進めて次の命令に進む
             return unimplemented.cycles
         }
@@ -508,11 +614,189 @@ class Z80CPU: CPUExecuting {
                     // ループを検出したことを記録
                     idleLoopDetected = true
                     idleLoopCounter = 0
+                    idleLoopStartTime = Date()
+                    idleLoopLastReportTime = idleLoopStartTime
                     
-                    print("アイドルループを検出: PC=0x\(String(idleLoopPC, radix: 16, uppercase: true)), 長さ=\(idleLoopLength), サイクル数=\(idleLoopCycles)")
+                    // ループの周辺メモリ状態を記録
+                    captureIdleLoopContext()
+                    
+                    // ループ情報を出力
+                    printIdleLoopInfo(isInitialDetection: true)
                     return
                 }
             }
+        }
+    }
+    
+    /// アイドルループの周辺コンテキストを取得
+    private func captureIdleLoopContext() {
+        // レジスタ状態を記録
+        idleLoopContext["registers"] = [
+            "a": registers.a,
+            "bc": registers.bc,
+            "de": registers.de,
+            "hl": registers.hl,
+            "sp": registers.sp,
+            "pc": idleLoopPC,
+            "ix": registers.ix,
+            "iy": registers.iy,
+            "flags": registers.f
+        ]
+        
+        // ループ内の命令を記録
+        var loopInstructions: [[String: Any]] = []
+        var currentPC = idleLoopPC
+        
+        for opcode in idleLoopInstructions {
+            let instruction = decoder.decode(opcode, memory: memory, pc: currentPC)
+            loopInstructions.append([
+                "pc": currentPC,
+                "opcode": opcode,
+                "description": instruction.description
+            ])
+            
+            // 次の命令のPCを計算（簡易的な実装）
+            currentPC = currentPC &+ 1
+        }
+        idleLoopContext["instructions"] = loopInstructions
+        
+        // スタック内容を記録（最大16バイト）
+        var stackContents: [UInt8] = []
+        for offset in 0..<16 {
+            let stackAddr = registers.sp &+ UInt16(offset)
+            if stackAddr < 0xFFFF {
+                stackContents.append(memory.readByte(at: stackAddr))
+            }
+        }
+        idleLoopContext["stack"] = stackContents
+        
+        // ループ周辺のメモリ内容を記録
+        var memoryContents: [UInt8] = []
+        let startAddr = max(0, Int(idleLoopPC) - 16)
+        let endAddr = min(0xFFFF, Int(idleLoopPC) + 32)
+        
+        for addr in startAddr...endAddr {
+            memoryContents.append(memory.readByte(at: UInt16(addr)))
+        }
+        idleLoopContext["memory"] = memoryContents
+        idleLoopContext["memoryStart"] = startAddr
+        
+        // ALPHA-MINI-DOS関連の重要なメモリ領域を記録
+        // ディスクパラメータテーブル (0xF800-0xF80F)
+        var diskParamTable: [UInt8] = []
+        for addr in 0xF800...0xF80F {
+            diskParamTable.append(memory.readByte(at: UInt16(addr)))
+        }
+        idleLoopContext["diskParamTable"] = diskParamTable
+        
+        // ディスクコントロールレジスタ (0x00D8-0x00DF)
+        var diskControlRegs: [UInt8] = []
+        for addr in 0x00D8...0x00DF {
+            diskControlRegs.append(memory.readByte(at: UInt16(addr)))
+        }
+        idleLoopContext["diskControlRegs"] = diskControlRegs
+        
+        // BIOSワークエリア (0x0000-0x0100)
+        var biosWorkArea: [UInt8] = []
+        for addr in 0x0000...0x00FF {
+            biosWorkArea.append(memory.readByte(at: UInt16(addr)))
+        }
+        idleLoopContext["biosWorkArea"] = biosWorkArea
+        
+        // ディスクI/Oポートの状態をシミュレートして取得
+        // 実際のポート状態は取得できないため、メモリの値から推測
+        var diskStatus: [String: Any] = [:]
+        
+        // ディスクステータスレジスタの推測値
+        let inferredStatus = memory.readByte(at: 0x00D8)
+        diskStatus["status"] = inferredStatus
+        
+        // ディスクコマンドレジスタの推測値
+        let inferredCommand = memory.readByte(at: 0x00D9)
+        diskStatus["command"] = inferredCommand
+        
+        // トラックレジスタの推測値
+        let inferredTrack = memory.readByte(at: 0x00DA)
+        diskStatus["track"] = inferredTrack
+        
+        // セクタレジスタの推測値
+        let inferredSector = memory.readByte(at: 0x00DB)
+        diskStatus["sector"] = inferredSector
+        
+        idleLoopContext["diskStatus"] = diskStatus
+    }
+    
+    /// アイドルループ情報を出力
+    private func printIdleLoopInfo(isInitialDetection: Bool = false) {
+        let now = Date()
+        
+        // 初回検出時または一定間隔でのみ詳細情報を出力
+        if isInitialDetection || idleLoopLastReportTime == nil || 
+           now.timeIntervalSince(idleLoopLastReportTime!) >= idleLoopReportInterval {
+            
+            // 経過時間を計算
+            var durationInfo = ""
+            if let startTime = idleLoopStartTime {
+                let duration = now.timeIntervalSince(startTime)
+                idleLoopDuration = duration
+                durationInfo = String(format: "経過時間: %.2f秒", duration)
+            }
+            
+            print("\n===== アイドルループ情報 =====")
+            print("PC: 0x\(String(idleLoopPC, radix: 16, uppercase: true))")
+            print("長さ: \(idleLoopLength) 命令")
+            print("サイクル数: \(idleLoopCycles)")
+            print("実行回数: \(idleLoopCounter)")
+            print(durationInfo)
+            
+            // レジスタ情報を出力
+            if let registers = idleLoopContext["registers"] as? [String: Any] {
+                print("\nレジスタ状態:")
+                print("A: 0x\(String(format: "%02X", registers["a"] as? UInt8 ?? 0))")
+                print("BC: 0x\(String(format: "%04X", registers["bc"] as? UInt16 ?? 0))")
+                print("DE: 0x\(String(format: "%04X", registers["de"] as? UInt16 ?? 0))")
+                print("HL: 0x\(String(format: "%04X", registers["hl"] as? UInt16 ?? 0))")
+                print("SP: 0x\(String(format: "%04X", registers["sp"] as? UInt16 ?? 0))")
+                print("Flags: 0x\(String(format: "%02X", registers["flags"] as? UInt8 ?? 0))")
+            }
+            
+            // 命令情報を出力
+            if let instructions = idleLoopContext["instructions"] as? [[String: Any]] {
+                print("\nループ内の命令:")
+                for inst in instructions {
+                    let pc = inst["pc"] as? UInt16 ?? 0
+                    let opcode = inst["opcode"] as? UInt8 ?? 0
+                    let desc = inst["description"] as? String ?? "不明"
+                    print("0x\(String(format: "%04X", pc)): 0x\(String(format: "%02X", opcode)) - \(desc)")
+                }
+            }
+            
+            // メモリ内容を出力
+            if let memory = idleLoopContext["memory"] as? [UInt8],
+               let memoryStart = idleLoopContext["memoryStart"] as? Int {
+                print("\n周辺メモリ内容:")
+                var line = ""
+                for (index, byte) in memory.enumerated() {
+                    let addr = memoryStart + index
+                    if index % 8 == 0 {
+                        if !line.isEmpty {
+                            print(line)
+                        }
+                        line = "0x\(String(format: "%04X", addr)): "
+                    }
+                    let highlight = addr == Int(idleLoopPC) ? "[" : " "
+                    let endHighlight = addr == Int(idleLoopPC) ? "]" : " "
+                    line += "\(highlight)\(String(format: "%02X", byte))\(endHighlight)"
+                }
+                if !line.isEmpty {
+                    print(line)
+                }
+            }
+            
+            print("=============================\n")
+            
+            // 最終レポート時間を更新
+            idleLoopLastReportTime = now
         }
     }
     

@@ -4,6 +4,9 @@
 //
 //  Created by 越川将人 on 2025/03/29.
 //
+//  注意: このファイルは Z80Opcodes/ControlOpcodes.swift で定義されている
+//  JumpCondition, JPInstruction, JRInstruction, CALLInstruction, RETInstruction の型を使用します。
+//  これらの型はZ80InstructionDecoderでは定義されていません。
 
 import Foundation
 
@@ -45,15 +48,174 @@ class Z80InstructionDecoder {
             return LDRegPairImmInstruction(register: .hl, value: value)
         case 0x23: // INC HL
             return INCRegPairInstruction(register: .hl)
+        case 0x02: // LD (BC),A
+            return LDMemRegInstruction(address: .bc, source: .a)
+            
+        case 0x1A: // LD A,(DE)
+            return LDRegMemInstruction(destination: .a, address: .de)
+            
         case 0x32: // LD (nn),A
             let lowByte = memory.readByte(at: pc)
             let highByte = memory.readByte(at: pc &+ 1)
             let address = UInt16(highByte) << 8 | UInt16(lowByte)
             return LDDirectMemRegInstruction(address: address, source: .a)
+            
+        case 0x3A: // LD A,(nn)
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDRegMemAddrInstruction(destination: .a, address: address)
+            
+        case 0x3B: // DEC SP
+            return DECRegPairInstruction(register: .sp)
+        case 0x01: // LD BC,nn
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let value = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDRegPairImmInstruction(register: .bc, value: value)
+        case 0x04: // INC B
+            return INCRegInstruction(register: .b)
+        case 0x05: // DEC B
+            return DECRegInstruction(register: .b)
+        case 0x06: // LD B,n
+            let value = memory.readByte(at: pc)
+            return LDRegImmInstruction(destination: .b, value: value)
+        case 0x0A: // LD A,(BC)
+            return LDRegMemInstruction(destination: .a, address: .bc)
+        case 0x0C: // INC C
+            return INCRegInstruction(register: .c)
+        case 0x0D: // DEC C
+            return DECRegInstruction(register: .c)
+        case 0x0E: // LD C,n
+            let value = memory.readByte(at: pc)
+            return LDRegImmInstruction(destination: .c, value: value)
+        case 0x14: // INC D
+            return INCRegInstruction(register: .d)
+        case 0x15: // DEC D
+            return DECRegInstruction(register: .d)
+        case 0x16: // LD D,n
+            let value = memory.readByte(at: pc)
+            return LDRegImmInstruction(destination: .d, value: value)
+        case 0x1C: // INC E
+            return INCRegInstruction(register: .e)
+        case 0x1D: // DEC E
+            return DECRegInstruction(register: .e)
+        case 0x1E: // LD E,n
+            let value = memory.readByte(at: pc)
+            return LDRegImmInstruction(destination: .e, value: value)
+        case 0x22: // LD (nn),HL
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDMemAddrRegPairInstruction(address: address, source: .hl)
+        case 0x24: // INC H
+            return INCRegInstruction(register: .h)
+        case 0x25: // DEC H
+            return DECRegInstruction(register: .h)
+        case 0x26: // LD H,n
+            let value = memory.readByte(at: pc)
+            return LDRegImmInstruction(destination: .h, value: value)
+        case 0x2A: // LD HL,(nn)
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDRegPairMemAddrInstruction(destination: .hl, address: address)
+        case 0x2C: // INC L
+            return INCRegInstruction(register: .l)
+        case 0x2D: // DEC L
+            return DECRegInstruction(register: .l)
+        case 0x2E: // LD L,n
+            let value = memory.readByte(at: pc)
+            return LDRegImmInstruction(destination: .l, value: value)
+        case 0x31: // LD SP,nn
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let value = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDRegPairImmInstruction(register: .sp, value: value)
+        case 0x33: // INC SP
+            return INCRegPairInstruction(register: .sp)
+        case 0x36: // LD (HL),n
+            let value = memory.readByte(at: pc)
+            return LDMemImmInstruction(address: .hl, value: value)
+        case 0x18: // JR n
+            let offset = memory.readByte(at: pc)
+            return JRInstruction(condition: .none, offset: Int8(bitPattern: offset))
+        case 0x20: // JR NZ,n
+            let offset = memory.readByte(at: pc)
+            return JRInstruction(condition: .notZero, offset: Int8(bitPattern: offset))
+        case 0x28: // JR Z,n
+            let offset = memory.readByte(at: pc)
+            return JRInstruction(condition: .zero, offset: Int8(bitPattern: offset))
+        case 0x30: // JR NC,n
+            let offset = memory.readByte(at: pc)
+            return JRInstruction(condition: .notCarry, offset: Int8(bitPattern: offset))
+        case 0x38: // JR C,n
+            let offset = memory.readByte(at: pc)
+            return JRInstruction(condition: .carry, offset: Int8(bitPattern: offset))
         case 0x39: // ADD HL,SP
             return ADDHLInstruction(source: .sp)
         case 0x76: // HALT
             return HALTInstruction()
+        case 0xC0: // RET NZ
+            return RETInstruction(condition: .notZero)
+        case 0xC2: // JP NZ,nn
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return JPInstruction(condition: .notZero, address: address)
+        case 0xC3: // JP nn
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return JPInstruction(condition: .none, address: address)
+        case 0xC4: // CALL NZ,nn
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return CALLInstruction(condition: .notZero, address: address)
+        case 0xC8: // RET Z
+            return RETInstruction(condition: .zero)
+        case 0xC9: // RET
+            return RETInstruction(condition: .none)
+        case 0xCA: // JP Z,nn
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return JPInstruction(condition: .zero, address: address)
+        case 0xCC: // CALL Z,nn
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return CALLInstruction(condition: .zero, address: address)
+        case 0xCD: // CALL nn
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return CALLInstruction(condition: .none, address: address)
+        case 0xD0: // RET NC
+            return RETInstruction(condition: .notCarry)
+        case 0xD2: // JP NC,nn
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return JPInstruction(condition: .notCarry, address: address)
+        case 0xD4: // CALL NC,nn
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return CALLInstruction(condition: .notCarry, address: address)
+        case 0xD8: // RET C
+            return RETInstruction(condition: .carry)
+        case 0xDA: // JP C,nn
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return JPInstruction(condition: .carry, address: address)
+        case 0xDC: // CALL C,nn
+            let lowByte = memory.readByte(at: pc)
+            let highByte = memory.readByte(at: pc &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return CALLInstruction(condition: .carry, address: address)
         case 0x98: // SBC A,B
             return SBCInstruction(source: .b)
         case 0xC5: // PUSH BC
@@ -680,6 +842,39 @@ struct INCRegPairInstruction: Z80Instruction {
 
 
 
+/// LD A,(nn)命令（直接アドレスからAレジスタへのロード）
+struct LDRegMemAddrInstruction: Z80Instruction {
+    let destination: RegisterOperand
+    let address: UInt16
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        let value = memory.readByte(at: address)
+        destination.write(to: &registers, value: value)
+        return cycles
+    }
+    
+    var size: UInt16 { return 3 }
+    var cycles: Int { return 13 }
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryReads: 3, internalCycles: 2) }
+    var description: String { return "LD \(destination),(\(String(address, radix: 16)))" }
+}
+
+/// レジスタペアのデクリメント命令
+struct DECRegPairInstruction: Z80Instruction {
+    let register: RegisterPairOperand
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        let value = register.read(from: registers)
+        register.write(to: &registers, value: value &- 1)
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 6 }
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) }
+    var description: String { return "DEC \(register)" }
+}
+
 /// LD直接メモリレジスタ命令
 struct LDDirectMemRegInstruction: Z80Instruction {
     let address: UInt16
@@ -807,3 +1002,13 @@ struct LDIYInstruction: Z80Instruction {
     var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) }
     var description: String { return "LD IY,\(String(format: "0x%04X", value))" }
 }
+
+
+
+
+
+
+
+
+
+

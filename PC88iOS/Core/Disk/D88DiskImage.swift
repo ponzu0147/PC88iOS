@@ -316,20 +316,31 @@ class D88DiskImage: DiskImageAccessing {
                 let isValidSectorSize = sectorSize > 0 && sectorSize <= 8192 // 8KBを上限とする
                 
                 if !isValidSectorSize {
-                    print("警告: セクタサイズが異常です - N=\(n) (理論値: \(theoreticalSize)バイト) vs 実際: \(sectorSize)バイト")
+                    print("警告: セクタサイズが異常です - N=\(n) (理論値: \(theoreticalSize)バイト) vs 実際: \(sectorSize)バイト)")
                     
                     // ALPHA-MINI-DOSの特別処理
-                    if isAlphaMiniDos() && c == 0 && r == 1 {
-                        print("  ALPHA-MINI-DOSのIPLセクタを検出しました。特別処理を適用します。")
-                        // 固定サイズ（256バイト）を使用
-                        let specialSize = 256
-                        let safeOffset = min(dataOffset, data.count - 1)
-                        let safeSize = min(specialSize, data.count - safeOffset)
-                        let sectorID = SectorID(cylinder: c, head: h, record: r, size: n)
-                        let sector = SectorData(id: sectorID, data: data.subdata(in: safeOffset..<(safeOffset + safeSize)))
-                        sectors.append(sector)
-                        currentOffset += 0x10 + sectorSize
-                        continue // 次のセクタへ
+                    if isAlphaMiniDos() {
+                        // IPLセクタ（トラック0、セクタ1）またはその他の重要なセクタの場合
+                        if (c == 0 && r == 1) || (track == 0 && side == 0) {
+                            print("  ALPHA-MINI-DOSの重要セクタを検出しました。特別処理を適用します。")
+                            // 固定サイズ（256バイト）を使用 - 標準的なセクタサイズ
+                            let specialSize = 256
+                            let safeOffset = min(dataOffset, data.count - 1)
+                            let safeSize = min(specialSize, data.count - safeOffset)
+                            
+                            // セクタIDを修正（異常な値の場合）
+                            let correctedC = c > 80 ? UInt8(track) : c  // 異常な値の場合はトラック番号を使用
+                            let correctedH = h > 1 ? UInt8(side) : h    // 異常な値の場合はサイド番号を使用
+                            let correctedR = r > 26 ? UInt8(1) : r      // 異常な値の場合は1を使用
+                            let correctedN = n > 3 ? UInt8(1) : n       // 異常な値の場合は1（256バイト）を使用
+                            
+                            let sectorID = SectorID(cylinder: correctedC, head: correctedH, record: correctedR, size: correctedN)
+                            let sector = SectorData(id: sectorID, data: data.subdata(in: safeOffset..<(safeOffset + safeSize)))
+                            sectors.append(sector)
+                            print("  修正されたセクタID: C=\(correctedC), H=\(correctedH), R=\(correctedR), N=\(correctedN) (\(safeSize)バイト)")
+                            currentOffset += 0x10 + sectorSize
+                            continue // 次のセクタへ
+                        }
                     }
                     
                     // 異常なセクタサイズの場合、理論値を使用
@@ -342,6 +353,15 @@ class D88DiskImage: DiskImageAccessing {
                         sectors.append(sector)
                         currentOffset += 0x10 + sectorSize
                         continue // 次のセクタへ
+                    } else {
+                        // 理論値も異常な場合は、固定の安全な値を使用
+                        print("  理論値も異常なため、安全な固定値（256バイト）を使用します")
+                        let safeSize = min(256, data.count - dataOffset)
+                        let sectorID = SectorID(cylinder: c, head: h, record: r, size: 1) // N=1 (256バイト)
+                        let sector = SectorData(id: sectorID, data: data.subdata(in: dataOffset..<(dataOffset + safeSize)))
+                        sectors.append(sector)
+                        currentOffset += 0x10 + sectorSize
+                        continue // 次のセクタへ
                     }
                 } else if theoreticalSize != sectorSize {
                     print("警告: セクタサイズの不一致 - N=\(n) (理論値: \(theoreticalSize)バイト) vs 実際: \(sectorSize)バイト)")
@@ -351,6 +371,29 @@ class D88DiskImage: DiskImageAccessing {
                 let isValidID = c < 80 && h < 2 && r < 30 // 一般的な制限
                 if !isValidID {
                     print("警告: セクタIDが異常です - C=\(c), H=\(h), R=\(r)")
+                    
+                    // ALPHA-MINI-DOSの場合、異常なセクタIDを修正
+                    if isAlphaMiniDos() {
+                        // セクタデータの読み取り
+                        guard dataOffset + sectorSize <= data.count else { break }
+                        let sectorDataChunk = data.subdata(in: dataOffset..<dataOffset + sectorSize)
+                        
+                        // セクタIDを修正（異常な値の場合）
+                        let correctedC = c > 80 ? UInt8(track) : c  // 異常な値の場合はトラック番号を使用
+                        let correctedH = h > 1 ? UInt8(side) : h    // 異常な値の場合はサイド番号を使用
+                        let correctedR = r > 26 ? UInt8(sectors.count + 1) : r // 異常な値の場合は連番を使用
+                        
+                        print("  ALPHA-MINI-DOS: セクタIDを修正しました - C=\(correctedC), H=\(correctedH), R=\(correctedR)")
+                        
+                        // 修正したセクタIDを使用
+                        let sectorID = SectorID(cylinder: correctedC, head: correctedH, record: correctedR, size: n)
+                        let sector = SectorData(id: sectorID, data: sectorDataChunk)
+                        sectors.append(sector)
+                        
+                        // 次のセクタへ
+                        currentOffset = dataOffset + sectorSize
+                        continue // 次のセクタへ
+                    }
                 }
                 
                 // セクタデータの読み取り
@@ -713,6 +756,11 @@ class D88DiskImage: DiskImageAccessing {
         return defaultSector
     }
     
+    /// ディスク名を取得する
+    func getDiskName() -> String {
+        return diskName
+    }
+    
     /// ディスクイメージがALPHA-MINI-DOSかどうかを判定
     private func isAlphaMiniDos() -> Bool {
         // ディスク名でチェック
@@ -736,6 +784,29 @@ class D88DiskImage: DiskImageAccessing {
                diskData[signatureOffset + 3] == 0x00 {
                 return true
             }
+            
+            // F3 C3 で始まるかチェック（DI命令とJP命令）
+            if diskData[signatureOffset] == 0xF3 && 
+               diskData[signatureOffset + 1] == 0xC3 {
+                return true
+            }
+        }
+        
+        // セクタデータの特徴をチェック
+        for trackData in sectorData where trackData.track == 0 && trackData.side == 0 {
+            for sector in trackData.sectors {
+                // セクタデータの先頭をチェック
+                if sector.data.count >= 4 {
+                    let bytes = [UInt8](sector.data)
+                    // DI命令（0xF3）で始まるセクタを探す
+                    if bytes[0] == 0xF3 {
+                        // 次がJP命令（0xC3）またはLD A,(nn)命令（0x3A）
+                        if bytes[1] == 0xC3 || bytes[1] == 0x3A {
+                            return true
+                        }
+                    }
+                }
+            }
         }
         
         return false
@@ -751,8 +822,70 @@ class D88DiskImage: DiskImageAccessing {
             return getDefaultIplSector()
         }
         
-        print("  ALPHA-MINI-DOSのIPLを抽出しました: オフセット=0x\(String(format: "%04X", alphaMiniDosIplOffset))")
-        return [UInt8](diskData.subdata(in: alphaMiniDosIplOffset..<alphaMiniDosIplOffset + iplSize))
+        // IPLの内容を詳細に表示
+        print("  ALPHA-MINI-DOSのIPLを抽出します: オフセット=0x\(String(format: "%04X", alphaMiniDosIplOffset))")
+        print("  IPLの最初の16バイト:")
+        
+        // IPLデータを取得
+        let iplData = [UInt8](diskData.subdata(in: alphaMiniDosIplOffset..<alphaMiniDosIplOffset + iplSize))
+        
+        // 最初の16バイトを表示
+        for i in 0..<min(16, iplData.count) {
+            print(String(format: "%02X ", iplData[i]), terminator: "")
+        }
+        print("")
+        
+        // IPLコードの典型的な特徴を確認
+        if iplData.count >= 4 {
+            if iplData[0] == 0xF3 { // DI命令（割り込み禁止）
+                print("  IPLの先頭にDI命令を確認: 正常")
+            } else {
+                print("  警告: IPLの先頭がDI命令ではありません (0x\(String(format: "%02X", iplData[0])))")
+                
+                // IPLが無効な場合、ディスクイメージ内を検索して有効なIPLを見つける
+                print("  有効なIPLを検索します...")
+                
+                // ディスクイメージ内の複数の場所を検索
+                let possibleOffsets = [0x02C0, 0x0000, 0x0100, 0x0200, 0x0300, 0x0400]
+                
+                for offset in possibleOffsets where offset != alphaMiniDosIplOffset {
+                    if offset + iplSize <= diskData.count {
+                        let candidateData = [UInt8](diskData.subdata(in: offset..<offset + iplSize))
+                        
+                        // 有効なIPLの特徴をチェック
+                        if candidateData[0] == 0xF3 && (candidateData[1] == 0xC3 || candidateData[1] == 0x3A) {
+                            print("  オフセット0x\(String(format: "%04X", offset))で有効なIPLを発見しました")
+                            return candidateData
+                        }
+                    }
+                }
+                
+                // 有効なIPLが見つからない場合は、修正を試みる
+                var modifiedIpl = iplData
+                modifiedIpl[0] = 0xF3  // DI命令を先頭に設定
+                if modifiedIpl[1] != 0xC3 && modifiedIpl[1] != 0x3A {
+                    modifiedIpl[1] = 0xC3  // JP命令を設定
+                    modifiedIpl[2] = 0x00  // アドレス下位バイト
+                    modifiedIpl[3] = 0x01  // アドレス上位バイト（0x0100にジャンプ）
+                }
+                print("  IPLを修正しました")
+                return modifiedIpl
+            }
+            
+            // ジャンプ命令を確認
+            if iplData[1] == 0xC3 { // JP命令
+                let jumpAddress = UInt16(iplData[2]) | (UInt16(iplData[3]) << 8)
+                print("  JP命令を確認: 0x\(String(format: "%04X", jumpAddress))にジャンプ")
+            } else if iplData[1] == 0x3A { // LD A,(nn)命令
+                let memAddress = UInt16(iplData[2]) | (UInt16(iplData[3]) << 8)
+                print("  LD A,(\(String(format: "%04X", memAddress)))命令を確認")
+            } else {
+                print("  警告: 2バイト目が予期しない命令です: 0x\(String(format: "%02X", iplData[1]))")
+            }
+        }
+        
+        // IPLデータを返す
+        return iplData
     }
     
     /// ALPHA-MINI-DOSのOS部分を抽出
@@ -761,7 +894,8 @@ class D88DiskImage: DiskImageAccessing {
             return nil
         }
         
-        let osSize = 2048 // OS部分のサイズ（適切なサイズに調整）
+        // ALPHA-MINI-DOSのOS部分は大きめに取る
+        let osSize = 4096 // OS部分のサイズを増やして確実に取得
         
         // OSオフセットからデータを抽出
         guard alphaMiniDosOsOffset + osSize <= diskData.count else {
@@ -769,8 +903,40 @@ class D88DiskImage: DiskImageAccessing {
             return nil
         }
         
-        print("  ALPHA-MINI-DOSのOS部分を抽出しました: オフセット=0x\(String(format: "%04X", alphaMiniDosOsOffset))")
-        return [UInt8](diskData.subdata(in: alphaMiniDosOsOffset..<alphaMiniDosOsOffset + osSize))
+        // OS部分のデータを取得
+        let osData = [UInt8](diskData.subdata(in: alphaMiniDosOsOffset..<alphaMiniDosOsOffset + osSize))
+        
+        print("  ALPHA-MINI-DOSのOS部分を抽出しました: オフセット=0x\(String(format: "%04X", alphaMiniDosOsOffset)), サイズ=\(osData.count)バイト")
+        
+        // OS部分の最初の32バイトを表示
+        print("  OS部分の最初の32バイト:")
+        for i in 0..<min(32, osData.count) {
+            if i % 16 == 0 && i > 0 {
+                print("")
+            }
+            print(String(format: "%02X ", osData[i]), terminator: "")
+        }
+        print("")
+        
+        // OS部分の特徴を確認
+        print("  OS部分の特徴を確認中...")
+        
+        // 有効なコードか確認
+        var validCodeFound = false
+        for i in 0..<min(256, osData.count) {
+            if osData[i] != 0 && osData[i] != 0xFF {
+                validCodeFound = true
+                break
+            }
+        }
+        
+        if validCodeFound {
+            print("  OS部分に有効なコードを確認しました")
+        } else {
+            print("  警告: OS部分に有効なコードが見つかりません")
+        }
+        
+        return osData
     }
     
     /// D88ディスクイメージからOSセクタを読み込む

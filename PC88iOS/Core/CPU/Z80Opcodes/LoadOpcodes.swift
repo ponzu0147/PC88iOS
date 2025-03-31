@@ -162,21 +162,12 @@ struct LDDEAInstruction: Z80Instruction {
 
 /// LD rp,nn命令（レジスタペアに16ビット即値をロード）
 struct LDRegPairImmInstruction: Z80Instruction {
-    let register: RegisterType
+    let register: RegisterPairOperand
     let value: UInt16
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
-        // 直接レジスタを更新する
-        switch register {
-        case .af: registers.af = value
-        case .bc: registers.bc = value
-        case .de: registers.de = value
-        case .hl: registers.hl = value
-        case .ix: registers.ix = value
-        case .iy: registers.iy = value
-        case .sp: registers.sp = value
-        case .pc: registers.pc = value
-        }
+        // レジスタペアに値を書き込む
+        register.write(to: &registers, value: value)
         return cycles
     }
     
@@ -199,4 +190,38 @@ struct LDnnAInstruction: Z80Instruction {
     var cycles: Int { return 13 }
     var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_nn_A }
     var description: String { return "LD (\(String(format: "0x%04X", address))),A" }
+}
+
+/// LD (nn),HL命令（HLレジスタペアの内容をメモリに格納）
+struct LDMemAddrRegPairInstruction: Z80Instruction {
+    let address: UInt16
+    let source: RegisterPairOperand
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        let value = source.read(from: registers)
+        memory.writeWord(value, at: address)
+        return cycles
+    }
+    
+    var size: UInt16 { return 3 }
+    var cycles: Int { return 16 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_nn_HL }
+    var description: String { return "LD (\(String(format: "0x%04X", address))),\(source)" }
+}
+
+/// LD HL,(nn)命令（メモリからHLレジスタペアにロード）
+struct LDRegPairMemAddrInstruction: Z80Instruction {
+    let destination: RegisterPairOperand
+    let address: UInt16
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        let value = memory.readWord(at: address)
+        destination.write(to: &registers, value: value)
+        return cycles
+    }
+    
+    var size: UInt16 { return 3 }
+    var cycles: Int { return 16 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_HL_nn }
+    var description: String { return "LD \(destination),(\(String(format: "0x%04X", address)))" }
 }

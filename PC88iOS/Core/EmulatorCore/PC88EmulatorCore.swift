@@ -176,14 +176,29 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         // ROMデータをメモリに転送
         loadROMsToMemory()
         
-        // テスト画面を表示
-        if let pc88Screen = screen as? PC88Screen {
-            pc88Screen.displayTestScreen()
-            print("テスト画面を表示しました")
-        }
-        
         // ALPHA-MINI-DOSディスクイメージを読み込む
         loadDefaultDiskImage()
+        
+        // ALPHA-MINI-DOSディスクが読み込まれているか確認
+        if let pc88FDC = fdc as? PC88FDC {
+            let diskName = pc88FDC.getDiskName(drive: 0) ?? ""
+            if diskName.contains("ALPHA-MINI") {
+                // ALPHA-MINI-DOSの場合はテスト画面を表示しない
+                print("ALPHA-MINI-DOSディスクが読み込まれているため、テスト画面をスキップします")
+            } else {
+                // 通常のディスクまたはディスクがない場合はテスト画面を表示
+                if let pc88Screen = screen as? PC88Screen {
+                    pc88Screen.displayTestScreen()
+                    print("テスト画面を表示しました")
+                }
+            }
+        } else {
+            // FDCが初期化されていない場合はテスト画面を表示
+            if let pc88Screen = screen as? PC88Screen {
+                pc88Screen.displayTestScreen()
+                print("テスト画面を表示しました")
+            }
+        }
         
         // FDDブートを有効化
         setFDDBootEnabled(true)
@@ -754,23 +769,131 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             return
         }
         
-        print("IPLをロード中: ドライブ1、トラック0、セクタ1")
+        // ディスクイメージの種類を確認
+        let diskName = pc88FDC.getDiskName(drive: 0) ?? ""
+        let isAlphaMiniDos = diskName.contains("ALPHA-MINI")
         
-        // ブートセクタを読み込む (トラック0、セクタ1)
-        if let sectorData = pc88FDC.readSector(drive: 0, track: 0, sector: 1) {
-            // メモリの0xC000にIPLをロード (256バイト)
-            for (offset, byte) in sectorData.enumerated() {
-                pc88Memory.writeByte(byte, at: 0xC000 + UInt16(offset))
-            }
-            print("IPLをメモリにロードしました: 0xC000-0xC0FF")
+        if isAlphaMiniDos {
+            // ALPHA-MINI-DOS用の特別処理
+            print("ALPHA-MINI-DOSを検出しました。特別処理を実行します。")
             
-            // IPLの実行を開始するためにPCを0xC000に設定
-            if let z80 = cpu as? Z80CPU {
-                z80.setProgramCounter(0xC000)
-                print("プログラムカウンタを0xC000に設定しました")
+            // D88DiskImageから直接IPLを取得
+            if let d88DiskImage = pc88FDC.getDiskImage(drive: 0) as? D88DiskImage,
+               let iplData = d88DiskImage.readSector(track: 0, sector: 1) {
+                
+                // メモリの0xC000にIPLをロード (256バイト)
+                for (offset, byte) in iplData.enumerated() {
+                    pc88Memory.writeByte(byte, at: 0xC000 + UInt16(offset))
+                }
+                print("ALPHA-MINI-DOSのIPLをメモリにロードしました: 0xC000-0xC0FF")
+                
+                // OS部分もロード
+                loadAlphaMiniDosOs()
+            } else {
+                print("ALPHA-MINI-DOSのIPLの読み込みに失敗しました")
             }
         } else {
-            print("IPLの読み込みに失敗しました")
+            // 通常のディスクイメージの処理
+            print("IPLをロード中: ドライブ1、トラック0、セクタ1")
+            
+            // ブートセクタを読み込む (トラック0、セクタ1)
+            if let sectorData = pc88FDC.readSector(drive: 0, track: 0, sector: 1) {
+                // メモリの0x8000にIPLをロード (256バイト)
+                for (offset, byte) in sectorData.enumerated() {
+                    pc88Memory.writeByte(byte, at: 0x8000 + UInt16(offset))
+                }
+                print("IPLをメモリにロードしました: 0x8000-0x80FF")
+            } else {
+                print("IPLの読み込みに失敗しました")
+            }
+        }
+    }
+    
+    /// ALPHA-MINI-DOSのOS部分をロードする
+    private func loadAlphaMiniDosOs() {
+        guard let pc88FDC = fdc as? PC88FDC,
+              let pc88Memory = memory as? PC88Memory else {
+            print("FDCまたはメモリが初期化されていません")
+            return
+        }
+        
+        print("ALPHA-MINI-DOSのOS部分をロードします")
+        
+        // メモリ領域をクリアしておく
+        let osStartAddress: UInt16 = 0xD000
+        let osClearSize: Int = 0x3000 // 12KBクリア
+        
+        print("OS領域をクリアします: 0xD000-0xFFFF")
+        
+        // UInt16の範囲を超えないように注意
+        for i in 0..<min(osClearSize, 0x3000) {
+            // 0xD000から0xFFFFまでの範囲のみクリア
+            if osStartAddress + UInt16(i) <= 0xFFFF {
+                let address = osStartAddress + UInt16(i)
+                pc88Memory.writeByte(0x00, at: address)
+            } else {
+                break // UInt16の範囲を超えた場合は終了
+            }
+        }
+        
+        // D88DiskImageからOSセクタを取得
+        if let d88DiskImage = pc88FDC.getDiskImage(drive: 0) as? D88DiskImage,
+           let osSectors = d88DiskImage.loadOsSectors() {
+            
+            print("ALPHA-MINI-DOSのOS部分をロードします: \(osSectors.count)セクタ")
+            
+            // OS部分を0xD000からロード
+            var memoryOffset: UInt16 = 0xD000
+            var totalBytesLoaded = 0
+            
+            for (index, sectorData) in osSectors.enumerated() {
+                // セクタデータのチェック
+                let validData = sectorData.contains { $0 != 0 && $0 != 0xFF }
+                
+                // 各セクタを連続したメモリ領域にロード
+                for (offset, byte) in sectorData.enumerated() {
+                    let address = memoryOffset + UInt16(offset)
+                    pc88Memory.writeByte(byte, at: address)
+                }
+                
+                totalBytesLoaded += sectorData.count
+                
+                // 次のセクタ用にオフセットを更新
+                memoryOffset += UInt16(sectorData.count)
+                
+                if index < 5 { // 最初の数セクタのみログ表示
+                    print("  OSセクタ\(index+1)をメモリにロードしました: 0x\(String(format: "%04X", memoryOffset - UInt16(sectorData.count)))-0x\(String(format: "%04X", memoryOffset - 1)) (有効データ: \(validData ? "あり" : "なし"))")
+                    
+                    // 最初の数セクタの内容を表示
+                    if index == 0 {
+                        print("  最初のセクタの内容 (16バイト):")
+                        for i in 0..<min(16, sectorData.count) {
+                            print(String(format: "%02X ", sectorData[i]), terminator: "")
+                        }
+                        print("")
+                    }
+                }
+            }
+            
+            print("ALPHA-MINI-DOSのOS部分のロードが完了しました: 0xD000-0x\(String(format: "%04X", memoryOffset - 1)) (合計: \(totalBytesLoaded) バイト)")
+            
+            // メモリに正しく書き込まれたか確認
+            print("OSメモリ内容確認 (0xD000-0xD00F):")
+            for i in 0..<16 {
+                let byte = pc88Memory.readByte(at: 0xD000 + UInt16(i))
+                print(String(format: "%02X ", byte), terminator: "")
+            }
+            print("")
+            
+            // ジャンプテーブルを確認
+            print("OSジャンプテーブル確認 (0xD100-0xD10F):")
+            for i in 0..<16 {
+                let byte = pc88Memory.readByte(at: 0xD100 + UInt16(i))
+                print(String(format: "%02X ", byte), terminator: "")
+            }
+            print("")
+        } else {
+            print("ALPHA-MINI-DOSのOS部分の読み込みに失敗しました")
         }
     }
     
@@ -1248,10 +1371,81 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             // ブートセクタをメモリにロード (通常0x8000にロード)
             loadBootSector()
             
-            // CPUのPCを0x8000に設定してブートセクタから実行開始
+            // ディスクイメージの種類を確認
+            let diskName = pc88FDC.getDiskName(drive: 0) ?? ""
+            let isAlphaMiniDos = diskName.contains("ALPHA-MINI")
+            
             if let z80 = cpu as? Z80CPU {
-                z80.setPC(0x8000)
-                print("ブートセクタから実行を開始します: PC=0x8000")
+                if isAlphaMiniDos {
+                    // ALPHA-MINI-DOSの場合は特別処理
+                    print("ALPHA-MINI-DOSの実行を開始します")
+                    
+                    // Z80 CPUの初期状態を設定
+                    z80.setPC(0xC000)  // プログラムカウンタをIPLの先頭に設定
+                    z80.setRegister(.af, value: 0x0000)  // Aレジスタとフラグをクリア
+                    z80.setRegister(.bc, value: 0x0000)  // BCレジスタをクリア
+                    z80.setRegister(.de, value: 0x0000)  // DEレジスタをクリア
+                    z80.setRegister(.hl, value: 0x0000)  // HLレジスタをクリア
+                    z80.setRegister(.ix, value: 0x0000)  // IXレジスタをクリア
+                    z80.setRegister(.iy, value: 0x0000)  // IYレジスタをクリア
+                    z80.setSP(0xF000)  // スタックポインタを設定
+                    
+                    // 割り込みを無効化
+                    // z80.setInterruptMode(0)  // 割り込みモードを0に設定 - このメソッドは存在しない
+                    z80.disableInterrupts()  // 割り込み無効化
+                    
+                    print("Z80 CPUの初期状態を設定しました: PC=0xC000, SP=0xF000")
+                    
+                    // メモリの内容を確認
+                    if let pc88Memory = memory as? PC88Memory {
+                        print("IPLメモリ内容確認 (0xC000-0xC00F):")
+                        for i in 0..<16 {
+                            let byte = pc88Memory.readByte(at: 0xC000 + UInt16(i))
+                            print(String(format: "%02X ", byte), terminator: "")
+                        }
+                        print("")
+                    }
+                    
+                    // 命令トレースを有効化
+                    z80.enableInstructionTrace()
+                    print("ALPHA-MINI-DOSの実行をトレースします")
+                    
+                    // 画面を強制的に更新
+                    if let pc88Screen = screen as? PC88Screen {
+                        // テスト画面を強制的に消す
+                        pc88Screen.forceClearScreen()
+                        
+                        // テキストモードを再設定
+                        pc88Screen.writeIO(port: 0x30, value: 0x00) // テキストモード有効
+                        pc88Screen.writeIO(port: 0x31, value: 0x00) // 色指定モード
+                        pc88Screen.writeIO(port: 0x32, value: 0x00) // グラフィックモード無効
+                        pc88Screen.writeIO(port: 0x33, value: 0x00) // スクロール無効
+                        
+                        // デバッグ用に文字を表示
+                        let testMessage = "ALPHA-MINI-DOS 1.3 (デバッグモード)"
+                        for (i, char) in testMessage.utf8.enumerated() {
+                            if i < 80 { // 1行目のみ
+                                pc88Screen.writeTextVRAM(address: UInt16(i), value: char)
+                            }
+                        }
+                        
+                        // 2行目に追加情報
+                        let infoMessage = "PC=C000h SP=F000h"
+                        for (i, char) in infoMessage.utf8.enumerated() {
+                            if i < 80 { // 2行目
+                                pc88Screen.writeTextVRAM(address: UInt16(80 + i), value: char)
+                            }
+                        }
+                        
+                        // 画面を更新
+                        updateScreen()
+                        print("ALPHA-MINI-DOS用に画面を更新しました")
+                    }
+                } else {
+                    // 通常のディスクイメージは0x8000に設定
+                    z80.setPC(0x8000)
+                    print("ブートセクタから実行を開始します: PC=0x8000")
+                }
             }
         } else {
             print("ディスクがセットされていないか、読み込みに失敗しました")

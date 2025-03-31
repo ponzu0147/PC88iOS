@@ -7,8 +7,11 @@
 
 import Foundation
 
+// 必要なファイルをインポート
+// プロジェクト内の他のファイルは直接参照できるはず
+
 /// ジャンプ条件
-enum JumpCondition {
+public enum JumpCondition {
     case none      // 無条件
     case zero      // ゼロフラグがセットされている
     case notZero   // ゼロフラグがセットされていない
@@ -33,7 +36,7 @@ enum JumpCondition {
 }
 
 /// JP命令（絶対ジャンプ）
-struct JPInstruction: Z80Instruction {
+public struct JPInstruction: Z80Instruction {
     let condition: JumpCondition
     let address: UInt16
     
@@ -54,7 +57,7 @@ struct JPInstruction: Z80Instruction {
 }
 
 /// JR命令（相対ジャンプ）
-struct JRInstruction: Z80Instruction {
+public struct JRInstruction: Z80Instruction {
     let condition: JumpCondition
     let offset: Int8
     
@@ -75,7 +78,7 @@ struct JRInstruction: Z80Instruction {
 }
 
 /// CALL命令（サブルーチンコール）
-struct CALLInstruction: Z80Instruction {
+public struct CALLInstruction: Z80Instruction {
     let condition: JumpCondition
     let address: UInt16
     
@@ -102,7 +105,7 @@ struct CALLInstruction: Z80Instruction {
 }
 
 /// RET命令（サブルーチンリターン）
-struct RETInstruction: Z80Instruction {
+public struct RETInstruction: Z80Instruction {
     let condition: JumpCondition
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {

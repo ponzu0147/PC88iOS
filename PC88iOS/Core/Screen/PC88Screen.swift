@@ -333,6 +333,15 @@ class PC88Screen: ScreenRendering {
         screenTest.displayTestScreen()
     }
     
+    /// 画面を強制的にクリア（テスト画面を消すために使用）
+    func forceClearScreen() {
+        // テキストVRAMをクリア
+        clearScreen()
+        
+        // 画面の更新は外部から行われるので、ここでは何もしない
+        // メモリ上のデータのみクリアされた状態にする
+    }
+    
     /// 画面をクリア
     private func clearScreen() {
         // テキストVRAMをクリア
