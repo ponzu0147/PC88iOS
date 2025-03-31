@@ -30,8 +30,24 @@ class Z80CPU: CPUExecuting {
     // ホルトフラグ
     private var halted = false
     
+    // アイドル検出用プロパティ
+    private var idleDetectionEnabled = true
+    private var idleLoopDetected = false
+    private var idleLoopPC: UInt16 = 0
+    private var idleLoopLength: Int = 0
+    private var idleLoopInstructions: [UInt8] = []
+    private var idleLoopCycles: Int = 0
+    private var idleLoopCounter: Int = 0
+    private var instructionHistory: [(pc: UInt16, opcode: UInt8)] = []
+    
+    // アイドル検出の閾値（小さいほど検出しやすい）
+    private var idleDetectionThreshold: Int = 5
+    
+    // アイドル状態でのスリープ時間（デフォルトは1ms）
+    private var idleSleepTime: TimeInterval = 0.001
+    
     // CPUクロック管理
-    private let cpuClock: PC88CPUClock
+    let cpuClock: PC88CPUClock
     
     // 実行した累積サイクル数
     private var totalCycles: UInt64 = 0
@@ -66,6 +82,9 @@ class Z80CPU: CPUExecuting {
     func setClockMode(_ mode: PC88CPUClock.ClockMode) {
         // 明示的にPC88CPUClockのメソッドを呼び出す
         self.cpuClock.setClockMode(mode)
+        
+        // クロック変更に伴う内部状態の調整
+        resetInstructionTiming()
     }
     
     /// CPUクロックを設定
@@ -76,13 +95,22 @@ class Z80CPU: CPUExecuting {
     
     /// クロックモード変更時の処理
     private func handleClockModeChanged(_ mode: PC88CPUClock.ClockMode) {
-        // 必要な処理があればここに追加
+        // 命令実行タイミングをリセット
+        resetInstructionTiming()
+        
         print("CPUがクロックモード変更を検出: \(mode == .mode4MHz ? "4MHz" : "8MHz")")
+    }
+    
+    /// 命令実行タイミングをリセット
+    private func resetInstructionTiming() {
+        // 命令タイミングに関する内部状態をリセット
     }
     
     /// CPUの初期化
     func initialize() {
         reset()
+        // アイドル検出の初期設定
+        resetIdleDetection()
     }
     
     /// リセット
@@ -95,12 +123,28 @@ class Z80CPU: CPUExecuting {
         currentMCycle = 0
         currentTState = 0
         currentInstructionCycles = nil
+        resetIdleDetection()
+    }
+    
+    /// アイドル検出をリセット
+    private func resetIdleDetection() {
+        idleLoopDetected = false
+        idleLoopPC = 0
+        idleLoopLength = 0
+        idleLoopInstructions = []
+        idleLoopCycles = 0
+        idleLoopCounter = 0
+        instructionHistory = []
     }
     
     /// 1ステップ実行
     func executeStep() -> Int {
         // 割り込み処理
         if let interrupt = pendingInterrupt, interruptEnabled {
+            // 割り込みが発生したらアイドル検出をリセット
+            if idleLoopDetected {
+                resetIdleDetection()
+            }
             let cycles = handleInterrupt(interrupt)
             totalCycles = totalCycles &+ UInt64(cycles)
             return cycles
@@ -114,9 +158,33 @@ class Z80CPU: CPUExecuting {
             return haltCycles
         }
         
+        // アイドルループが検出されている場合
+        if idleLoopDetected {
+            // アイドルループのサイクル数を消費して、実際の命令実行をスキップ
+            totalCycles = totalCycles &+ UInt64(idleLoopCycles)
+            idleLoopCounter += 1
+            
+            // 定期的にアイドルループから抜け出して実際の状態を確認（100回に1回）
+            if idleLoopCounter >= 100 {
+                idleLoopDetected = false
+                idleLoopCounter = 0
+            } else if idleLoopCounter > 10 {
+                // アイドル状態では設定された時間だけスリープしてCPU負荷を下げる
+                Thread.sleep(forTimeInterval: idleSleepTime)
+            }
+            
+            return idleLoopCycles
+        }
+        
         // 命令フェッチ
-        let opcode = memory.readByte(at: registers.pc)
+        let pc = registers.pc
+        let opcode = memory.readByte(at: pc)
         registers.pc = registers.pc &+ 1 // 安全な加算を使用
+        
+        // アイドル検出のための履歴更新
+        if idleDetectionEnabled {
+            updateInstructionHistory(pc: pc, opcode: opcode)
+        }
         
         // 命令実行
         let cycles = executeInstruction(opcode)
@@ -132,7 +200,37 @@ class Z80CPU: CPUExecuting {
         // クロックモードに基づいてサイクル数を調整
         let adjustedCycles = adjustCyclesForClockMode(cycles)
         
-        var remainingCycles = adjustedCycles
+        // アイドルループが検出されている場合は、サイクル数を一括で消費
+        if idleLoopDetected && !halted && pendingInterrupt == nil {
+            // アイドルループのサイクル数を計算
+            let loopCount = adjustedCycles / idleLoopCycles
+            let consumedCycles = loopCount * idleLoopCycles
+            
+            // 定期的にアイドルループから抜け出して実際の状態を確認
+            idleLoopCounter += loopCount
+            if idleLoopCounter >= 100 {
+                idleLoopDetected = false
+                idleLoopCounter = 0
+                
+                // 残りのサイクルを通常実行
+                let remainingCycles = adjustedCycles - consumedCycles
+                if remainingCycles > 0 {
+                    let normalExecutedCycles = executeNormalCycles(remainingCycles)
+                    return consumedCycles + normalExecutedCycles
+                }
+            }
+            
+            totalCycles = totalCycles &+ UInt64(consumedCycles)
+            return consumedCycles
+        }
+        
+        // 通常のサイクル実行
+        return executeNormalCycles(adjustedCycles)
+    }
+    
+    /// 通常モードでサイクル実行
+    private func executeNormalCycles(_ cycles: Int) -> Int {
+        var remainingCycles = cycles
         var executedCycles = 0
         
         // 無限ループを防止するためのカウンタ
@@ -176,11 +274,8 @@ class Z80CPU: CPUExecuting {
     
     /// クロックモードに基づいてサイクル数を調整
     private func adjustCyclesForClockMode(_ cycles: Int) -> Int {
-        // 8MHzモードの場合は実行サイクル数を2倍にする
-        if cpuClock.currentMode == .mode8MHz {
-            return cycles * 2
-        }
-        return cycles
+        // PC88CPUClockのメソッドを使用して適切に調整
+        return cpuClock.adjustCycles(cycles, impact: .full)
     }
     
     /// 割り込み要求
@@ -201,11 +296,52 @@ class Z80CPU: CPUExecuting {
     /// CPUをホルト状態にする
     func halt() {
         halted = true
+        // ホルト状態になったらアイドル検出をリセット
+        resetIdleDetection()
     }
     
     /// CPUがホルト状態かどうかを取得
     func isHalted() -> Bool {
         return halted
+    }
+    
+    /// アイドル検出の有効/無効を設定
+    func setIdleDetectionEnabled(_ enabled: Bool) {
+        idleDetectionEnabled = enabled
+        if !enabled {
+            resetIdleDetection()
+        }
+    }
+    
+    /// アイドル検出が有効かどうかを取得
+    func isIdleDetectionEnabled() -> Bool {
+        return idleDetectionEnabled
+    }
+    
+    /// アイドル状態でのスリープ時間を設定
+    func setIdleSleepTime(_ sleepTime: TimeInterval) {
+        idleSleepTime = max(0.0001, sleepTime) // 最少0.1ms以上に制限
+    }
+    
+    /// アイドル状態でのスリープ時間を取得
+    func getIdleSleepTime() -> TimeInterval {
+        return idleSleepTime
+    }
+    
+    /// アイドル検出の閾値を設定
+    /// - Parameter threshold: 閾値（小さいほど検出しやすい、デフォルトは5）
+    func setIdleDetectionThreshold(_ threshold: Int) {
+        idleDetectionThreshold = max(2, min(10, threshold)) // 2〜10の範囲に制限
+    }
+    
+    /// アイドル検出の閾値を取得
+    func getIdleDetectionThreshold() -> Int {
+        return idleDetectionThreshold
+    }
+    
+    /// アイドルループが検出されているかどうかを取得
+    func isIdleLoopDetected() -> Bool {
+        return idleLoopDetected
     }
     
     /// 相対ジャンプ
@@ -257,8 +393,7 @@ class Z80CPU: CPUExecuting {
             let cycles = InstructionCycles.standard(
                 opcodeFetch: false,
                 memoryWrites: 2,
-                internalCycles: 1,
-                interruptAcknowledge: true
+                internalCycles: 1
             )
             pushWord(registers.pc)
             registers.pc = 0x0066
@@ -272,8 +407,7 @@ class Z80CPU: CPUExecuting {
                 let cycles = InstructionCycles.standard(
                     opcodeFetch: false,
                     memoryWrites: 2,
-                    internalCycles: 2,
-                    interruptAcknowledge: true
+                    internalCycles: 2
                 )
                 pushWord(registers.pc)
                 registers.pc = 0x0038
@@ -307,6 +441,139 @@ class Z80CPU: CPUExecuting {
             print("警告: スタックポインタがオーバーフローしました")
         }
         memory.writeWord(value, at: registers.sp)
+    }
+    
+    // MARK: - アイドル検出関連
+    
+    /// 命令履歴を更新
+    private func updateInstructionHistory(pc: UInt16, opcode: UInt8) {
+        // 履歴に追加
+        instructionHistory.append((pc: pc, opcode: opcode))
+        
+        // 履歴が長すぎる場合は古いものを削除
+        if instructionHistory.count > 20 { // 最大20命令を記録
+            instructionHistory.removeFirst()
+        }
+        
+        // アイドルループの検出
+        detectIdleLoop()
+    }
+    
+    /// アイドルループを検出
+    private func detectIdleLoop() {
+        // 履歴が少なすぎる場合は検出しない
+        guard instructionHistory.count >= idleDetectionThreshold * 2 else { return }
+        
+        // 短いループを検出（閾値に基づいて検出範囲を調整）
+        for loopLength in 2...idleDetectionThreshold {
+            // 履歴が十分にある場合のみ
+            if instructionHistory.count >= loopLength * 2 {
+                // 最新のloopLength命令と、その前のloopLength命令を比較
+                let recentInstructions = Array(instructionHistory.suffix(loopLength))
+                let previousInstructions = Array(instructionHistory.suffix(loopLength * 2).prefix(loopLength))
+                
+                // PCとオペコードが一致するか確認
+                var isLoop = true
+                for i in 0..<loopLength {
+                    if recentInstructions[i].pc != previousInstructions[i].pc || 
+                       recentInstructions[i].opcode != previousInstructions[i].opcode {
+                        isLoop = false
+                        break
+                    }
+                }
+                
+                // ループが検出された場合
+                if isLoop {
+                    // 最初のPCを記録
+                    idleLoopPC = recentInstructions[0].pc
+                    idleLoopLength = loopLength
+                    
+                    // ループの命令を記録
+                    idleLoopInstructions = recentInstructions.map { $0.opcode }
+                    
+                    // ループのサイクル数を計算
+                    calculateIdleLoopCycles()
+                    
+                    // ループを検出したことを記録
+                    idleLoopDetected = true
+                    idleLoopCounter = 0
+                    
+                    print("アイドルループを検出: PC=0x\(String(idleLoopPC, radix: 16, uppercase: true)), 長さ=\(idleLoopLength), サイクル数=\(idleLoopCycles)")
+                    return
+                }
+            }
+        }
+    }
+    
+    /// アイドルループのサイクル数を計算
+    private func calculateIdleLoopCycles() {
+        // 簡易的な計算: 各命令の平均サイクル数 * ループ長
+        // 実際には各命令のサイクル数を正確に計算する必要がある
+        idleLoopCycles = 4 * idleLoopLength // 仮の値として平均4サイクルと仮定
+    }
+    
+    // アイドル検出の有効/無効設定と状態取得メソッドは上部で定義済み
+}
+
+// MARK: - Z80CPU Extension for Memory and IO Access
+extension Z80CPU {
+    /// メモリから読み込み
+    func readMemory(address: UInt16) -> UInt8 {
+        // VRAM領域かどうかを判定
+        let isVRAMAccess = isVRAMAddress(address)
+        
+        // クロックモードに応じたメモリアクセス時間の調整
+        let deviceType: PC88CPUClock.DeviceType = isVRAMAccess ? .vram : .memory
+        _ = cpuClock.getClockImpact(for: deviceType)
+        
+        // 8MHzモードでVRAMアクセスの場合、ウェイトを挿入する可能性がある
+        // 実際のウェイト処理はPC88メモリシステム側で実装
+        
+        return memory.readByte(at: address)
+    }
+    
+    /// メモリに書き込み
+    func writeMemory(address: UInt16, value: UInt8) {
+        // VRAM領域かどうかを判定
+        let isVRAMAccess = isVRAMAddress(address)
+        
+        // クロックモードに応じたメモリアクセス時間の調整
+        let deviceType: PC88CPUClock.DeviceType = isVRAMAccess ? .vram : .memory
+        _ = cpuClock.getClockImpact(for: deviceType)
+        
+        // 8MHzモードでVRAMアクセスの場合、ウェイトを挿入する可能性がある
+        // 実際のウェイト処理はPC88メモリシステム側で実装
+        
+        memory.writeByte(value, at: address)
+    }
+    
+    /// I/Oポートから読み込み
+    func readIO(port: UInt16) -> UInt8 {
+        // クロックモードに応じたI/Oアクセス時間の調整
+        _ = cpuClock.getClockImpact(for: .ioPort)
+        // I/Oポートアクセスは完全にクロックの影響を受ける
+        
+        // UInt8にキャストしてポート番号を渡す
+        return io.readPort(UInt8(port & 0xFF))
+    }
+    
+    /// I/Oポートに書き込み
+    func writeIO(port: UInt16, value: UInt8) {
+        // クロックモードに応じたI/Oアクセス時間の調整
+        _ = cpuClock.getClockImpact(for: .ioPort)
+        // I/Oポートアクセスは完全にクロックの影響を受ける
+        
+        // UInt8にキャストしてポート番号を渡す
+        io.writePort(UInt8(port & 0xFF), value: value)
+    }
+    
+    /// アドレスがVRAM領域かどうかを判定
+    private func isVRAMAddress(_ address: UInt16) -> Bool {
+        // PC-8801のVRAM領域
+        // テキストVRAM: 0xC000-0xCFFF
+        // グラフィックVRAM: 0x8000-0xBFFF (機種によって異なる)
+        return (address >= 0xC000 && address <= 0xCFFF) || 
+               (address >= 0x8000 && address <= 0xBFFF)
     }
 }
 

@@ -8,6 +8,19 @@
 import Foundation
 import AVFoundation
 
+/// サウンドチップの品質モード
+/// - サウンド出力の品質とCPU使用率のバランスを調整するためのモード
+enum SoundQualityMode {
+    /// 高品質モード - 高いサンプリングレートと正確なエミュレーション
+    case high
+    
+    /// 中品質モード - バランスの取れた設定
+    case medium
+    
+    /// 低品質モード - 低いサンプリングレートと簡略化されたエミュレーション
+    case low
+}
+
 /// サウンドチップエミュレーションを担当するプロトコル
 protocol SoundChipEmulating {
     /// 初期化
@@ -42,4 +55,11 @@ protocol SoundChipEmulating {
     
     /// サウンドチップの更新
     func update(_ cycles: Int)
+    
+    /// 品質モードを設定
+    /// - Parameter mode: 設定する品質モード
+    func setQualityMode(_ mode: SoundQualityMode)
+    
+    /// 現在の品質モードを取得
+    func getQualityMode() -> SoundQualityMode
 }

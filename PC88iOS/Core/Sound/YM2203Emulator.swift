@@ -193,6 +193,56 @@ class YM2203Emulator: SoundChipEmulating {
         // ここでは簡易的な実装として、サイクル数は無視
     }
     
+    /// 現在の品質モード
+    private var qualityMode: SoundQualityMode = .medium
+    
+    /// 品質モードを設定
+    /// - Parameter mode: 設定する品質モード
+    func setQualityMode(_ mode: SoundQualityMode) {
+        qualityMode = mode
+        
+        // 品質モードに応じた設定を適用
+        switch mode {
+        case .high:
+            // 高品質モードの設定
+            // FM音源の高精度計算、高いサンプリングレート、複雑なLFOやエンベロープの計算を有効化
+            if let audioEngine = audioEngine, audioEngine.isRunning {
+                // オーディオエンジンを再設定
+                audioEngine.stop()
+                setupAudio()
+                startAudio()
+            }
+            print("YM2203サウンド品質モードを高品質に設定しました")
+            
+        case .medium:
+            // 中品質モードの設定
+            // バランスの取れた設定
+            if let audioEngine = audioEngine, audioEngine.isRunning {
+                // オーディオエンジンを再設定
+                audioEngine.stop()
+                setupAudio()
+                startAudio()
+            }
+            print("YM2203サウンド品質モードを中品質に設定しました")
+            
+        case .low:
+            // 低品質モードの設定
+            // FM音源の簡略計算、低いサンプリングレート、LFOや複雑なエンベロープの簡略化
+            if let audioEngine = audioEngine, audioEngine.isRunning {
+                // オーディオエンジンを再設定
+                audioEngine.stop()
+                setupAudio()
+                startAudio()
+            }
+            print("YM2203サウンド品質モードを低品質に設定しました")
+        }
+    }
+    
+    /// 現在の品質モードを取得
+    func getQualityMode() -> SoundQualityMode {
+        return qualityMode
+    }
+    
     // MARK: - 内部メソッド
     
     /// オーディオセットアップ

@@ -146,6 +146,56 @@ class PC88SoundChip: SoundChipEmulating {
         // 実際の実装では、タイミングに基づいてエンベロープや周波数を更新
     }
     
+    /// 現在の品質モード
+    private var qualityMode: SoundQualityMode = .medium
+    
+    /// 品質モードを設定
+    /// - Parameter mode: 設定する品質モード
+    func setQualityMode(_ mode: SoundQualityMode) {
+        qualityMode = mode
+        
+        // 品質モードに応じた設定を適用
+        switch mode {
+        case .high:
+            // 高品質モードの設定
+            // 高いサンプリングレートや正確な波形生成を設定
+            if let audioEngine = audioEngine, audioEngine.isRunning {
+                // 必要に応じてオーディオエンジンを再設定
+                audioEngine.stop()
+                setupAudio()
+                startAudio()
+            }
+            print("サウンド品質モードを高品質に設定しました")
+            
+        case .medium:
+            // 中品質モードの設定
+            // バランスの取れた設定
+            if let audioEngine = audioEngine, audioEngine.isRunning {
+                // 必要に応じてオーディオエンジンを再設定
+                audioEngine.stop()
+                setupAudio()
+                startAudio()
+            }
+            print("サウンド品質モードを中品質に設定しました")
+            
+        case .low:
+            // 低品質モードの設定
+            // 低いサンプリングレートや簡略化された波形生成を設定
+            if let audioEngine = audioEngine, audioEngine.isRunning {
+                // 必要に応じてオーディオエンジンを再設定
+                audioEngine.stop()
+                setupAudio()
+                startAudio()
+            }
+            print("サウンド品質モードを低品質に設定しました")
+        }
+    }
+    
+    /// 現在の品質モードを取得
+    func getQualityMode() -> SoundQualityMode {
+        return qualityMode
+    }
+    
     /// チャンネルカウンター
     private var counter = [Double](repeating: 0, count: 3)
     

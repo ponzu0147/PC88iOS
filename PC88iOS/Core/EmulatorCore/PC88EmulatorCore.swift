@@ -16,6 +16,9 @@ import SwiftUI
 class PC88EmulatorCore: EmulatorCoreManaging {
     // MARK: - プロパティ
     
+    /// ターゲットフレームレート
+    private var targetFPS: Double = 30.0 // デフォルトは30fpsに設定
+    
     /// CPUエミュレーション
     private var cpu: CPUExecuting?
     
@@ -40,11 +43,14 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// エミュレーション速度（1.0 = 通常速度）
     private var emulationSpeed: Float = 1.0
     
+    /// ビープ音サンプル
+    private var beepSample: PC88BeepSample?
+    
     /// CPUクロック
     private var cpuClock = PC88CPUClock()
     
     /// 現在のCPUクロックモード
-    private var currentClockMode: PC88CPUClock.ClockMode = .mode4MHz
+    private var currentClockMode: PC88CPUClock.ClockMode = .mode4MHz // デフォルトは4MHz
     
     /// エミュレーションスレッド
     private var emulationThread: Thread?
@@ -54,6 +60,18 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     /// 画面イメージ
     private var screenImage: CGImage?
+    
+    /// フレームスキップ設定（0=スキップなし、1=1フレームごとに描画、2=2フレームごとに描画...）
+    private var frameSkip: Int = 0
+    
+    /// 省電力モード
+    private var powerSavingMode: Bool = true // デフォルトで省電力モードを有効化
+    
+    /// フレームカウンタ（フレームスキップ用）
+    private var frameCounter: UInt = 0
+    
+    /// メトリクスリセットフラグ
+    private var shouldResetMetrics: Bool = false
     
     // MARK: - 初期化
     
@@ -87,6 +105,9 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             // CPUクロックモードを設定
             if let z80 = cpu as? Z80CPU {
                 z80.setClockMode(currentClockMode)
+                
+                // アイドル検出を有効化（デフォルトで有効）
+                z80.setIdleDetectionEnabled(true)
             }
         }
         
@@ -115,7 +136,14 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         soundChip = YM2203Emulator()
         if let soundChip = soundChip as? YM2203Emulator, let io = io as? PC88IO {
             soundChip.initialize(sampleRate: 44100.0)
+            // デフォルトで中品質モードに設定
+            soundChip.setQualityMode(SoundQualityMode.medium)
             io.connectSoundChip(soundChip)
+        }
+        
+        // ビープ音サンプルの初期化
+        if let io = io {
+            beepSample = PC88BeepSample(io: io, cpuClock: cpuClock)
         }
         
         // ROMデータをメモリに転送
@@ -140,6 +168,15 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             return
         }
         
+        // テストテキストを表示（エミュレーション開始前に実行）
+        if let pc88Screen = screen as? PC88Screen {
+            pc88Screen.displayTestScreen()
+            print("テスト画面を表示しました")
+            
+            // 画面更新を強制的に行う
+            updateScreen()
+        }
+        
         // IPLを実行してOSを起動
         executeIPL()
         
@@ -152,17 +189,22 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         emulationThread?.start()
         
         // 画面更新タイマーの開始
-        // メインスレッドで画面更新を行う
-        emulationTimer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
-            self?.updateScreen()
-        }
+        updateEmulationTimer()
         
         // サウンドチップを有効化
         if let soundChip = soundChip {
             soundChip.start()
+            // サウンド品質を中品質に設定
+            soundChip.setQualityMode(SoundQualityMode.medium)
         }
         
-        print("PC-88エミュレーションを開始しました")
+        // 省電力モードを有効化
+        setPowerSavingMode(true)
+        
+        // フレームスキップを設定（2フレームに1回描画）
+        setFrameSkip(1)
+        
+        print("PC-88エミュレーションを開始しました（最適化設定適用済み）")
         
         // 状態を実行中に変更
         state = .running
@@ -304,6 +346,17 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             z80.setClockMode(mode)
         }
         
+        // 4MHzモードの場合はスリープ時間を調整
+        if mode == .mode4MHz {
+            cpuClock.adjustSleepTimeForMode4MHz(frameRate: targetFPS)
+        }
+        
+        // ROMを再ロード
+        loadROMsToMemory()
+        
+        // IPLを実行
+        executeIPL()
+        
         // エミュレーションループのメトリクスをリセットするためのフラグを設定
         shouldResetMetrics = true
         
@@ -323,6 +376,146 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// エミュレーション速度の設定
     func setEmulationSpeed(_ speed: Float) {
         emulationSpeed = max(0.1, min(10.0, speed))
+        shouldResetMetrics = true
+    }
+    
+    /// フレームスキップを設定
+    func setFrameSkip(_ skip: Int) {
+        frameSkip = max(0, min(skip, 10)) // 0〜10の範囲に制限
+        print("フレームスキップを設定: \(frameSkip)")
+        shouldResetMetrics = true
+    }
+    
+    /// 省電力モードを設定
+    func setPowerSavingMode(_ enabled: Bool) {
+        powerSavingMode = enabled
+        
+        // 省電力モードの設定に基づいて各種パラメータを調整
+        if powerSavingMode {
+            // 省電力モード有効時の設定
+            // フレームレートに応じてフレームスキップを設定
+            if targetFPS <= 15.0 {
+                setFrameSkip(3) // 15fpsの場合は4フレームに1回描画
+            } else if targetFPS <= 30.0 {
+                setFrameSkip(1) // 30fpsの場合は2フレームに1回描画
+            } else {
+                setFrameSkip(0) // 60fpsの場合は毎フレーム描画
+            }
+            
+            // Z80 CPUのアイドル検出を有効化し、スリープ時間を設定
+            if let z80 = cpu as? Z80CPU {
+                z80.setIdleDetectionEnabled(true)
+                
+                // フレームレートに応じたスリープ時間を設定
+                let idleSleepTime = 1.0 / targetFPS * 0.5
+                z80.setIdleSleepTime(idleSleepTime)
+            }
+            
+            // サウンドチップの品質を中品質に設定
+            if let soundChip = soundChip {
+                soundChip.setQualityMode(SoundQualityMode.medium)
+            }
+            
+            print("省電力モードを有効化しました（フレームレート: \(targetFPS)fps）")
+        } else {
+            // 省電力モード無効時の設定
+            setFrameSkip(0) // すべてのフレームを描画
+            
+            // Z80 CPUのアイドル検出は維持するが、スリープ時間を短く設定
+            if let z80 = cpu as? Z80CPU {
+                z80.setIdleSleepTime(0.0001) // 最小値に設定
+            }
+            
+            // サウンドチップの品質を上げる
+            if let soundChip = soundChip {
+                soundChip.setQualityMode(SoundQualityMode.high)
+            }
+            
+            print("省電力モードを無効化しました")
+        }
+    }
+    
+    /// 現在の省電力モード設定を取得
+    func isPowerSavingModeEnabled() -> Bool {
+        return powerSavingMode
+    }
+    
+    /// フレームレートを設定
+    /// - Parameter fps: 設定するフレームレート（60, 30, 15のいずれか）
+    func setFrameRate(_ fps: Double) {
+        // 有効な値かチェック
+        guard fps == 60.0 || fps == 30.0 || fps == 15.0 else {
+            print("無効なフレームレート値: \(fps)")
+            return
+        }
+        
+        // フレームレートを設定
+        targetFPS = fps
+        
+        // メトリクスをリセットしてサイクル数を再計算させる
+        shouldResetMetrics = true
+        
+        // エミュレーションタイマーを更新
+        updateEmulationTimer()
+        
+        // Z80 CPUのアイドル状態でのスリープ時間を調整
+        if let z80 = cpu as? Z80CPU {
+            // フレームレートが低いほどスリープ時間を長くする
+            let idleSleepTime = 1.0 / fps * 0.5 // フレーム間の半分の時間をスリープに充てる
+            z80.setIdleSleepTime(idleSleepTime)
+            
+            // フレームレートに応じてフレームスキップを調整
+            if fps <= 15.0 {
+                setFrameSkip(3) // 15fpsの場合は4フレームに1回描画
+            } else if fps <= 30.0 {
+                setFrameSkip(1) // 30fpsの場合は2フレームに1回描画
+            } else {
+                setFrameSkip(0) // 60fpsの場合は毎フレーム描画
+            }
+            
+            // フレームレートに応じてアイドル検出の閾値を調整
+            // フレームレートが低いほどアイドル検出を積極的に行う
+            let idleDetectionThreshold = fps <= 30.0 ? 3 : 5
+            z80.setIdleDetectionThreshold(idleDetectionThreshold)
+        }
+        
+        // 4MHzモードの場合はスリープ時間を調整
+        if cpuClock.currentMode == .mode4MHz {
+            cpuClock.adjustSleepTimeForMode4MHz(frameRate: fps)
+        }
+        
+        print("フレームレートを\(fps)fpsに設定しました")
+    }
+    
+    /// エミュレーションタイマーを更新
+    private func updateEmulationTimer() {
+        // 既存のタイマーを停止
+        emulationTimer?.invalidate()
+        
+        // 新しい間隔でタイマーを再開始
+        let screenUpdateInterval = 1.0/targetFPS
+        emulationTimer = Timer.scheduledTimer(withTimeInterval: screenUpdateInterval, repeats: true) { [weak self] _ in
+            self?.updateScreen()
+        }
+        RunLoop.current.add(emulationTimer!, forMode: .common)
+    }
+    
+    /// 現在のフレームレートを取得
+    func getFrameRate() -> Double {
+        return targetFPS
+    }
+    
+    /// フレームレートを切り替え
+    /// 60fps -> 30fps -> 15fps -> 60fpsの順に切り替わる
+    func cycleFrameRate() {
+        switch targetFPS {
+        case 60.0:
+            setFrameRate(30.0)
+        case 30.0:
+            setFrameRate(15.0)
+        default: // 15fpsまたはその他
+            setFrameRate(60.0)
+        }
     }
     
     /// 現在のエミュレータの状態を取得
@@ -378,17 +571,15 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     // MARK: - プライベートメソッド
     
-    // メトリクスリセットフラグ
-    private var shouldResetMetrics = false
+    // メトリクスリセットフラグはクラスの先頭で定義済み
     
     /// エミュレーションのメインループ
     private func emulationLoop() {
-        // 定数定義
-        let targetFPS: Double = 60.0
+        // クラスプロパティのtargetFPSを使用
         
         // 高精度なタイミング用の変数
         var lastFrameTime = CACurrentMediaTime()
-        var frameCounter: UInt = 0
+        frameCounter = 0 // クラスのプロパティを使用
         var cyclesRemainder: Int = 0
         
         // パフォーマンスメトリクス
@@ -416,7 +607,15 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             // クロックモードが変更された場合、サイクル数を再計算
             if currentMode != currentClockMode || shouldResetMetrics {
                 currentMode = currentClockMode
-                baseCyclesPerSecond = currentMode == .mode4MHz ? 4_000_000 : 8_000_000
+                
+                // PC88CPUClockから現在の周波数を取得
+                if let z80 = cpu as? Z80CPU {
+                    baseCyclesPerSecond = z80.cpuClock.currentFrequency
+                } else {
+                    // フォールバック値
+                    baseCyclesPerSecond = currentMode == .mode4MHz ? 4_000_000 : 8_000_000
+                }
+                
                 cyclesPerFrame = Int(Double(baseCyclesPerSecond) / targetFPS)
                 
                 // メトリクスをリセット
@@ -427,11 +626,13 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                 cyclesRemainder = 0
                 shouldResetMetrics = false
                 
-                print("クロックモード変更検出: \(currentMode), サイクル数/フレーム: \(cyclesPerFrame)")
+                print("クロックモード変更検出: \(currentMode), 周波数: \(baseCyclesPerSecond) Hz, サイクル数/フレーム: \(cyclesPerFrame)")
             }
             
             // 1フレーム分のCPUサイクルを実行
-            let adjustedCycles = Int(Double(cyclesPerFrame) * Double(emulationSpeed)) + cyclesRemainder
+            // フレームレートに応じて処理量を調整
+            let frameRateAdjustment = 60.0 / targetFPS
+            let adjustedCycles = Int(Double(cyclesPerFrame) * Double(emulationSpeed) / frameRateAdjustment) + cyclesRemainder
             var executedCycles = 0
             
             // サイクル単位で実行し、割り込みを適切に処理
@@ -446,15 +647,20 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                     executedCycles += executed
                     remainingCycles -= executed
                     
-                    // FDCの定期更新
+                    // FDCの定期更新 - クロックの影響を受けない
+                    // 実行されたサイクル数をそのまま渡す
                     if let fdc = fdc {
                         fdc.update(cycles: executed)
                     }
                     
-                    // サウンドチップの定期更新
+                    // サウンドチップの定期更新 - クロックの影響を受けない
+                    // YM2203/YM2608は独自のクロックで動作するため
                     if let soundChip = soundChip {
                         soundChip.update(executed)
                     }
+                    
+                    // ディスプレイ更新はクロックの影響を受けない
+                    // 60Hzの垂直同期はクロックモードに関わらず一定
                 }
             }
             
@@ -462,15 +668,15 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             cyclesRemainder = adjustedCycles - executedCycles
             
             // 垂直同期割り込みの処理（60Hz）
+            // クロックモードに関わらず常に60Hzで発生
             frameCounter += 1
-            if frameCounter % 1 == 0 { // 毎フレーム
-                // 垂直同期割り込みを発生させる
-                cpu?.requestInterrupt(.int)
-                
-                // 垂直同期割り込みをIOに通知
-                if let io = io as? PC88IO {
-                    io.requestInterrupt(from: .vblank)
-                }
+            
+            // 垂直同期割り込みを発生させる
+            cpu?.requestInterrupt(.int)
+            
+            // 垂直同期割り込みをIOに通知
+            if let io = io as? PC88IO {
+                io.requestInterrupt(from: .vblank)
             }
             
             // パフォーマンスメトリクスの収集
@@ -481,7 +687,10 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             let targetFrameTime = 1.0 / (targetFPS * Double(emulationSpeed))
             if frameTime < targetFrameTime {
                 let sleepTime = targetFrameTime - frameTime
-                Thread.sleep(forTimeInterval: sleepTime)
+                
+                // 省電力モードの場合は、さらに長めにスリープして消費電力を抑える
+                let adjustedSleepTime = powerSavingMode ? sleepTime * 1.1 : sleepTime
+                Thread.sleep(forTimeInterval: adjustedSleepTime)
             }
             
             // 次のフレームの測定のために時間を更新
@@ -497,7 +706,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                 let avgFrameTime = frameTimeAccumulator / Double(frameCount)
                 let fps = 1.0 / avgFrameTime
                 let clockMode = currentClockMode == .mode4MHz ? "4MHz" : "8MHz"
-                print("[クロックモード: \(clockMode)] FPS: \(String(format: "%.2f", fps)), 平均フレーム時間: \(String(format: "%.2f", avgFrameTime * 1000)) ms, サイクル数/フレーム: \(cyclesPerFrame)")
+                print("[クロックモード: \(clockMode)] FPS: \(String(format: "%.2f", fps)), 平均フレーム時間: \(String(format: "%.2f", avgFrameTime * 1000)) ms, サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(baseCyclesPerSecond) Hz")
                 
                 // メトリクスをリセット
                 frameTimeAccumulator = 0
@@ -509,6 +718,13 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     /// 画面の更新
     private func updateScreen() {
+        // フレームスキップの処理
+        // frameCounterはemulationLoopで更新される
+        if frameSkip > 0 && (frameCounter % UInt(frameSkip + 1) != 0) {
+            // フレームスキップ中は描画をスキップ
+            return
+        }
+        
         if let screen = screen {
             // 画面の描画処理
             screenImage = screen.render()
@@ -523,6 +739,42 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// ROMを読み込む
     private func loadROMs() -> Bool {
         return PC88ROMLoader.shared.loadAllROMs()
+    }
+    
+    /// ビープ音でドレミファソラシドを演奏
+    /// 4MHzモードを基準に各音1秒ずつ鳴らす
+    func playBeepScale() {
+        // ビープ音サンプルが初期化されているか確認
+        guard let beepSample = beepSample else {
+            print("ビープ音サンプルが初期化されていません")
+            return
+        }
+        
+        // 現在の状態を保存
+        let wasRunning = state == .running
+        
+        // エミュレーションを一時停止
+        if wasRunning {
+            pause()
+        }
+        
+        // 別スレッドで演奏を実行
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            // ドレミファソラシドを演奏
+            beepSample.playScale()
+            
+            // メインスレッドに戻ってエミュレーションを再開
+            DispatchQueue.main.async {
+                // 元の状態が実行中だった場合は再開
+                if wasRunning {
+                    self?.resume()
+                }
+                
+                print("ビープ音の演奏が完了しました")
+            }
+        }
+        
+        print("ビープ音の演奏を開始しました")
     }
     
     /// フォントを設定
