@@ -42,20 +42,47 @@ struct PC88EmulatorApp: App {
                         copyResourceFilesToDocuments()
                         
                         // エミュレータの画面表示を確実に初期化するための処理
-                        // 複数回の通知を送信して確実に画面を更新する
+                        // 通知名を定数化して一責性を確保
+                        let forceUpdateNotification = Notification.Name("ForceScreenUpdateNotification")
+                        let emulatorStartNotification = Notification.Name("EmulatorStartNotification")
+                        
+                        // EmulatorViewの初期化が完了するのを待ってから通知を送信
+                        // 最初のエミュレータ開始通知（これが重要）
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            // 最初の画面更新を通知
-                            NotificationCenter.default.post(name: .init("ForceScreenUpdateNotification"), object: nil)
+                            print("アプリ起動時: エミュレータ開始通知を送信します")
+                            NotificationCenter.default.post(name: emulatorStartNotification, object: nil)
                         }
                         
-                        // 少し遅らせて再度更新
+                        // 最初の画面更新通知（EmulatorViewのonAppearが呼ばれた後）
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            NotificationCenter.default.post(name: .init("ForceScreenUpdateNotification"), object: nil)
+                            print("アプリ起動時: 最初の画面更新通知を送信します")
+                            NotificationCenter.default.post(name: forceUpdateNotification, object: nil)
+                            // エミュレータ開始通知も再度送信
+                            NotificationCenter.default.post(name: emulatorStartNotification, object: nil)
                         }
                         
-                        // さらに遅らせて再度更新
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                            NotificationCenter.default.post(name: .init("ForceScreenUpdateNotification"), object: nil)
+                        // 少し遅らせて再度更新（EmulatorViewInternalModelの初期化完了後）
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                            print("アプリ起動時: 2回目の画面更新通知を送信します")
+                            NotificationCenter.default.post(name: forceUpdateNotification, object: nil)
+                            // エミュレータ開始通知も再度送信
+                            NotificationCenter.default.post(name: emulatorStartNotification, object: nil)
+                        }
+                        
+                        // さらに遅らせて再度更新（エミュレータコアの初期化完了後）
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            print("アプリ起動時: 3回目の画面更新通知を送信します")
+                            NotificationCenter.default.post(name: forceUpdateNotification, object: nil)
+                            // エミュレータ開始通知も再度送信
+                            NotificationCenter.default.post(name: emulatorStartNotification, object: nil)
+                        }
+                        
+                        // 最終確認の更新通知
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            print("アプリ起動時: 最終確認の画面更新通知を送信します")
+                            NotificationCenter.default.post(name: forceUpdateNotification, object: nil)
+                            // エミュレータ開始通知も再度送信
+                            NotificationCenter.default.post(name: emulatorStartNotification, object: nil)
                         }
                         
                         isInitialized = true

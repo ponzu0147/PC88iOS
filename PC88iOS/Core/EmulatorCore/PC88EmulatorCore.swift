@@ -9,6 +9,7 @@ import Foundation
 import CoreGraphics
 import UIKit
 import SwiftUI
+import os.log
 
 // インポートはプロジェクト全体で共有されているので、明示的なインポートは不要
 
@@ -29,7 +30,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     private var io: IOAccessing?
     
     /// 画面レンダリング
-    private var screen: ScreenRendering?
+    internal var screen: ScreenRendering?
     
     /// FDCエミュレーション
     private var fdc: FDCEmulating?
@@ -69,6 +70,9 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     /// エミュレーションスレッド
     private var emulationThread: Thread?
+    
+    /// ログ表示用タイマー
+    private var logTimer: DispatchSourceTimer?
     
     /// エミュレーションタイマー
     private var emulationTimer: Timer?
@@ -180,11 +184,21 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     }
     
     func start() {
-        guard state == .initialized || state == .paused else { return }
+        guard state == .initialized || state == .paused else { 
+            print("警告: エミュレータの状態が開始可能ではありません: \(state)")
+            return 
+        }
+        
+        // 既存のログタイマーを停止（再開始のため）
+        stopLogTimer()
         
         // 一時停止中なら再開するだけ
         if state == .paused {
             state = .running
+            print("エミュレーションを再開しました（一時停止から）")
+            
+            // 一時停止からの再開時にも画面を更新
+            updateScreen()
             return
         }
         
@@ -199,6 +213,27 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         // IPLを実行してOSを起動
         executeIPL()
+        print("IPLを実行しました")
+        
+        // クロックモードの設定を確認してログ出力
+        let frequency = currentClockMode == .mode4MHz ? 4_000_000 : 8_000_000
+        let cyclesPerFrame = Int(Double(frequency) / targetFPS)
+        let clockModeStr = currentClockMode == .mode4MHz ? "4MHz" : "8MHz"
+        
+        // 起動直後からパフォーマンス情報を表示
+        let startupLog = "[クロックモード: \(clockModeStr)] FPS: \(String(format: "%.2f", targetFPS)), 平均フレーム時間: \(String(format: "%.2f", (1.0/targetFPS) * 1000)) ms, サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(frequency) Hz"
+        
+        // コンソールにログを出力
+        print("\n\n")
+        print(startupLog)
+        print("\n")
+        fflush(stdout)
+        
+        // システムログにも出力
+        NSLog("PC88 Startup: %@", startupLog)
+        
+        // 既存のログタイマーを停止
+        stopLogTimer()
         
         // エミュレーションスレッドの開始
         emulationThread = Thread { [weak self] in
@@ -207,6 +242,17 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         emulationThread?.name = "PC88EmulationThread"
         emulationThread?.qualityOfService = .userInteractive
         emulationThread?.start()
+        
+        // 状態を実行中に変更
+        state = .running
+        print("エミュレーションを開始しました（PC88EmulatorCore.start()）")
+        
+        // 定期的にパフォーマンス情報を表示するタイマーを設定（状態変更後に設定）
+        startLogTimer()
+        
+        // 開始後に再度画面を更新
+        updateScreen()
+        print("エミュレーション開始後に画面を更新しました")
         
         // 画面更新タイマーの開始
         updateEmulationTimer()
@@ -284,10 +330,30 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             soundChip.resume()
         }
         
-        print("PC-88エミュレーションを再開しました")
-        
         // 状態を実行中に変更
         state = .running
+        
+        // 即時にログを表示
+        logPerformanceMetrics(forceLog: true)
+        
+        // ログタイマーを開始
+        startLogTimer()
+        
+        // 別のタイミングでも試行（万が一のための冗長化）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self, self.state == .running else { return }
+            if self.logTimer == nil {
+                self.startLogTimer()
+            }
+        }
+        
+        // さらに別のタイミングでも試行
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            guard let self = self, self.state == .running else { return }
+            if self.logTimer == nil {
+                self.startLogTimer()
+            }
+        }
     }
     
     /// オーディオをミュート（バックグラウンド移行時に呼び出される）
@@ -372,6 +438,19 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     /// 画面の取得
     func getScreen() -> CGImage? {
+        // 画面イメージがnullの場合はテスト画面を表示して再生成を試みる
+        if screenImage == nil {
+            print("警告: PC88EmulatorCore.getScreen() - screenImageがnullです。テスト画面を表示して再生成します")
+            
+            // テスト画面を表示
+            if let pc88Screen = screen as? PC88Screen {
+                pc88Screen.displayTestScreen()
+                
+                // 画面を強制的に更新
+                updateScreen()
+            }
+        }
+        
         return screenImage
     }
     
@@ -382,12 +461,20 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             return
         }
         
+        print("\nクロックモード変更開始: \(currentClockMode) -> \(mode)\n")
+        
         // 現在の状態を保存
         let wasRunning = state == .running
         
         // 実行中なら一時停止
         if wasRunning {
-            pause()
+            // 状態を一時停止に変更
+            state = .paused
+            
+            // サウンドチップを一時停止
+            if let soundChip = soundChip {
+                soundChip.pause()
+            }
         }
         
         // クロックモードを変更
@@ -417,12 +504,19 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         // エミュレーションループのメトリクスをリセットするためのフラグを設定
         shouldResetMetrics = true
         
+        // クロックモード変更後の情報を表示（強制的に表示）
+        logPerformanceMetrics(forceLog: true)
+        
         // 元の状態が実行中だった場合は再開
         if wasRunning {
-            resume()
+            // 状態を実行中に変更
+            state = .running
+            
+            // サウンドチップを再開
+            if let soundChip = soundChip {
+                soundChip.resume()
+            }
         }
-        
-        print("CPUクロックモードを変更し、リセットしました: \(mode == .mode4MHz ? "4MHz" : "8MHz")")
     }
     
     /// 現在のCPUクロックモードを取得
@@ -628,7 +722,75 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     // MARK: - プライベートメソッド
     
-    // メトリクスリセットフラグはクラスの先頭で定義済み
+    /// ログタイマーを停止
+    private func stopLogTimer() {
+        // タイマーが存在する場合のみ停止する
+        if let timer = logTimer {
+            timer.cancel()
+            logTimer = nil
+        }
+    }
+    
+    /// ログ表示用のタイマーを開始
+    private func startLogTimer() {
+        // 既存のタイマーがあれば何もしない
+        if logTimer != nil {
+            return
+        }
+        
+        // 即時にログを表示
+        logPerformanceMetrics(forceLog: true)
+        
+        // バックグラウンドキューでタイマーを作成
+        let queue = DispatchQueue.global(qos: .utility)
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        
+        // 5秒ごとに実行するように設定
+        timer.schedule(deadline: .now() + 5.0, repeating: 5.0)
+        
+        // タイマーイベントのハンドラを設定
+        timer.setEventHandler { [weak self] in
+            guard let self = self else { return }
+            // 実行中か一時停止中に関わらずログを表示
+            self.logPerformanceMetrics(forceLog: true)
+        }
+        
+        // タイマーを開始
+        timer.resume()
+        
+        // タイマーを保存
+        logTimer = timer
+    }
+    
+
+    
+    /// パフォーマンスメトリクスをログに出力
+    private func logPerformanceMetrics(forceLog: Bool = false) {
+        
+        // ログタイマーがない場合は再作成を試みる
+        if logTimer == nil {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self, self.logTimer == nil else { return }
+                self.startLogTimer()
+            }
+        }
+        
+        // 現在のクロックモードに基づく値を計算
+        let clockMode = currentClockMode == .mode4MHz ? "4MHz" : "8MHz"
+        let baseCyclesPerSecond = currentClockMode == .mode4MHz ? 4_000_000 : 8_000_000
+        let cyclesPerFrame = Int(Double(baseCyclesPerSecond) / targetFPS)
+        
+        // パフォーマンス情報を生成
+        let perfLog = "[クロックモード: \(clockMode)] FPS: \(String(format: "%.2f", targetFPS)), 平均フレーム時間: \(String(format: "%.2f", (1.0/targetFPS) * 1000)) ms, サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(baseCyclesPerSecond) Hz"
+        
+        // コンソールにログを出力
+        print("\n")
+        print(perfLog)
+        print("\n")
+        
+        // ログ出力を確実に行うために強制的にフラッシュ
+        fflush(stdout)
+    }
     
     /// エミュレーションのメインループ
     private func emulationLoop() {
@@ -758,13 +920,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             frameTimeAccumulator += actualFrameTime
             frameCount += 1
             
-            // 5秒ごとにパフォーマンスメトリクスを表示
+            // メトリクスの計算のみを行い、ログ出力は別のタイマーで実行
             if now - lastMetricsTime > 5.0 && frameCount > 0 {
-                let avgFrameTime = frameTimeAccumulator / Double(frameCount)
-                let fps = 1.0 / avgFrameTime
-                let clockMode = currentClockMode == .mode4MHz ? "4MHz" : "8MHz"
-                print("[クロックモード: \(clockMode)] FPS: \(String(format: "%.2f", fps)), 平均フレーム時間: \(String(format: "%.2f", avgFrameTime * 1000)) ms, サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(baseCyclesPerSecond) Hz")
-                
                 // メトリクスをリセット
                 frameTimeAccumulator = 0
                 frameCount = 0
@@ -774,7 +931,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     }
     
     /// 画面の更新
-    private func updateScreen() {
+    internal func updateScreen() {
         // フレームスキップの処理
         // frameCounterはemulationLoopで更新される
         if frameSkip > 0 && (frameCounter % UInt(frameSkip + 1) != 0) {

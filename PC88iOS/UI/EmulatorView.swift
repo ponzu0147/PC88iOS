@@ -9,6 +9,9 @@ import SwiftUI
 import CoreGraphics
 import Foundation
 import Combine
+import AVFoundation
+
+// サウンド関連クラスをインポート
 
 // 必要なクラスをインポート
 
@@ -16,6 +19,10 @@ import Combine
 struct EmulatorView: View {
     @StateObject private var viewModel = EmulatorViewInternalModel()
     @EnvironmentObject private var appState: EmulatorAppState
+    
+    // パフォーマンス情報を表示するための状態変数
+    @State private var performanceLog: String = ""
+    @State private var showPerformanceLog: Bool = false
     
     var body: some View {
         VStack {
@@ -25,6 +32,7 @@ struct EmulatorView: View {
                     .interpolation(.none)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
+
                     .overlay(alignment: .topTrailing) {
                         // バックグラウンド時は一時停止表示
                         if appState.isInBackground || viewModel.isPaused {
@@ -71,7 +79,7 @@ struct EmulatorView: View {
                     
                     Button(action: viewModel.loadDisk) {
                         VStack {
-                            Image(systemName: "opticaldisc")
+                            Image(systemName: "rectangle.on.rectangle")
                                 .font(.system(size: 20))
                             Text("ディスク")
                                 .font(.caption)
@@ -83,6 +91,7 @@ struct EmulatorView: View {
                 
                 // 下段ボタン行
                 HStack(spacing: 15) {
+
                     Button(action: viewModel.playBeepSound) {
                         VStack {
                             Image(systemName: "music.note")
@@ -165,6 +174,13 @@ struct EmulatorView: View {
         .onAppear {
             viewModel.startEmulator()
             viewModel.setupBackgroundHandling()
+            
+            // パフォーマンス情報の通知を受け取る
+            NotificationCenter.default.addObserver(forName: NSNotification.Name("LogUpdateNotification"), object: nil, queue: .main) { notification in
+                if let logMessage = notification.object as? String {
+                    self.performanceLog = logMessage
+                }
+            }
         }
         .onDisappear {
             viewModel.stopEmulator()
@@ -190,7 +206,7 @@ class EmulatorViewInternalModel: ObservableObject {
     @Published var diskImagePath: String = ""
     @Published var clockMode: PC88CPUClock.ClockMode = .mode4MHz
     @Published var clockFrequency: String = "4MHz"
-    @Published var currentFPS: Int = 60
+    @Published var currentFPS: Int = 30
     @Published var volume: Float = 0.5 {
         didSet {
             // 音量変更をPC88BeepSoundに反映
@@ -202,46 +218,142 @@ class EmulatorViewInternalModel: ObservableObject {
     private var timer: Timer?
     
     func startEmulator() {
+        print("エミュレータの初期化を開始します")
         // エミュレータコアの初期化
         emulatorCore = PC88EmulatorCore()
         emulatorCore?.initialize()
         
-        // 初期音量を設定
-        PC88BeepSound.volume = volume
-        
         // スクリーンテストを表示（必ず最初に表示する）
         if let core = emulatorCore as? PC88EmulatorCore {
-            // スクリーンテストの表示を強制
-            // PC88EmulatorCoreの初期化メソッド内ですでにテスト画面が表示されている
-            // 画面更新を強制的に行う
-            updateScreen()
-            print("スクリーンテストを表示しました")
+            print("エミュレータコアの初期化が完了しました")
             
             // 初期クロックモードを4MHzに設定
             core.setCPUClockMode(.mode4MHz)
             clockMode = .mode4MHz
             clockFrequency = "4MHz"
+            print("初期クロックモードを4MHzに設定しました")
+            
+            // 4MHzボタンを押した時と同じ処理を行う
+            resetEmulator()
+            print("エミュレータをリセットしました")
+            
+            // スクリーンテストの表示を強制
+            updateScreen()
+            print("スクリーンテストを表示しました")
+            
+            // エミュレータを開始
+            emulatorCore?.start()
+            print("エミュレータを開始しました（初期化直後）")
+            
+            // 画面を即座に更新
+            forceScreenUpdate()
+            print("画面を強制更新しました（開始直後）")
+            
+            // クロックモードを再設定してリセット（これが重要）
+            core.setCPUClockMode(.mode4MHz)
+            print("クロックモードを再設定しました: 4MHz")
+            
+            // 画面更新のタイミングを調整
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.forceScreenUpdate()
+                print("画面を強制更新しました（初期化後0.1秒）")
+                
+                // エミュレーションが開始されているか確認
+                if self?.emulatorCore?.getState() != .running {
+                    self?.emulatorCore?.start()
+                    print("エミュレーションを再度開始しました（初期化後0.1秒）")
+                }
+            }
+            
+            // クロックモードの再設定と画面更新
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                if let self = self, let core = self.emulatorCore as? PC88EmulatorCore {
+                    // クロックモードを再設定
+                    core.setCPUClockMode(.mode4MHz)
+                    print("クロックモードを再設定しました: 4MHz（初期化後0.3秒）")
+                    
+                    // エミュレーションが開始されているか確認
+                    if self.emulatorCore?.getState() != .running {
+                        self.emulatorCore?.start()
+                        print("エミュレーションを再度開始しました（初期化後0.3秒）")
+                    }
+                    
+                    // 画面を強制更新
+                    self.forceScreenUpdate()
+                    print("画面を強制更新しました（初期化後0.3秒）")
+                }
+            }
+            
+            // 最終確認と画面更新
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                if let self = self {
+                    // エミュレーションが開始されているか確認
+                    if self.emulatorCore?.getState() != .running {
+                        self.emulatorCore?.start() // 再度開始を試みる
+                        print("エミュレーションを再度開始しました（初期化後0.5秒）")
+                    } else {
+                        print("エミュレーションは正常に実行中です（初期化後0.5秒）")
+                    }
+                    
+                    // 画面を強制更新
+                    self.forceScreenUpdate()
+                    print("画面を強制更新しました（初期化後0.5秒）")
+                    
+                    // 4MHzモードを再設定して確実にエミュレーションを開始
+                    if let core = self.emulatorCore as? PC88EmulatorCore {
+                        core.setCPUClockMode(.mode4MHz)
+                        print("最終確認: クロックモードを4MHzに再設定しました")
+                    }
+                }
+            }
         }
         
-        // エミュレータを開始
-        emulatorCore?.start()
+        // 初期状態ではユーザー設定の音量を適用
+        PC88BeepSound.volume = volume
         
-        // 画面更新タイマーの開始（初期値は60FPS）
-        let initialFPS = 60.0
+        // 画面更新タイマーの開始（初期値は30FPS）
+        let initialFPS = 30.0
         timer = Timer.scheduledTimer(withTimeInterval: 1.0/initialFPS, repeats: true) { [weak self] _ in
             self?.updateScreen()
         }
         RunLoop.current.add(timer!, forMode: .common) // スクロール中も更新を継続
         
-        // 初期化後に強制的に画面更新を行う（タイマーが動く前に確実に更新）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+        // 確実に画面が更新されるように複数回の更新を行う
+        // 初期化直後に更新
+        updateScreen() // 即座に更新
+        
+        // 強制的に画面を更新するための処理
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             self?.updateScreen()
+            print("画面を更新しました（初期化直後）")
         }
         
-        // エミュレーションループが確実に開始されるように少し待ってから再度更新
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        // 少し待ってから再度更新
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             self?.updateScreen()
-            print("エミュレーションを開始しました")
+            print("画面を更新しました（初期化後0.2秒）")
+        }
+        
+        // エミュレーションループが確実に開始された後に再度更新
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            self.updateScreen()
+            print("エミュレーションを開始しました（初期化後0.5秒）")
+            
+            // 画面イメージが正しく生成されているか確認
+            if self.screenImage == nil {
+                print("警告: 画面イメージがnilです。強制的に再生成を試みます")
+                if let image = self.emulatorCore?.getScreen() {
+                    self.screenImage = image
+                    print("画面イメージを強制的に再生成しました")
+                }
+            }
+        }
+        
+        // さらに遅らせて再度更新
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.updateScreen()
+            print("画面を更新しました（初期化後1.0秒）")
         }
     }
     
@@ -253,6 +365,9 @@ class EmulatorViewInternalModel: ObservableObject {
     
     /// バックグラウンド処理のセットアップ
     func setupBackgroundHandling() {
+        // 既存の購読をクリア
+        backgroundObservers.removeAll()
+        
         // バックグラウンド移行時の通知を購読
         NotificationCenter.default.publisher(for: .emulatorPauseNotification)
             .sink { [weak self] _ in
@@ -266,6 +381,44 @@ class EmulatorViewInternalModel: ObservableObject {
                 self?.handleForegroundTransition()
             }
             .store(in: &backgroundObservers)
+            
+        // 強制画面更新通知を購読
+        NotificationCenter.default.publisher(for: Notification.Name("ForceScreenUpdateNotification"))
+            .sink { [weak self] _ in
+                self?.forceScreenUpdate()
+                print("強制画面更新通知を受信しました")
+            }
+            .store(in: &backgroundObservers)
+        
+        // エミュレータ開始通知を購読
+        NotificationCenter.default.publisher(for: Notification.Name("EmulatorStartNotification"))
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                
+                // エミュレーションが開始されていない場合は開始する
+                if self.emulatorCore?.getState() != .running {
+                    print("エミュレータ開始通知を受信し、エミュレーションを開始します")
+                    
+                    // クロックモードを4MHzに再設定
+                    if let core = self.emulatorCore as? PC88EmulatorCore {
+                        core.setCPUClockMode(.mode4MHz)
+                        print("エミュレータ開始通知: クロックモードを4MHzに再設定しました")
+                    }
+                    
+                    // エミュレーション開始
+                    self.emulatorCore?.start()
+                    
+                    // 画面を強制更新
+                    self.forceScreenUpdate()
+                }
+            }
+            .store(in: &backgroundObservers)
+        
+        // 購読設定後に強制的に画面更新を行う
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.forceScreenUpdate()
+            print("通知購読設定後に画面を強制更新しました")
+        }
     }
     
     /// バックグラウンド処理の解除
@@ -306,7 +459,7 @@ class EmulatorViewInternalModel: ObservableObject {
             }
             
             // タイマーを再開
-            let fps = currentFPS > 0 ? Double(currentFPS) : 60.0
+            let fps = currentFPS > 0 ? Double(currentFPS) : 30.0
             updateTimerInterval(fps: fps)
             
             print("フォアグラウンド復帰によりエミュレータを再開しました")
@@ -434,6 +587,49 @@ class EmulatorViewInternalModel: ObservableObject {
         // エミュレータコアから画面イメージを取得
         if let image = emulatorCore?.getScreen() {
             screenImage = image
+        } else {
+            print("警告: エミュレータコアから画面イメージを取得できませんでした")
+        }
+    }
+    
+    /// 強制的に画面を更新する
+    func forceScreenUpdate() {
+        // エミュレータが初期化されていない場合は初期化する
+        if emulatorCore == nil {
+            startEmulator()
+            print("エミュレータを初期化しました")
+            return // 初期化後は startEmulator 内で画面更新が行われるため、ここでは終了
+        }
+        
+        // エミュレータが一時停止中なら再開する
+        if isPaused {
+            emulatorCore?.resume()
+            isPaused = false
+            print("エミュレータを再開しました")
+        }
+        
+        // 画面を即座に更新
+        updateScreen()
+        
+        // 画面イメージが取得できない場合は、再度試行
+        if screenImage == nil {
+            print("警告: 画面イメージがnilです。強制的に再生成を試みます")
+            if let core = emulatorCore as? PC88EmulatorCore {
+                // テスト画面を再表示するための代替処理
+                // PC88EmulatorCoreのgetScreen()メソッドを利用して内部でテスト画面を表示する
+                // これにより、privateプロパティにアクセスする必要がなくなる
+                _ = core.getScreen() // これは内部でテスト画面を表示する処理を含む
+                
+                // 少し待ってから再度取得
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                    if let image = self?.emulatorCore?.getScreen() {
+                        self?.screenImage = image
+                        print("画面イメージを強制的に再生成しました")
+                    }
+                }
+            }
+        } else {
+            print("画面を強制更新しました")
         }
     }
 }
