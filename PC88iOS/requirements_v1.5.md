@@ -138,7 +138,7 @@ PC-8801mkII SR では、標準で **YM2203 (OPN)** 音源が内蔵されてお�
     * 依存: (タイミング管理用インターフェース)
 * **`DiskImageAccessing`**: D88 ディスクイメージファイルの読み込みとセクタ単位のアクセスを提供。
 * **`FDCEmulating`**: FDC の動作をエミュレート。`IOAccessing` を通じて CPU と連携し、`DiskImageAccessing` を利用。
-* **`ScreenRendering`**: VRAM や CRTC/GDC (SR相当) の状態に基づき、画面データを生成。
+* **`ScreenRendering`**: VRAM や CRTC (SR相当) の状態に基づき、画面データを生成。
     * 依存: `MemoryAccessing`, `IOAccessing`
 * **`DriverDetecting`**: ディスクイメージの内容を解析し、FM 音源ドライバの種類を判別。
     * 依存: `DiskImageAccessing` (または FDC 経由でのアクセス)
