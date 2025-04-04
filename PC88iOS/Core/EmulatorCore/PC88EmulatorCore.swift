@@ -1023,20 +1023,22 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// メモリ内容を確認してログに出力
     private func verifyOsMemoryContents(pc88Memory: PC88Memory) {
         // メモリに正しく書き込まれたか確認
-        print("OSメモリ内容確認 (0xD000-0xD00F):")
+        PC88Logger.core.debug("OSメモリ内容確認 (0xD000-0xD00F):")
+        var memoryContent = ""
         for i in 0..<16 {
             let byte = pc88Memory.readByte(at: 0xD000 + UInt16(i))
-            print(String(format: "%02X ", byte), terminator: "")
+            memoryContent += String(format: "%02X ", byte)
         }
-        print("")
+        PC88Logger.core.debug(memoryContent)
         
         // ジャンプテーブルを確認
-        print("OSジャンプテーブル確認 (0xD100-0xD10F):")
+        PC88Logger.core.debug("OSジャンプテーブル確認 (0xD100-0xD10F):")
+        memoryContent = ""
         for i in 0..<16 {
             let byte = pc88Memory.readByte(at: 0xD100 + UInt16(i))
-            print(String(format: "%02X ", byte), terminator: "")
+            memoryContent += String(format: "%02X ", byte)
         }
-        print("")
+        PC88Logger.core.debug(memoryContent)
     }
     
     /// ディスクイメージをロードする共通メソッド
@@ -1047,7 +1049,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// - Returns: 成功したかどうか
     private func loadDiskImageInternal(from url: URL, drive: Int, tempFileName: String) -> Bool {
         guard let pc88FDC = fdc as? PC88FDC else { 
-            print("FDCが初期化されていません")
+            PC88Logger.core.error("FDCが初期化されていません")
             return false 
         }
         
@@ -1058,11 +1060,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         // ディスクイメージをFDCにセット
         pc88FDC.setDiskImage(diskImage, drive: drive)
-        print("ディスクイメージをドライブ\(drive + 1)に読み込みました: \(url.lastPathComponent)")
+        PC88Logger.disk.debug("ディスクイメージをドライブ\(drive + 1)に読み込みました: \(url.lastPathComponent)")
         
         // ALPHA-MINI-DOSかどうかをログに出力
         if let d88DiskImage = diskImage as? D88DiskImage, d88DiskImage.isAlphaMiniDos() {
-            print("ALPHA-MINI-DOSディスクイメージを検出しました: \(url.lastPathComponent)")
+            PC88Logger.disk.debug("ALPHA-MINI-DOSディスクイメージを検出しました: \(url.lastPathComponent)")
         }
         
         return true
@@ -1089,12 +1091,12 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                 cleanupTempFile(at: tempURL)
                 return diskImage
             } else {
-                print("ディスクイメージのフォーマットが無効です: \(url.lastPathComponent)")
+                PC88Logger.disk.error("ディスクイメージのフォーマットが無効です: \(url.lastPathComponent)")
                 cleanupTempFile(at: tempURL)
                 return nil
             }
         } catch {
-            print("ディスクイメージの読み込みエラー: \(error.localizedDescription)")
+            PC88Logger.disk.error("ディスクイメージの読み込みエラー: \(error.localizedDescription)")
             return nil
         }
     }
@@ -1116,7 +1118,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     private func loadDefaultDiskImage() {
         // リソースからALPHA-MINI-DOSディスクイメージを取得
         guard let diskImageURL = Bundle.main.url(forResource: "ALPHA-MINI-DOS", withExtension: "d88") else {
-            print("ALPHA-MINI-DOSディスクイメージが見つかりません")
+            PC88Logger.disk.warning("ALPHA-MINI-DOSディスクイメージが見つかりません")
             return
         }
         
