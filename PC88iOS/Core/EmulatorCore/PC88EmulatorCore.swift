@@ -11,11 +11,17 @@ import UIKit
 import SwiftUI
 import os.log
 
-// インポートはプロジェクト全体で共有されているので、明示的なインポートは不要
+// 必要なプロトコルを明示的にインポート
+// これにより型の曖昧さを解消
+// Swiftではファイルを直接インポートするのではなく、モジュールをインポートします
+// この場合、プロトコルは同じモジュール内にあるので、明示的なインポートは必要ありません
 
 /// PC-88エミュレータのコア実装
 class PC88EmulatorCore: EmulatorCoreManaging {
     // MARK: - プロパティ
+    
+    /// エミュレータの状態
+    private var state: EmulatorState = .uninitialized
     
     /// ターゲットフレームレート
     private var targetFPS: Double = 30.0 // デフォルトは30fpsに設定
@@ -27,7 +33,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     private var cpu: CPUExecuting?
     
     /// メモリアクセス
-    private var memory: MemoryAccessing?
+    private var memory: PC88iOS.MemoryAccessing?
     
     /// I/Oアクセス
     private var io: IOAccessing?
@@ -47,6 +53,10 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// ビープ音テスト用クラス
     private var beepTest: PC88BeepTest?
     
+
+    
+
+    
     /// ビープ音生成機能へのアクセサ
     func getBeepSound() -> Any? {
         return beepSound
@@ -57,10 +67,27 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         return beepTest
     }
     
+    /// 画面の取得
+    func getScreen() -> CGImage? {
+        // 画面イメージがnullの場合はテスト画面を表示して再生成を試みる
+        if screenImage == nil {
+            print("警告: PC88EmulatorCore.getScreen() - screenImageがnullです。テスト画面を表示して再生成します")
+            
+            // テスト画面を表示
+            if let pc88Screen = screen as? PC88ScreenBase {
+                pc88Screen.displayTestScreen()
+                
+                // 画面を再描画し、レンダリング結果を取得
+                screenImage = pc88Screen.render()
+            }
+        }
+        
+        return screenImage
+    }
+    
 
     
-    /// エミュレータの状態
-    private var state: EmulatorState = .initialized
+
     
     /// エミュレーション速度（1.0 = 通常速度）
     private var emulationSpeed: Float = 1.0
@@ -71,14 +98,18 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// 現在のCPUクロックモード
     private var currentClockMode: PC88CPUClock.ClockMode = .mode4MHz // デフォルトは4MHz
     
+
+    
+    /// ログ表示用タイマー
+    private var logTimer: Timer?
+    
     /// エミュレーションスレッド
     private var emulationThread: Thread?
     
-    /// ログ表示用タイマー
-    private var logTimer: DispatchSourceTimer?
-    
     /// エミュレーションタイマー
     private var emulationTimer: Timer?
+    
+
     
     /// 画面イメージ
     private var screenImage: CGImage?
@@ -103,102 +134,21 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     // MARK: - EmulatorCoreManaging プロトコル実装
     
+    /// エミュレータの初期化を行う
     func initialize() {
-        // ROMの読み込み
-        if !loadROMs() {
-            print("警告: ROMの読み込みに失敗しました")
-        }
-        
-        // リズム音源の読み込み
-        if !loadRhythmSounds() {
-            print("警告: リズム音源の読み込みに失敗しました")
-        }
-        
-        // メモリの初期化
-        memory = PC88Memory()
-        
-        // I/Oの初期化
-        io = PC88IO()
-        
-        // CPUの初期化
-        if let memory = memory, let io = io {
-            cpu = Z80CPU(memory: memory, io: io)
-            
-            // CPUクロックモードを設定
-            if let z80 = cpu as? Z80CPU {
-                z80.setClockMode(currentClockMode)
-                
-                // アイドル検出を有効化（デフォルトで有効）
-                z80.setIdleDetectionEnabled(true)
-            }
-        }
-        
-        // 画面の初期化
-        screen = PC88ScreenBase()
-        if let pc88Screen = screen as? PC88ScreenBase, let memory = memory, let io = io {
-            pc88Screen.connectMemory(memory)
-            pc88Screen.connectIO(io)
-            
-            // フォントデータを設定
-            setupFonts(for: pc88Screen)
-        }
-        
-        // FDCの初期化
-        fdc = PC88FDC()
-        if let fdc = fdc as? PC88FDC, let io = io {
-            fdc.connectIO(io)
-            
-            // IOとFDCを相互接続
-            if let io = io as? PC88IO {
-                io.connectFDC(fdc)
-            }
-        }
-        
-        // サウンドチップの初期化
-        soundChip = YM2203Emulator()
-        if let soundChip = soundChip as? YM2203Emulator, let io = io as? PC88IO {
-            soundChip.initialize(sampleRate: 44100.0)
-            // デフォルトで中品質モードに設定
-            soundChip.setQualityMode(SoundQualityMode.medium)
-            io.connectSoundChip(soundChip)
-        }
-        
-        // 初期モデル用ビープ音生成の初期化
-        beepSound = PC88BeepSound()
-        if let beepSound = beepSound, let io = io as? PC88IO {
-            beepSound.initialize(sampleRate: 44100.0)
-            io.connectBeepSound(beepSound)
-            
-            // ビープ音テスト機能の初期化
-            beepTest = PC88BeepTest(io: io, cpuClock: cpuClock)
-        }
+        // 各コンポーネントの初期化
+        initializeROM()
+        initializeMemoryAndIO()
+        initializeCPU()
+        initializeScreen()
+        initializeFDC()
+        initializeSoundComponents()
         
         // ROMデータをメモリに転送
         loadROMsToMemory()
         
-        // ALPHA-MINI-DOSディスクイメージを読み込む
-        loadDefaultDiskImage()
-        
-        // ALPHA-MINI-DOSディスクが読み込まれているか確認
-        if let pc88FDC = fdc as? PC88FDC {
-            let diskName = pc88FDC.getDiskName(drive: 0) ?? ""
-            if diskName.contains("ALPHA-MINI") {
-                // ALPHA-MINI-DOSの場合はテスト画面を表示しない
-                print("ALPHA-MINI-DOSディスクが読み込まれているため、テスト画面をスキップします")
-            } else {
-                // 通常のディスクまたはディスクがない場合はテスト画面を表示
-                if let pc88Screen = screen as? PC88ScreenBase {
-                    pc88Screen.displayTestScreen()
-                    print("テスト画面を表示しました")
-                }
-            }
-        } else {
-            // FDCが初期化されていない場合はテスト画面を表示
-            if let pc88Screen = screen as? PC88ScreenBase {
-                pc88Screen.displayTestScreen()
-                print("テスト画面を表示しました")
-            }
-        }
+        // ディスクイメージの読み込みと初期画面表示
+        setupInitialDiskAndScreen()
         
         // FDDブートを有効化
         setFDDBootEnabled(true)
@@ -208,6 +158,134 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         // 状態を初期化済みに変更
         state = .initialized
+    }
+    
+    /// ROMとリズム音源の初期化
+    private func initializeROM() {
+        // ROMの読み込み
+        if !loadROMs() {
+            print("警告: ROMの読み込みに失敗しました")
+        }
+        
+        // リズム音源の読み込み
+        if !loadRhythmSounds() {
+            print("警告: リズム音源の読み込みに失敗しました")
+        }
+    }
+    
+    /// メモリとI/Oの初期化
+    private func initializeMemoryAndIO() {
+        // メモリの初期化
+        memory = PC88Memory()
+        
+        // I/Oの初期化
+        io = PC88IO()
+    }
+    
+    /// CPUの初期化
+    private func initializeCPU() {
+        guard let memory = memory, let io = io else { return }
+        
+        cpu = Z80CPU(memory: memory, io: io)
+        
+        // CPUクロックモードを設定
+        if let z80 = cpu as? Z80CPU {
+            z80.setClockMode(currentClockMode)
+            
+            // アイドル検出を有効化（デフォルトで有効）
+            z80.setIdleDetectionEnabled(true)
+        }
+    }
+    
+    /// 画面の初期化
+    private func initializeScreen() {
+        screen = PC88ScreenBase()
+        
+        guard let pc88Screen = screen as? PC88ScreenBase,
+              let memory = memory,
+              let io = io else { return }
+        
+        pc88Screen.connectMemory(memory)
+        pc88Screen.connectIO(io)
+        
+        // フォントデータを設定
+        setupFonts(for: pc88Screen)
+    }
+    
+    /// FDC（フロッピーディスクコントローラ）の初期化
+    private func initializeFDC() {
+        fdc = PC88FDC()
+        
+        guard let fdc = fdc as? PC88FDC,
+              let io = io else { return }
+        
+        fdc.connectIO(io)
+        
+        // IOとFDCを相互接続
+        if let io = io as? PC88IO {
+            io.connectFDC(fdc)
+        }
+    }
+    
+    /// サウンド関連コンポーネントの初期化
+    private func initializeSoundComponents() {
+        initializeYM2203SoundChip()
+        initializeBeepSound()
+    }
+    
+    /// YM2203サウンドチップの初期化
+    private func initializeYM2203SoundChip() {
+        soundChip = YM2203Emulator()
+        
+        guard let soundChip = soundChip as? YM2203Emulator,
+              let io = io as? PC88IO else { return }
+        
+        soundChip.initialize(sampleRate: 44100.0)
+        // デフォルトで中品質モードに設定
+        soundChip.setQualityMode(SoundQualityMode.medium)
+        io.connectSoundChip(soundChip)
+    }
+    
+    /// ビープ音生成の初期化
+    private func initializeBeepSound() {
+        beepSound = PC88BeepSound()
+        
+        guard let beepSound = beepSound,
+              let io = io as? PC88IO else { return }
+        
+        beepSound.initialize(sampleRate: 44100.0)
+        io.connectBeepSound(beepSound)
+        
+        // ビープ音テスト機能の初期化
+        beepTest = PC88BeepTest(io: io, cpuClock: cpuClock)
+    }
+    
+    /// 初期ディスクイメージの読み込みと初期画面表示
+    private func setupInitialDiskAndScreen() {
+        // ALPHA-MINI-DOSディスクイメージを読み込む
+        loadDefaultDiskImage()
+        
+        // ディスクに基づいて初期画面を表示するか判断
+        shouldDisplayTestScreen()
+    }
+    
+    /// テスト画面を表示するか判断する
+    private func shouldDisplayTestScreen() {
+        // ALPHA-MINI-DOSディスクが読み込まれているか確認
+        if let pc88FDC = fdc as? PC88FDC {
+            let diskName = pc88FDC.getDiskName(drive: 0) ?? ""
+            if diskName.contains("ALPHA-MINI") {
+                // ALPHA-MINI-DOSの場合はテスト画面を表示しない
+                print("ALPHA-MINI-DOSディスクが読み込まれているため、テスト画面をスキップします")
+                return
+            }
+        }
+        
+        // ディスクがないか、ALPHA-MINI-DOS以外の場合はテスト画面を表示
+        if let pc88Screen = screen as? PC88ScreenBase {
+            pc88Screen.displayTestScreen()
+            print("テスト画面を表示しました")
+        }
     }
     
     func start() {
@@ -221,8 +299,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         // 一時停止中なら再開するだけ
         if state == .paused {
-            state = .running
-            print("エミュレーションを再開しました（一時停止から）")
+            changeState(to: .running)
             
             // 一時停止からの再開時にも画面を更新
             updateScreen()
@@ -305,14 +382,16 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         print("PC-88エミュレーションを開始しました（最適化設定適用済み）")
         
         // 状態を実行中に変更
-        state = .running
+        changeState(to: .running)
     }
     
     func stop() {
         guard state == .running || state == .paused else { return }
         
         // エミュレーションスレッドの停止
-        emulationThread?.cancel()
+        // Threadクラスにはcancelメソッドがないため、状態変数を使用してスレッドの終了を管理する
+        state = .stopping
+        // スレッドが自然に終了するのを待つ
         emulationThread = nil
         
         // 画面更新タイマーの停止
@@ -329,43 +408,57 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             cpu.reset()
         }
         
-        print("PC-88エミュレーションを停止しました")
-        
-        // 状態を停止に変更
-        state = .initialized
+        // 状態を初期化済みに変更
+        changeState(to: .initialized)
     }
     
-    func pause() {
-        guard state == .running else { return }
+    /// エミュレータの状態を変更する
+    /// - Parameter newState: 新しい状態
+    private func changeState(to newState: EmulatorState) {
+        // 同じ状態なら何もしない
+        if state == newState { return }
         
-        // サウンドチップを一時停止
-        if let soundChip = soundChip {
-            soundChip.pause()
+        let oldState = state
+        state = newState
+        
+        switch (oldState, newState) {
+        case (.running, .paused):
+            // 実行中から一時停止に変更
+            if let soundChip = soundChip {
+                soundChip.pause()
+            }
+            print("PC-88エミュレーションを一時停止しました")
+            
+        case (.paused, .running):
+            // 一時停止から実行中に変更
+            if let soundChip = soundChip {
+                soundChip.resume()
+            }
+            logPerformanceMetrics(forceLog: true)
+            startLogTimer()
+            print("PC-88エミュレーションを再開しました")
+            
+            // ログタイマーの開始を冗長化（信頼性向上のため）
+            scheduleLogTimerStarts()
+            
+        case (_, .initialized):
+            // 任意の状態から初期化済みに変更
+            if let soundChip = soundChip {
+                soundChip.pause()
+            }
+            print("PC-88エミュレーションを停止しました")
+            
+        case (.initialized, .running):
+            // 初期化済みから実行中に変更
+            print("PC-88エミュレーションを開始しました")
+            
+        default:
+            break
         }
-        
-        print("PC-88エミュレーションを一時停止しました")
-        
-        // 状態を一時停止に変更
-        state = .paused
     }
     
-    func resume() {
-        guard state == .paused else { return }
-        
-        // サウンドチップを再開
-        if let soundChip = soundChip {
-            soundChip.resume()
-        }
-        
-        // 状態を実行中に変更
-        state = .running
-        
-        // 即時にログを表示
-        logPerformanceMetrics(forceLog: true)
-        
-        // ログタイマーを開始
-        startLogTimer()
-        
+    /// ログタイマーの開始を冗長化する（信頼性向上のため）
+    private func scheduleLogTimerStarts() {
         // 別のタイミングでも試行（万が一のための冗長化）
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self, self.state == .running else { return }
@@ -381,6 +474,16 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                 self.startLogTimer()
             }
         }
+    }
+    
+    func pause() {
+        guard state == .running else { return }
+        changeState(to: .paused)
+    }
+    
+    func resume() {
+        guard state == .paused else { return }
+        changeState(to: .running)
     }
     
     /// オーディオをミュート（バックグラウンド移行時に呼び出される）
@@ -460,26 +563,9 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     func loadDiskImage(url: URL, drive: Int) -> Bool {
         guard drive >= 0 && drive < 2 else { return false }
         guard let fdc = fdc else { return false }
-        return fdc.loadDiskImage(url: url, drive: drive)
+        return loadDiskImage(from: url, drive: drive, tempFileName: "user_disk.d88", reloadBootSector: fddBootEnabled)
     }
-    
-    /// 画面の取得
-    func getScreen() -> CGImage? {
-        // 画面イメージがnullの場合はテスト画面を表示して再生成を試みる
-        if screenImage == nil {
-            print("警告: PC88EmulatorCore.getScreen() - screenImageがnullです。テスト画面を表示して再生成します")
-            
-            // テスト画面を表示
-            if let pc88Screen = screen as? PC88ScreenBase {
-                pc88Screen.displayTestScreen()
-                
-                // 画面を強制的に更新
-                updateScreen()
-            }
-        }
-        
-        return screenImage
-    }
+
     
     /// CPUクロックモードを設定
     func setCPUClockMode(_ mode: PC88CPUClock.ClockMode) {
@@ -496,12 +582,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         // 実行中なら一時停止
         if wasRunning {
             // 状態を一時停止に変更
-            state = .paused
-            
-            // サウンドチップを一時停止
-            if let soundChip = soundChip {
-                soundChip.pause()
-            }
+            changeState(to: .paused)
         }
         
         // クロックモードを変更
@@ -537,12 +618,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         // 元の状態が実行中だった場合は再開
         if wasRunning {
             // 状態を実行中に変更
-            state = .running
-            
-            // サウンドチップを再開
-            if let soundChip = soundChip {
-                soundChip.resume()
-            }
+            changeState(to: .running)
         }
     }
     
@@ -757,15 +833,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             return
         }
         
-        // FDDブートが有効でない場合は何もしない
-        if !fddBootEnabled {
-            print("FDDブートが無効です")
-            return
-        }
-        
-        // ドライブ1にディスクイメージがセットされているか確認
-        if !pc88FDC.hasDiskImage(drive: 0) {
-            print("ドライブ1にディスクイメージがセットされていません")
+        // 必要な前提条件を確認
+        if !isBootSectorLoadable(pc88FDC: pc88FDC) {
             return
         }
         
@@ -774,17 +843,57 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         let isAlphaMiniDos = diskName.contains("ALPHA-MINI")
         
         if isAlphaMiniDos {
-            // ALPHA-MINI-DOS用の特別処理
-            print("ALPHA-MINI-DOSを検出しました。特別処理を実行します。")
+            loadAlphaMiniDosBootSector(pc88FDC: pc88FDC, pc88Memory: pc88Memory)
+        } else {
+            loadStandardBootSector(pc88FDC: pc88FDC, pc88Memory: pc88Memory)
+        }
+    }
+    
+    /// ブートセクタがロード可能か確認する
+    private func isBootSectorLoadable(pc88FDC: PC88FDC) -> Bool {
+        // FDDブートが有効でない場合は何もしない
+        if !fddBootEnabled {
+            print("FDDブートが無効です")
+            return false
+        }
+        
+        // ドライブ1にディスクイメージがセットされているか確認
+        if !pc88FDC.hasDiskImage(drive: 0) {
+            print("ドライブ1にディスクイメージがセットされていません")
+            return false
+        }
+        
+        return true
+    }
+    
+    /// ALPHA-MINI-DOSのブートセクタをロードする
+    private func loadAlphaMiniDosBootSector(pc88FDC: PC88FDC, pc88Memory: PC88Memory) {
+        print("ALPHA-MINI-DOSを検出しました。特別処理を実行します。")
+        
+        // D88DiskImageを取得
+        guard let d88DiskImage = pc88FDC.getDiskImage(drive: 0) as? D88DiskImage else {
+            print("ALPHA-MINI-DOSのディスクイメージの取得に失敗しました")
+            return
+        }
+        
+        // CPUを取得
+        guard let z80CPU = cpu as? Z80CPU else {
+            print("CPUが初期化されていません")
+            return
+        }
+        
+        // AlphaMiniDosIntegrationを使用してロード
+        let integration = PC88AlphaMiniDosIntegration(memory: pc88Memory, cpu: z80CPU)
+        
+        if integration.loadAlphaMiniDos(from: d88DiskImage) {
+            print("ALPHA-MINI-DOSのロードに成功しました")
+        } else {
+            print("ALPHA-MINI-DOSのロードに失敗しました")
             
-            // D88DiskImageから直接IPLを取得
-            if let d88DiskImage = pc88FDC.getDiskImage(drive: 0) as? D88DiskImage,
-               let iplData = d88DiskImage.readSector(track: 0, sector: 1) {
-                
+            // 失敗した場合は従来の方法で再試行
+            if let iplData = d88DiskImage.readSector(track: 0, sector: 1) {
                 // メモリの0xC000にIPLをロード (256バイト)
-                for (offset, byte) in iplData.enumerated() {
-                    pc88Memory.writeByte(byte, at: 0xC000 + UInt16(offset))
-                }
+                loadDataToMemory(data: iplData, startAddress: 0xC000, pc88Memory: pc88Memory)
                 print("ALPHA-MINI-DOSのIPLをメモリにロードしました: 0xC000-0xC0FF")
                 
                 // OS部分もロード
@@ -792,20 +901,27 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             } else {
                 print("ALPHA-MINI-DOSのIPLの読み込みに失敗しました")
             }
+        }
+    }
+    
+    /// 標準的なブートセクタをロードする
+    private func loadStandardBootSector(pc88FDC: PC88FDC, pc88Memory: PC88Memory) {
+        print("IPLをロード中: ドライブ1、トラック0、セクタ1")
+        
+        // ブートセクタを読み込む (トラック0、セクタ1)
+        if let sectorData = pc88FDC.readSector(drive: 0, track: 0, sector: 1) {
+            // メモリの0x8000にIPLをロード (256バイト)
+            loadDataToMemory(data: sectorData, startAddress: 0x8000, pc88Memory: pc88Memory)
+            print("IPLをメモリにロードしました: 0x8000-0x80FF")
         } else {
-            // 通常のディスクイメージの処理
-            print("IPLをロード中: ドライブ1、トラック0、セクタ1")
-            
-            // ブートセクタを読み込む (トラック0、セクタ1)
-            if let sectorData = pc88FDC.readSector(drive: 0, track: 0, sector: 1) {
-                // メモリの0x8000にIPLをロード (256バイト)
-                for (offset, byte) in sectorData.enumerated() {
-                    pc88Memory.writeByte(byte, at: 0x8000 + UInt16(offset))
-                }
-                print("IPLをメモリにロードしました: 0x8000-0x80FF")
-            } else {
-                print("IPLの読み込みに失敗しました")
-            }
+            print("IPLの読み込みに失敗しました")
+        }
+    }
+    
+    /// データをメモリにロードするヘルパーメソッド
+    private func loadDataToMemory(data: [UInt8], startAddress: UInt16, pc88Memory: PC88Memory) {
+        for (offset, byte) in data.enumerated() {
+            pc88Memory.writeByte(byte, at: startAddress + UInt16(offset))
         }
     }
     
@@ -819,7 +935,15 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         print("ALPHA-MINI-DOSのOS部分をロードします")
         
-        // メモリ領域をクリアしておく
+        // OS領域をクリア
+        clearOsMemoryRegion(pc88Memory: pc88Memory)
+        
+        // OSセクタをロード
+        loadOsSectors(pc88FDC: pc88FDC, pc88Memory: pc88Memory)
+    }
+    
+    /// OS領域のメモリをクリアする
+    private func clearOsMemoryRegion(pc88Memory: PC88Memory) {
         let osStartAddress: UInt16 = 0xD000
         let osClearSize: Int = 0x3000 // 12KBクリア
         
@@ -835,7 +959,10 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                 break // UInt16の範囲を超えた場合は終了
             }
         }
-        
+    }
+    
+    /// OSセクタをメモリにロードする
+    private func loadOsSectors(pc88FDC: PC88FDC, pc88Memory: PC88Memory) {
         // D88DiskImageからOSセクタを取得
         if let d88DiskImage = pc88FDC.getDiskImage(drive: 0) as? D88DiskImage,
            let osSectors = d88DiskImage.loadOsSectors() {
@@ -843,127 +970,183 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             print("ALPHA-MINI-DOSのOS部分をロードします: \(osSectors.count)セクタ")
             
             // OS部分を0xD000からロード
-            var memoryOffset: UInt16 = 0xD000
-            var totalBytesLoaded = 0
+            let memoryOffset = loadOsSectorsToMemory(osSectors: osSectors, pc88Memory: pc88Memory)
             
-            for (index, sectorData) in osSectors.enumerated() {
-                // セクタデータのチェック
-                let validData = sectorData.contains { $0 != 0 && $0 != 0xFF }
-                
-                // 各セクタを連続したメモリ領域にロード
-                for (offset, byte) in sectorData.enumerated() {
-                    let address = memoryOffset + UInt16(offset)
-                    pc88Memory.writeByte(byte, at: address)
-                }
-                
-                totalBytesLoaded += sectorData.count
-                
-                // 次のセクタ用にオフセットを更新
-                memoryOffset += UInt16(sectorData.count)
-                
-                if index < 5 { // 最初の数セクタのみログ表示
-                    print("  OSセクタ\(index+1)をメモリにロードしました: 0x\(String(format: "%04X", memoryOffset - UInt16(sectorData.count)))-0x\(String(format: "%04X", memoryOffset - 1)) (有効データ: \(validData ? "あり" : "なし"))")
-                    
-                    // 最初の数セクタの内容を表示
-                    if index == 0 {
-                        print("  最初のセクタの内容 (16バイト):")
-                        for i in 0..<min(16, sectorData.count) {
-                            print(String(format: "%02X ", sectorData[i]), terminator: "")
-                        }
-                        print("")
-                    }
-                }
-            }
-            
-            print("ALPHA-MINI-DOSのOS部分のロードが完了しました: 0xD000-0x\(String(format: "%04X", memoryOffset - 1)) (合計: \(totalBytesLoaded) バイト)")
-            
-            // メモリに正しく書き込まれたか確認
-            print("OSメモリ内容確認 (0xD000-0xD00F):")
-            for i in 0..<16 {
-                let byte = pc88Memory.readByte(at: 0xD000 + UInt16(i))
-                print(String(format: "%02X ", byte), terminator: "")
-            }
-            print("")
-            
-            // ジャンプテーブルを確認
-            print("OSジャンプテーブル確認 (0xD100-0xD10F):")
-            for i in 0..<16 {
-                let byte = pc88Memory.readByte(at: 0xD100 + UInt16(i))
-                print(String(format: "%02X ", byte), terminator: "")
-            }
-            print("")
+            // メモリ内容を確認してログに出力
+            verifyOsMemoryContents(pc88Memory: pc88Memory)
         } else {
-            print("ALPHA-MINI-DOSのOS部分の読み込みに失敗しました")
+            print("ALPHA-MINI-DOSのOSセクタの読み込みに失敗しました")
         }
     }
     
-    /// ALPHA-MINI-DOSディスクイメージを自動的に読み込む
-    private func loadDefaultDiskImage() {
-        guard let fdc = fdc as? PC88FDC else { return }
+    /// OSセクタをメモリにロードし、最終オフセットを返す
+    private func loadOsSectorsToMemory(osSectors: [[UInt8]], pc88Memory: PC88Memory) -> UInt16 {
+        var memoryOffset: UInt16 = 0xD000
+        var totalBytesLoaded = 0
         
-        // リソースからALPHA-MINI-DOSディスクイメージを取得
-        if let diskImageURL = Bundle.main.url(forResource: "ALPHA-MINI-DOS", withExtension: "d88") {
-            do {
-                let diskImageData = try Data(contentsOf: diskImageURL)
-                let diskImage = D88DiskImage()
-                
-                // ディスクイメージデータを一時ファイルに保存してからロード
-                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_disk.d88")
-                try diskImageData.write(to: tempURL)
-                
-                if diskImage.loadDiskImage(from: tempURL) {
-                    // ドライブ0にディスクイメージをセット
-                    fdc.setDiskImage(diskImage, drive: 0)
-                    print("ALPHA-MINI-DOSディスクイメージを読み込みました")
-                    
-                    // 一時ファイルを削除
-                    try? FileManager.default.removeItem(at: tempURL)
-                } else {
-                    print("ALPHA-MINI-DOSディスクイメージの読み込みに失敗しました")
-                }
-            } catch {
-                print("ディスクイメージの読み込みエラー: \(error.localizedDescription)")
+        for (index, sectorData) in osSectors.enumerated() {
+            // セクタデータのチェック
+            let validData = sectorData.contains { $0 != 0 && $0 != 0xFF }
+            
+            // 各セクタを連続したメモリ領域にロード
+            loadDataToMemory(data: sectorData, startAddress: memoryOffset, pc88Memory: pc88Memory)
+            
+            totalBytesLoaded += sectorData.count
+            
+            // 次のセクタ用にオフセットを更新
+            let previousOffset = memoryOffset
+            memoryOffset += UInt16(sectorData.count)
+            
+            // 最初の数セクタのみログ表示
+            if index < 5 {
+                logSectorLoad(index: index, sectorData: sectorData, startAddress: previousOffset, endAddress: memoryOffset - 1, validData: validData)
             }
-        } else {
-            print("ALPHA-MINI-DOSディスクイメージが見つかりません")
+        }
+        
+        print("ALPHA-MINI-DOSのOS部分のロードが完了しました: 0xD000-0x\(String(format: "%04X", memoryOffset - 1)) (合計: \(totalBytesLoaded) バイト)")
+        
+        return memoryOffset
+    }
+    
+    /// セクタロードの情報をログに出力
+    private func logSectorLoad(index: Int, sectorData: [UInt8], startAddress: UInt16, endAddress: UInt16, validData: Bool) {
+        print("  OSセクタ\(index+1)をメモリにロードしました: 0x\(String(format: "%04X", startAddress))-0x\(String(format: "%04X", endAddress)) (有効データ: \(validData ? "あり" : "なし"))")
+        
+        // 最初のセクタの内容を表示
+        if index == 0 {
+            print("  最初のセクタの内容 (16バイト):")
+            for i in 0..<min(16, sectorData.count) {
+                print(String(format: "%02X ", sectorData[i]), terminator: "")
+            }
+            print("")
         }
     }
     
-    /// 外部からディスクイメージをロード
-    func loadDiskImage(from url: URL, drive: Int) -> Bool {
-        guard let fdc = fdc as? PC88FDC else { return false }
+    /// メモリ内容を確認してログに出力
+    private func verifyOsMemoryContents(pc88Memory: PC88Memory) {
+        // メモリに正しく書き込まれたか確認
+        print("OSメモリ内容確認 (0xD000-0xD00F):")
+        for i in 0..<16 {
+            let byte = pc88Memory.readByte(at: 0xD000 + UInt16(i))
+            print(String(format: "%02X ", byte), terminator: "")
+        }
+        print("")
         
+        // ジャンプテーブルを確認
+        print("OSジャンプテーブル確認 (0xD100-0xD10F):")
+        for i in 0..<16 {
+            let byte = pc88Memory.readByte(at: 0xD100 + UInt16(i))
+            print(String(format: "%02X ", byte), terminator: "")
+        }
+        print("")
+    }
+    
+    /// ディスクイメージをロードする共通メソッド
+    /// - Parameters:
+    ///   - url: ディスクイメージのURL
+    ///   - drive: ドライブ番号（0または1）
+    ///   - tempFileName: 一時ファイル名
+    /// - Returns: 成功したかどうか
+    private func loadDiskImageInternal(from url: URL, drive: Int, tempFileName: String) -> Bool {
+        guard let pc88FDC = fdc as? PC88FDC else { 
+            print("FDCが初期化されていません")
+            return false 
+        }
+        
+        // ディスクイメージデータを読み込む
+        guard let diskImage = createDiskImageFromURL(url: url, tempFileName: tempFileName) else {
+            return false
+        }
+        
+        // ディスクイメージをFDCにセット
+        pc88FDC.setDiskImage(diskImage, drive: drive)
+        print("ディスクイメージをドライブ\(drive + 1)に読み込みました: \(url.lastPathComponent)")
+        
+        // ALPHA-MINI-DOSかどうかをログに出力
+        if let d88DiskImage = diskImage as? D88DiskImage, d88DiskImage.isAlphaMiniDos() {
+            print("ALPHA-MINI-DOSディスクイメージを検出しました: \(url.lastPathComponent)")
+        }
+        
+        return true
+    }
+    
+    /// URLからディスクイメージを作成する
+    /// - Parameters:
+    ///   - url: ディスクイメージのURL
+    ///   - tempFileName: 一時ファイル名
+    /// - Returns: 作成されたディスクイメージ、失敗した場合はnil
+    private func createDiskImageFromURL(url: URL, tempFileName: String) -> DiskImageAccessing? {
         do {
+            // ディスクイメージデータを読み込む
             let diskImageData = try Data(contentsOf: url)
             let diskImage = D88DiskImage()
             
-            // ディスクイメージデータを一時ファイルに保存してからロード
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("user_disk.d88")
+            // 一時ファイルに保存してからロード
+            let tempURL = createTempFileURL(fileName: tempFileName)
             try diskImageData.write(to: tempURL)
             
+            // ディスクイメージをロード
             if diskImage.loadDiskImage(from: tempURL) {
-                // 指定されたドライブにディスクイメージをセット
-                fdc.setDiskImage(diskImage, drive: drive)
-                print("ディスクイメージをドライブ\(drive + 1)に読み込みました: \(url.lastPathComponent)")
-                
                 // 一時ファイルを削除
-                try? FileManager.default.removeItem(at: tempURL)
-                
-                // FDDブートが有効な場合、ブートセクタを再ロード
-                if fddBootEnabled && drive == 0 {
-                    loadBootSector()
-                }
-                
-                return true
+                cleanupTempFile(at: tempURL)
+                return diskImage
             } else {
-                print("ディスクイメージの読み込みに失敗しました: \(url.lastPathComponent)")
+                print("ディスクイメージのフォーマットが無効です: \(url.lastPathComponent)")
+                cleanupTempFile(at: tempURL)
+                return nil
             }
         } catch {
             print("ディスクイメージの読み込みエラー: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    /// 一時ファイルのURLを作成する
+    /// - Parameter fileName: ファイル名
+    /// - Returns: 一時ファイルのURL
+    private func createTempFileURL(fileName: String) -> URL {
+        return FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+    }
+    
+    /// 一時ファイルを削除する
+    /// - Parameter url: 削除する一時ファイルのURL
+    private func cleanupTempFile(at url: URL) {
+        try? FileManager.default.removeItem(at: url)
+    }
+    
+    /// デフォルトのALPHA-MINI-DOSディスクイメージをロードする
+    private func loadDefaultDiskImage() {
+        // リソースからALPHA-MINI-DOSディスクイメージを取得
+        guard let diskImageURL = Bundle.main.url(forResource: "ALPHA-MINI-DOS", withExtension: "d88") else {
+            print("ALPHA-MINI-DOSディスクイメージが見つかりません")
+            return
         }
         
-        return false
+        // ディスクイメージをロードし、結果をログに出力
+        let result = loadDiskImage(url: diskImageURL, drive: 0)
+        
+        if result {
+            print("ALPHA-MINI-DOSディスクイメージを正常に読み込みました")
+        } else {
+            print("ALPHA-MINI-DOSディスクイメージの読み込みに失敗しました")
+        }
     }
+    
+    /// 外部からディスクイメージをロード（内部使用のみ）
+    private func loadDiskImage(from url: URL, drive: Int, tempFileName: String, reloadBootSector: Bool) -> Bool {
+        // ディスクイメージをロード
+        let result = loadDiskImageInternal(from: url, drive: drive, tempFileName: tempFileName)
+        
+        // 成功した場合、ドライブ0にロードされた場合はブートセクタを再ロード
+        if result && reloadBootSector && drive == 0 {
+            print("ディスクイメージがロードされたため、ブートセクタを再ロードします")
+            loadBootSector()
+        }
+        
+        return result
+    }
+    
+
     
     /// FDDブートの有効/無効を設定
     func setFDDBootEnabled(_ enabled: Bool) {
@@ -985,7 +1168,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     private func stopLogTimer() {
         // タイマーが存在する場合のみ停止する
         if let timer = logTimer {
-            timer.cancel()
+            timer.invalidate()
             logTimer = nil
         }
     }
@@ -1000,28 +1183,138 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         // 即時にログを表示
         logPerformanceMetrics(forceLog: true)
         
-        // バックグラウンドキューでタイマーを作成
-        let queue = DispatchQueue.global(qos: .utility)
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        
-        // 5秒ごとに実行するように設定
-        timer.schedule(deadline: .now() + 5.0, repeating: 5.0)
-        
-        // タイマーイベントのハンドラを設定
-        timer.setEventHandler { [weak self] in
+        // タイマーを作成し、5秒ごとにログを表示
+        logTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             // 実行中か一時停止中に関わらずログを表示
             self.logPerformanceMetrics(forceLog: true)
         }
-        
-        // タイマーを開始
-        timer.resume()
-        
-        // タイマーを保存
-        logTimer = timer
     }
     
 
+    
+    /// CPUサイクルを実行し、周辺デバイスを更新する
+    private func executeCPUCycles(adjustedCycles: Int) -> Int {
+        var executedCycles = 0
+        
+        // サイクル単位で実行し、割り込みを適切に処理
+        if let cpu = cpu {
+            // 大きなサイクル数を小分けして実行
+            let chunkSize = 1000 // 一度に実行するサイクル数
+            var remainingCycles = adjustedCycles
+            
+            while remainingCycles > 0 && !Thread.current.isCancelled && state == .running {
+                let cyclesToExecute = min(remainingCycles, chunkSize)
+                let executed = cpu.executeCycles(cyclesToExecute)
+                executedCycles += executed
+                remainingCycles -= executed
+                
+                updatePeripherals(executedCycles: executed)
+            }
+        }
+        
+        return executedCycles
+    }
+    
+    /// 周辺デバイスを更新する
+    private func updatePeripherals(executedCycles: Int) {
+        // FDCの定期更新 - クロックの影響を受けない
+        // 実行されたサイクル数をそのまま渡す
+        if let fdc = fdc {
+            fdc.update(cycles: executedCycles)
+        }
+        
+        // サウンドチップの定期更新 - クロックの影響を受けない
+        // YM2203/YM2608は独自のクロックで動作するため
+        if let soundChip = soundChip {
+            soundChip.update(executedCycles)
+        }
+        
+        // ディスプレイ更新はクロックの影響を受けない
+        // 60Hzの垂直同期はクロックモードに関わらず一定
+    }
+    
+    /// 垂直同期割り込みを発生させる
+    private func generateVBlankInterrupt() {
+        // クロックモードに関わらず常に60Hzで発生
+        frameCounter += 1
+        
+        // 垂直同期割り込みを発生させる
+        cpu?.requestInterrupt(.int)
+        
+        // 垂直同期割り込みをIOに通知
+        if let io = io as? PC88IO {
+            io.requestInterrupt(from: .vblank)
+        }
+    }
+    
+    /// フレームレートを調整し、パフォーマンスメトリクスを収集する
+    private func adjustFrameRate(lastFrameTime: inout CFTimeInterval,
+                               frameTimeAccumulator: inout Double,
+                               frameCount: inout Int,
+                               lastMetricsTime: inout CFTimeInterval) {
+        // パフォーマンスメトリクスの収集
+        let now = CACurrentMediaTime()
+        let frameTime = now - lastFrameTime
+        
+        // フレームレート調整（エミュレーション速度を考慮）
+        let targetFrameTime = 1.0 / (targetFPS * Double(emulationSpeed))
+        if frameTime < targetFrameTime {
+            let sleepTime = targetFrameTime - frameTime
+            
+            // 省電力モードの場合は、さらに長めにスリープして消費電力を抑える
+            let adjustedSleepTime = powerSavingMode ? sleepTime * 1.1 : sleepTime
+            Thread.sleep(forTimeInterval: adjustedSleepTime)
+        }
+        
+        // 次のフレームの測定のために時間を更新
+        let actualFrameTime = CACurrentMediaTime() - lastFrameTime
+        lastFrameTime = CACurrentMediaTime()
+        
+        // メトリクスに実際のフレーム時間を追加
+        frameTimeAccumulator += actualFrameTime
+        frameCount += 1
+        
+        // メトリクスの計算のみを行い、ログ出力は別のタイマーで実行
+        if now - lastMetricsTime > 5.0 && frameCount > 0 {
+            // メトリクスをリセット
+            frameTimeAccumulator = 0
+            frameCount = 0
+            lastMetricsTime = now
+        }
+    }
+    
+    /// クロックモード変更時の設定を更新
+    private func updateClockModeSettings(currentMode: inout PC88CPUClock.ClockMode,
+                                        baseCyclesPerSecond: inout Int,
+                                        cyclesPerFrame: inout Int,
+                                        frameTimeAccumulator: inout Double,
+                                        frameCount: inout Int,
+                                        lastMetricsTime: inout CFTimeInterval,
+                                        lastFrameTime: inout CFTimeInterval,
+                                        cyclesRemainder: inout Int) {
+        currentMode = currentClockMode
+        
+        // PC88CPUClockから現在の周波数を取得
+        if let z80 = cpu as? Z80CPU {
+            baseCyclesPerSecond = z80.cpuClock.currentFrequency
+        } else {
+            // フォールバック値
+            baseCyclesPerSecond = currentMode == .mode4MHz ? 4_000_000 : 8_000_000
+        }
+        
+        cyclesPerFrame = Int(Double(baseCyclesPerSecond) / targetFPS)
+        
+        // メトリクスをリセット
+        frameTimeAccumulator = 0
+        frameCount = 0
+        lastMetricsTime = CACurrentMediaTime()
+        lastFrameTime = CACurrentMediaTime()
+        cyclesRemainder = 0
+        shouldResetMetrics = false
+        
+        print("クロックモード変更検出: \(currentMode), 周波数: \(baseCyclesPerSecond) Hz, サイクル数/フレーム: \(cyclesPerFrame)")
+    }
     
     /// パフォーマンスメトリクスをログに出力
     private func logPerformanceMetrics(forceLog: Bool = false) {
@@ -1084,108 +1377,33 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             
             // クロックモードが変更された場合、サイクル数を再計算
             if currentMode != currentClockMode || shouldResetMetrics {
-                currentMode = currentClockMode
-                
-                // PC88CPUClockから現在の周波数を取得
-                if let z80 = cpu as? Z80CPU {
-                    baseCyclesPerSecond = z80.cpuClock.currentFrequency
-                } else {
-                    // フォールバック値
-                    baseCyclesPerSecond = currentMode == .mode4MHz ? 4_000_000 : 8_000_000
-                }
-                
-                cyclesPerFrame = Int(Double(baseCyclesPerSecond) / targetFPS)
-                
-                // メトリクスをリセット
-                frameTimeAccumulator = 0
-                frameCount = 0
-                lastMetricsTime = CACurrentMediaTime()
-                lastFrameTime = CACurrentMediaTime()
-                cyclesRemainder = 0
-                shouldResetMetrics = false
-                
-                print("クロックモード変更検出: \(currentMode), 周波数: \(baseCyclesPerSecond) Hz, サイクル数/フレーム: \(cyclesPerFrame)")
+                updateClockModeSettings(currentMode: &currentMode, 
+                                        baseCyclesPerSecond: &baseCyclesPerSecond, 
+                                        cyclesPerFrame: &cyclesPerFrame, 
+                                        frameTimeAccumulator: &frameTimeAccumulator, 
+                                        frameCount: &frameCount, 
+                                        lastMetricsTime: &lastMetricsTime, 
+                                        lastFrameTime: &lastFrameTime, 
+                                        cyclesRemainder: &cyclesRemainder)
             }
             
             // 1フレーム分のCPUサイクルを実行
             // フレームレートに応じて処理量を調整
             let frameRateAdjustment = 60.0 / targetFPS
             let adjustedCycles = Int(Double(cyclesPerFrame) * Double(emulationSpeed) / frameRateAdjustment) + cyclesRemainder
-            var executedCycles = 0
-            
-            // サイクル単位で実行し、割り込みを適切に処理
-            if let cpu = cpu {
-                // 大きなサイクル数を小分けして実行
-                let chunkSize = 1000 // 一度に実行するサイクル数
-                var remainingCycles = adjustedCycles
-                
-                while remainingCycles > 0 && !Thread.current.isCancelled && state == .running {
-                    let cyclesToExecute = min(remainingCycles, chunkSize)
-                    let executed = cpu.executeCycles(cyclesToExecute)
-                    executedCycles += executed
-                    remainingCycles -= executed
-                    
-                    // FDCの定期更新 - クロックの影響を受けない
-                    // 実行されたサイクル数をそのまま渡す
-                    if let fdc = fdc {
-                        fdc.update(cycles: executed)
-                    }
-                    
-                    // サウンドチップの定期更新 - クロックの影響を受けない
-                    // YM2203/YM2608は独自のクロックで動作するため
-                    if let soundChip = soundChip {
-                        soundChip.update(executed)
-                    }
-                    
-                    // ディスプレイ更新はクロックの影響を受けない
-                    // 60Hzの垂直同期はクロックモードに関わらず一定
-                }
-            }
+            let executedCycles = executeCPUCycles(adjustedCycles: adjustedCycles)
             
             // 実行されたサイクル数と目標サイクル数の差を次のフレームに持ち越す
             cyclesRemainder = adjustedCycles - executedCycles
             
             // 垂直同期割り込みの処理（60Hz）
-            // クロックモードに関わらず常に60Hzで発生
-            frameCounter += 1
+            generateVBlankInterrupt()
             
-            // 垂直同期割り込みを発生させる
-            cpu?.requestInterrupt(.int)
-            
-            // 垂直同期割り込みをIOに通知
-            if let io = io as? PC88IO {
-                io.requestInterrupt(from: .vblank)
-            }
-            
-            // パフォーマンスメトリクスの収集
-            let now = CACurrentMediaTime()
-            let frameTime = now - lastFrameTime
-            
-            // フレームレート調整（エミュレーション速度を考慮）
-            let targetFrameTime = 1.0 / (targetFPS * Double(emulationSpeed))
-            if frameTime < targetFrameTime {
-                let sleepTime = targetFrameTime - frameTime
-                
-                // 省電力モードの場合は、さらに長めにスリープして消費電力を抑える
-                let adjustedSleepTime = powerSavingMode ? sleepTime * 1.1 : sleepTime
-                Thread.sleep(forTimeInterval: adjustedSleepTime)
-            }
-            
-            // 次のフレームの測定のために時間を更新
-            let actualFrameTime = CACurrentMediaTime() - lastFrameTime
-            lastFrameTime = CACurrentMediaTime()
-            
-            // メトリクスに実際のフレーム時間を追加
-            frameTimeAccumulator += actualFrameTime
-            frameCount += 1
-            
-            // メトリクスの計算のみを行い、ログ出力は別のタイマーで実行
-            if now - lastMetricsTime > 5.0 && frameCount > 0 {
-                // メトリクスをリセット
-                frameTimeAccumulator = 0
-                frameCount = 0
-                lastMetricsTime = now
-            }
+            // パフォーマンスメトリクスの収集とフレームレート調整
+            adjustFrameRate(lastFrameTime: &lastFrameTime, 
+                           frameTimeAccumulator: &frameTimeAccumulator, 
+                           frameCount: &frameCount, 
+                           lastMetricsTime: &lastMetricsTime)
         }
     }
     
@@ -1380,19 +1598,40 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                     // ALPHA-MINI-DOSの場合は特別処理
                     print("ALPHA-MINI-DOSの実行を開始します")
                     
-                    // Z80 CPUの初期状態を設定
-                    z80.setPC(0xC000)  // プログラムカウンタをIPLの先頭に設定
-                    z80.setRegister(.af, value: 0x0000)  // Aレジスタとフラグをクリア
-                    z80.setRegister(.bc, value: 0x0000)  // BCレジスタをクリア
-                    z80.setRegister(.de, value: 0x0000)  // DEレジスタをクリア
-                    z80.setRegister(.hl, value: 0x0000)  // HLレジスタをクリア
-                    z80.setRegister(.ix, value: 0x0000)  // IXレジスタをクリア
-                    z80.setRegister(.iy, value: 0x0000)  // IYレジスタをクリア
-                    z80.setSP(0xF000)  // スタックポインタを設定
-                    
-                    // 割り込みを無効化
-                    // z80.setInterruptMode(0)  // 割り込みモードを0に設定 - このメソッドは存在しない
-                    z80.disableInterrupts()  // 割り込み無効化
+                    // PC88AlphaMiniDosIntegrationを使用して初期化
+                    if let pc88Memory = memory as? PC88Memory,
+                       let pc88FDC = fdc as? PC88FDC,
+                       let d88DiskImage = pc88FDC.getDiskImage(drive: 0) as? D88DiskImage {
+                        
+                        let integration = PC88AlphaMiniDosIntegration(memory: pc88Memory, cpu: z80)
+                        
+                        if integration.loadAlphaMiniDos(from: d88DiskImage) {
+                            print("ALPHA-MINI-DOSの初期化に成功しました")
+                        } else {
+                            print("ALPHA-MINI-DOSの初期化に失敗しました。従来の方法で続行します")
+                            
+                            // 従来の方法で初期化
+                            // Z80 CPUの初期状態を設定
+                            z80.setPC(0xC000)  // プログラムカウンタをIPLの先頭に設定
+                            z80.setRegister(.af, value: 0x0000)  // Aレジスタとフラグをクリア
+                            z80.setRegister(.bc, value: 0x0000)  // BCレジスタをクリア
+                            z80.setRegister(.de, value: 0x0000)  // DEレジスタをクリア
+                            z80.setRegister(.hl, value: 0x0000)  // HLレジスタをクリア
+                            z80.setRegister(.ix, value: 0x0000)  // IXレジスタをクリア
+                            z80.setRegister(.iy, value: 0x0000)  // IYレジスタをクリア
+                            z80.setSP(0xF000)  // スタックポインタを設定
+                            
+                            // 割り込みを無効化
+                            z80.disableInterrupts()  // 割り込み無効化
+                        }
+                    } else {
+                        print("ALPHA-MINI-DOSの初期化に必要なコンポーネントが取得できませんでした")
+                        
+                        // 従来の方法で初期化
+                        z80.setPC(0xC000)  // プログラムカウンタをIPLの先頭に設定
+                        z80.setSP(0xF000)  // スタックポインタを設定
+                        z80.disableInterrupts()  // 割り込み無効化
+                    }
                     
                     print("Z80 CPUの初期状態を設定しました: PC=0xC000, SP=0xF000")
                     

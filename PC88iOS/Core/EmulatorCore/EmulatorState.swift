@@ -23,6 +23,9 @@ enum EmulatorState: Equatable {
     
     /// エラー状態
     case error(message: String)
+    
+    /// 停止処理中
+    case stopping
 }
 
 /// エミュレータの詳細な状態情報

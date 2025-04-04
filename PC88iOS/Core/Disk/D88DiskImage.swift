@@ -760,7 +760,7 @@ class D88DiskImage: DiskImageAccessing {
     }
     
     /// ディスクイメージがALPHA-MINI-DOSかどうかを判定
-    private func isAlphaMiniDos() -> Bool {
+    internal func isAlphaMiniDos() -> Bool {
         // 1. ディスク名でチェック（最も信頼性が高い）
         if diskName.contains("ALPHA-MINI") {
             return true
