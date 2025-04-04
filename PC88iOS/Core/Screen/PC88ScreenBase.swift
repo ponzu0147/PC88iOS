@@ -135,7 +135,8 @@ class PC88ScreenBase: ScreenRendering {
     func render() -> CGImage? {
         // 描画コンテキストの作成
         let width = PC88ScreenConstants.graphicsWidth
-        let height = settings.is400LineMode ? PC88ScreenConstants.graphicsHeight400 : PC88ScreenConstants.graphicsHeight200
+        // 常に400ラインモードを使用（インターレース表示）
+        let height = PC88ScreenConstants.graphicsHeight400
         
         guard let context = createGraphicsContext(width: width, height: height) else {
             return nil
@@ -313,14 +314,79 @@ class PC88ScreenBase: ScreenRendering {
         self.memory = memory
     }
     
+    /// メモリアクセスを接続
+    func connectMemory(_ memory: MemoryAccessing) {
+        self.memory = memory
+    }
+    
     /// I/Oアクセスを設定
     func setIO(_ io: IOAccessing) {
+        self.io = io
+    }
+    
+    /// I/Oアクセスを接続
+    func connectIO(_ io: IOAccessing) {
         self.io = io
     }
     
     /// フォントデータを設定
     func setFontData(_ data: [UInt8]) {
         textRenderer.setFontData(data)
+    }
+    
+    /// 特定の文字コードに対するフォントデータを設定
+    func setFontData(charCode: UInt8, data: [UInt8]) {
+        // PC88TextRendererに渡す前に文字コードごとのフォントデータを設定する必要がある場合はここで処理
+        // 現在は単純にtextRendererに渡す
+        textRenderer.setFontData(data)
+    }
+    
+    /// 画面を描画してCGImageを返す
+    func renderScreen() -> CGImage? {
+        // テキストモードの場合はテキストレンダラーを使用
+        return render()
+    }
+    
+    /// 画面の幅（ピクセル単位）
+    var screenWidth: Int {
+        return PC88ScreenConstants.graphicsWidth
+    }
+    
+    /// 画面の高さ（ピクセル単位）
+    var screenHeight: Int {
+        // 常に400ラインモードを使用（インターレース表示）
+        return PC88ScreenConstants.graphicsHeight400
+    }
+    
+    /// 指定されたCGContextに画面を描画
+    func render(to context: CGContext) {
+        // テキストモードの場合はテキストレンダラーを使用
+        switch currentScreenMode {
+        case .text:
+            textRenderer.renderTextScreen(context: context)
+        case .graphics:
+            graphicsRenderer.renderGraphicsMode(context)
+        case .mixed:
+            graphicsRenderer.renderGraphicsMode(context)
+            textRenderer.renderTextScreen(context: context)
+        }
+    }
+    
+    /// テスト画面を表示（デバッグ用）
+    func displayTestScreen() {
+        // テストクラスを使用してテスト画面を表示
+        let screenTest = PC88ScreenTest(screen: self)
+        screenTest.displayTestScreen()
+    }
+    
+    /// 画面を強制的にクリア（テスト画面を消すために使用）
+    func forceClearScreen() {
+        // テキストVRAMをクリア
+        for i in 0..<textVRAM.count {
+            textVRAM[i] = 0x20 // スペース文字
+        }
+        // グラフィックスVRAMもクリア
+        graphicsRenderer.clearGraphicsVRAM()
     }
     
     /// 行のテキストモードを設定
@@ -338,20 +404,58 @@ class PC88ScreenBase: ScreenRendering {
         attributeHandler.setDecorationAttribute(line: line, startColumn: startColumn, decoration: decoration, underline: underline, upperline: upperline)
     }
     
-    /// 画面を強制的にクリア
-    func forceClearScreen() {
-        textRenderer.clearScreen()
-        graphicsRenderer.clearGraphicsVRAM()
-    }
+
     
-    /// テスト画面を表示
-    func displayTestScreen() {
-        textRenderer.displayTestScreen(context: createGraphicsContext(width: PC88ScreenConstants.graphicsWidth, height: PC88ScreenConstants.graphicsHeight400)!)
-    }
+
     
     /// 詳細なテスト画面を表示
     func displayDetailedTestScreen() {
         textRenderer.displayDetailedTestScreen()
         graphicsRenderer.drawTestPattern()
+    }
+    
+    /// 画面をクリアする
+    func clear() {
+        forceClearScreen()
+    }
+    
+    /// テキストVRAMから読み込む
+    func readTextVRAM(offset: Int) -> UInt8 {
+        guard offset >= 0 && offset < textVRAM.count else { return 0x20 } // 範囲外の場合はスペース
+        return textVRAM[offset]
+    }
+    
+    /// テキストVRAMに書き込む
+    func writeTextVRAM(offset: Int, value: UInt8) {
+        guard offset >= 0 && offset < textVRAM.count else { return }
+        textVRAM[offset] = value
+    }
+    
+    /// テキストVRAMへの書き込み
+    func writeTextVRAM(address: UInt16, value: UInt8) {
+        let offset = Int(address)
+        if offset < textVRAM.count {
+            textVRAM[offset] = value
+        }
+    }
+    
+    /// テキストVRAMからの読み込み
+    func readTextVRAM(address: UInt16) -> UInt8 {
+        let offset = Int(address)
+        if offset < textVRAM.count {
+            return textVRAM[offset]
+        }
+        return 0
+    }
+    
+    /// 指定位置に文字を書き込む
+    func writeCharacter(_ char: UInt8, atLine line: Int, column: Int) {
+        guard line >= 0 && line < PC88ScreenConstants.textHeight25 else { return }
+        guard column >= 0 && column < PC88ScreenConstants.textWidth80 else { return }
+        
+        let offset = line * PC88ScreenConstants.textVRAMBytesPerLine + column
+        if offset < textVRAM.count {
+            textVRAM[offset] = char
+        }
     }
 }

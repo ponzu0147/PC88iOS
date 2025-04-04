@@ -10,7 +10,7 @@ import SwiftUI
 /// PC-88のテキスト表示速度テスト画面
 struct PC88TextSpeedTestView: View {
     /// PC-88画面
-    @State private var screen = PC88Screen()
+    @State private var screen = PC88ScreenBase()
     
     /// テキスト表示速度テスト
     @State private var speedTest: PC88TextSpeedTest?

@@ -11,7 +11,7 @@ import CoreGraphics
 /// PC-88のテキスト表示エミュレーションテスト画面
 struct PC88TextEmulatorView: View {
     /// PC-88画面
-    @State private var screen = PC88Screen()
+    @State private var screen = PC88ScreenBase()
     
     /// テキストエミュレータ
     @State private var textEmulator: PC88TextEmulator?

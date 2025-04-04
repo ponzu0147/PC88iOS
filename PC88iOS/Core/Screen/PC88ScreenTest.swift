@@ -2,9 +2,9 @@ import Foundation
 
 /// PC-88画面テスト用のクラス
 class PC88ScreenTest {
-    private let screen: PC88Screen
+    private let screen: PC88ScreenBase
     
-    init(screen: PC88Screen) {
+    init(screen: PC88ScreenBase) {
         self.screen = screen
     }
     

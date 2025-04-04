@@ -24,7 +24,7 @@ class PC88TextSpeedTest {
     private(set) var state: TestState = .idle
     
     /// 画面
-    private let screen: PC88Screen
+    private let screen: PC88ScreenBase
     
     /// CPUクロック管理
     private let cpuClock: PC88CPUClock
@@ -40,7 +40,7 @@ class PC88TextSpeedTest {
     
     /// 初期化
     /// - Parameter screen: 表示対象の画面
-    init(screen: PC88Screen) {
+    init(screen: PC88ScreenBase) {
         self.screen = screen
         self.cpuClock = PC88CPUClock()
         self.textDisplayEmulator = PC88TextDisplayEmulator(screen: screen, cpuClock: cpuClock)

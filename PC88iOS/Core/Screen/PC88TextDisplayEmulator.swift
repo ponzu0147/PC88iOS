@@ -26,7 +26,7 @@ class PC88TextDisplayEmulator {
     private let cpuClock: PC88CPUClock
     
     /// 表示対象の画面
-    private weak var screen: PC88Screen?
+    private weak var screen: PC88ScreenBase?
     
     /// 表示するテキスト
     private var displayText: String = ""
@@ -62,7 +62,7 @@ class PC88TextDisplayEmulator {
     /// - Parameters:
     ///   - screen: 表示対象の画面
     ///   - cpuClock: CPUクロック管理
-    init(screen: PC88Screen, cpuClock: PC88CPUClock) {
+    init(screen: PC88ScreenBase, cpuClock: PC88CPUClock) {
         self.screen = screen
         self.cpuClock = cpuClock
     }

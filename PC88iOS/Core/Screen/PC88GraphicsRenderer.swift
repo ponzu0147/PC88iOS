@@ -52,7 +52,8 @@ class PC88GraphicsRenderer {
     
     /// グラフィックモードを描画
     func renderGraphicsMode(_ context: CGContext) {
-        let height = settings.is400LineMode ? PC88ScreenConstants.graphicsHeight400 : PC88ScreenConstants.graphicsHeight200
+        // 常に400ラインモードを使用（インターレース表示）
+        let height = PC88ScreenConstants.graphicsHeight400
         
         for y in 0..<height {
             for x in 0..<PC88ScreenConstants.graphicsWidth {

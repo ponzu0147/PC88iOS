@@ -189,8 +189,11 @@ class D88DiskImage: DiskImageAccessing {
     
     /// セクタサイズ(N)の値から実際のバイト数を計算
     private func calculateSectorSizeFromN(_ n: UInt8) -> Int {
-        // N=0: 128バイト, N=1: 256バイト, N=2: 512バイト, N=3: 1024バイト, ...
-        return 128 << Int(n)
+        // N値が異常に大きい場合はオーバーフローを防止
+        if n > 10 { // 10を超えるとサイズが非現実的になる（128KB以上）
+            return 256 // 安全な値として256バイトを返す
+        }
+        return 128 << Int(n) // N=0: 128バイト, N=1: 256バイト, N=2: 512バイト, N=3: 1024バイト, ...
     }
     
     /// ディスクタイプに基づいた期待されるセクタ数を取得
@@ -425,16 +428,11 @@ class D88DiskImage: DiskImageAccessing {
     ///   - sector: セクタ番号（1から始まる）
     /// - Returns: セクタデータ（バイト配列）
     func readSector(track: Int, sector: Int) -> [UInt8]? {
-        print("D88DiskImage.readSector: track=\(track), sector=\(sector)")
-        
         // トラックとセクタの範囲チェック
         guard track >= 0 && track < maxTracks && sector >= 1 && sector <= maxSectorsPerTrack else {
-            print("  トラックまたはセクタが範囲外です: track=\(track), sector=\(sector), maxTracks=\(maxTracks), maxSectorsPerTrack=\(maxSectorsPerTrack)")
+            print("トラックまたはセクタが範囲外: track=\(track), sector=\(sector)")
             return nil
         }
-        
-        print("  ディスクイメージ情報: トラック数=\(sectorData.count)")
-        print("  注意: PC-88では、セクタ番号は1から始まります。セクタ\(sector)を検索します。")
         
         // ALPHA-MINI-DOSの特別処理: トラック0セクタ1のIPLを要求された場合
         if track == 0 && sector == 1 && isAlphaMiniDos() {
@@ -444,19 +442,17 @@ class D88DiskImage: DiskImageAccessing {
         
         // トラック0の場合は特別な処理を行う
         if track == 0 {
-            print("  トラック0を検索します。")
-            print("  ディスクタイプ: \(getDiskTypeString()), 期待されるセクタ数/トラック: \(getExpectedSectorsPerTrack())")
+            print("トラック0を検索: ディスクタイプ=\(getDiskTypeString()), 期待セクタ数=\(getExpectedSectorsPerTrack())")
             
             // 有効なセクタデータを保持する変数
             var validSectorData: Data? = nil
             var validSectorSize: Int = 0
             var validSectorN: UInt8 = 0
-            // validSectorFound変数は不要なので削除
             
             // 2Dフォーマットの場合の期待されるセクタサイズ
             let expectedSectorSize = diskType == diskType2D ? 256 : 0
             
-            // 特殊処理: ディスクイメージが破損している場合に備えて、デフォルトのIPLセクタを用意
+            // デフォルトのIPLセクタを用意（ディスクイメージが破損している場合用）
             let defaultIPLSectorSize = 256 // 標準的なIPLセクタサイズ
             var defaultIPLSector = Data(count: defaultIPLSectorSize)
             // デフォルトIPLセクタを0xC9 (RET命令) で埋める - 最低限のブート処理
@@ -747,11 +743,13 @@ class D88DiskImage: DiskImageAccessing {
         // 256バイトの空のIPLセクタを作成
         var defaultSector = [UInt8](repeating: 0, count: 256)
         
-        // 最初の数バイトにジャンプ命令を設定（基本的なブートローダーの開始）
-        defaultSector[0] = 0xF3  // DI命令（割り込み禁止）
-        defaultSector[1] = 0xC3  // JP命令
-        defaultSector[2] = 0x00  // アドレス下位バイト
-        defaultSector[3] = 0x01  // アドレス上位バイト（0x0100にジャンプ）
+        // 基本的なブートローダーを設定
+        // 0xF3: DI命令（割り込み禁止）
+        // 0xC3 0x00 0x01: JP 0x0100（0x0100番地にジャンプ）
+        defaultSector[0] = 0xF3
+        defaultSector[1] = 0xC3
+        defaultSector[2] = 0x00
+        defaultSector[3] = 0x01
         
         return defaultSector
     }
@@ -763,48 +761,35 @@ class D88DiskImage: DiskImageAccessing {
     
     /// ディスクイメージがALPHA-MINI-DOSかどうかを判定
     private func isAlphaMiniDos() -> Bool {
-        // ディスク名でチェック
+        // 1. ディスク名でチェック（最も信頼性が高い）
         if diskName.contains("ALPHA-MINI") {
             return true
         }
         
-        // ディスクイメージのサイズが一定以上あるかチェック
-        if diskData.count < alphaMiniDosIplOffset + 256 {
+        // 2. ディスクイメージのサイズが十分あるか確認
+        guard diskData.count >= alphaMiniDosIplOffset + 256 else {
             return false
         }
         
-        // IPLの特徴的なバイトパターンをチェック
-        // ALPHA-MINI-DOSのIPLは0x02C0から始まり、特徴的なパターンを持つ
+        // 3. IPLの特徴的なバイトパターンをチェック
         let signatureOffset = alphaMiniDosIplOffset
         if diskData.count >= signatureOffset + 4 {
-            // F3 3A 02 00 で始まるかチェック（DI命令とLD A,(0002h)）
-            if diskData[signatureOffset] == 0xF3 && 
-               diskData[signatureOffset + 1] == 0x3A && 
-               diskData[signatureOffset + 2] == 0x02 && 
-               diskData[signatureOffset + 3] == 0x00 {
-                return true
-            }
+            let firstByte = diskData[signatureOffset]
+            let secondByte = diskData[signatureOffset + 1]
             
-            // F3 C3 で始まるかチェック（DI命令とJP命令）
-            if diskData[signatureOffset] == 0xF3 && 
-               diskData[signatureOffset + 1] == 0xC3 {
+            // DI命令（0xF3）で始まり、JP命令（0xC3）またはLD A,(nn)命令（0x3A）が続く
+            if firstByte == 0xF3 && (secondByte == 0xC3 || secondByte == 0x3A) {
                 return true
             }
         }
         
-        // セクタデータの特徴をチェック
+        // 4. トラック0のセクタデータをチェック
         for trackData in sectorData where trackData.track == 0 && trackData.side == 0 {
-            for sector in trackData.sectors {
-                // セクタデータの先頭をチェック
-                if sector.data.count >= 4 {
-                    let bytes = [UInt8](sector.data)
-                    // DI命令（0xF3）で始まるセクタを探す
-                    if bytes[0] == 0xF3 {
-                        // 次がJP命令（0xC3）またはLD A,(nn)命令（0x3A）
-                        if bytes[1] == 0xC3 || bytes[1] == 0x3A {
-                            return true
-                        }
-                    }
+            for sector in trackData.sectors where sector.data.count >= 4 {
+                let bytes = [UInt8](sector.data)
+                // DI命令（0xF3）で始まり、JP命令（0xC3）またはLD A,(nn)命令（0x3A）が続く
+                if bytes[0] == 0xF3 && (bytes[1] == 0xC3 || bytes[1] == 0x3A) {
+                    return true
                 }
             }
         }
@@ -818,74 +803,57 @@ class D88DiskImage: DiskImageAccessing {
         
         // IPLオフセットからデータを抽出
         guard alphaMiniDosIplOffset + iplSize <= diskData.count else {
-            print("  ALPHA-MINI-DOSのIPL抽出に失敗: ディスクイメージが小さすぎます")
+            print("ALPHA-MINI-DOSのIPL抽出に失敗: ディスクイメージが小さすぎます")
             return getDefaultIplSector()
         }
-        
-        // IPLの内容を詳細に表示
-        print("  ALPHA-MINI-DOSのIPLを抽出します: オフセット=0x\(String(format: "%04X", alphaMiniDosIplOffset))")
-        print("  IPLの最初の16バイト:")
         
         // IPLデータを取得
         let iplData = [UInt8](diskData.subdata(in: alphaMiniDosIplOffset..<alphaMiniDosIplOffset + iplSize))
         
-        // 最初の16バイトを表示
-        for i in 0..<min(16, iplData.count) {
-            print(String(format: "%02X ", iplData[i]), terminator: "")
-        }
-        print("")
-        
         // IPLコードの典型的な特徴を確認
-        if iplData.count >= 4 {
-            if iplData[0] == 0xF3 { // DI命令（割り込み禁止）
-                print("  IPLの先頭にDI命令を確認: 正常")
-            } else {
-                print("  警告: IPLの先頭がDI命令ではありません (0x\(String(format: "%02X", iplData[0])))")
-                
-                // IPLが無効な場合、ディスクイメージ内を検索して有効なIPLを見つける
-                print("  有効なIPLを検索します...")
-                
-                // ディスクイメージ内の複数の場所を検索
-                let possibleOffsets = [0x02C0, 0x0000, 0x0100, 0x0200, 0x0300, 0x0400]
-                
-                for offset in possibleOffsets where offset != alphaMiniDosIplOffset {
-                    if offset + iplSize <= diskData.count {
-                        let candidateData = [UInt8](diskData.subdata(in: offset..<offset + iplSize))
-                        
-                        // 有効なIPLの特徴をチェック
-                        if candidateData[0] == 0xF3 && (candidateData[1] == 0xC3 || candidateData[1] == 0x3A) {
-                            print("  オフセット0x\(String(format: "%04X", offset))で有効なIPLを発見しました")
-                            return candidateData
-                        }
-                    }
-                }
-                
-                // 有効なIPLが見つからない場合は、修正を試みる
-                var modifiedIpl = iplData
-                modifiedIpl[0] = 0xF3  // DI命令を先頭に設定
-                if modifiedIpl[1] != 0xC3 && modifiedIpl[1] != 0x3A {
-                    modifiedIpl[1] = 0xC3  // JP命令を設定
-                    modifiedIpl[2] = 0x00  // アドレス下位バイト
-                    modifiedIpl[3] = 0x01  // アドレス上位バイト（0x0100にジャンプ）
-                }
-                print("  IPLを修正しました")
-                return modifiedIpl
-            }
+        if iplData.count >= 4 && iplData[0] == 0xF3 {
+            // 正常なIPLを検出
+            let secondByte = iplData[1]
             
-            // ジャンプ命令を確認
-            if iplData[1] == 0xC3 { // JP命令
-                let jumpAddress = UInt16(iplData[2]) | (UInt16(iplData[3]) << 8)
-                print("  JP命令を確認: 0x\(String(format: "%04X", jumpAddress))にジャンプ")
-            } else if iplData[1] == 0x3A { // LD A,(nn)命令
-                let memAddress = UInt16(iplData[2]) | (UInt16(iplData[3]) << 8)
-                print("  LD A,(\(String(format: "%04X", memAddress)))命令を確認")
-            } else {
-                print("  警告: 2バイト目が予期しない命令です: 0x\(String(format: "%02X", iplData[1]))")
+            if secondByte == 0xC3 || secondByte == 0x3A {
+                // 正常なIPLを返す
+                return iplData
             }
         }
         
-        // IPLデータを返す
-        return iplData
+        // IPLが無効な場合、ディスクイメージ内を検索して有効なIPLを見つける
+        print("有効なIPLを検索中...")
+        
+        // ディスクイメージ内の複数の場所を検索
+        let possibleOffsets = [0x02C0, 0x0000, 0x0100, 0x0200, 0x0300, 0x0400]
+        
+        for offset in possibleOffsets where offset != alphaMiniDosIplOffset {
+            if offset + iplSize <= diskData.count {
+                let candidateData = [UInt8](diskData.subdata(in: offset..<offset + iplSize))
+                
+                // 有効なIPLの特徴をチェック
+                if candidateData.count >= 4 && 
+                   candidateData[0] == 0xF3 && 
+                   (candidateData[1] == 0xC3 || candidateData[1] == 0x3A) {
+                    print("オフセット0x\(String(format: "%04X", offset))で有効なIPLを発見")
+                    return candidateData
+                }
+            }
+        }
+        
+        // 有効なIPLが見つからない場合は、修正を試みる
+        var modifiedIpl = iplData
+        modifiedIpl[0] = 0xF3  // DI命令を先頭に設定
+        
+        // 2バイト目が無効な場合は修正
+        if modifiedIpl[1] != 0xC3 && modifiedIpl[1] != 0x3A {
+            modifiedIpl[1] = 0xC3  // JP命令を設定
+            modifiedIpl[2] = 0x00  // アドレス下位バイト
+            modifiedIpl[3] = 0x01  // アドレス上位バイト（0x0100にジャンプ）
+        }
+        
+        print("IPLを修正しました")
+        return modifiedIpl
     }
     
     /// ALPHA-MINI-DOSのOS部分を抽出

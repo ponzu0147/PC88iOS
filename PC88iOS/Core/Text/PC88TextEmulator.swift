@@ -11,7 +11,7 @@ import SwiftUI
 /// PC-88のテキスト表示をエミュレートするクラス
 class PC88TextEmulator {
     /// 画面
-    private let screen: PC88Screen
+    private let screen: PC88ScreenBase
     
     /// 表示タイマー
     private var displayTimer: Timer?
@@ -35,7 +35,7 @@ class PC88TextEmulator {
     var onCharacterDisplayed: ((Int, Int, Character) -> Void)?
     
     /// 初期化
-    init(screen: PC88Screen) {
+    init(screen: PC88ScreenBase) {
         self.screen = screen
     }
     

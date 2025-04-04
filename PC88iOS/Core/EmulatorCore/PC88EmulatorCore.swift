@@ -134,8 +134,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         }
         
         // 画面の初期化
-        screen = PC88Screen()
-        if let pc88Screen = screen as? PC88Screen, let memory = memory, let io = io {
+        screen = PC88ScreenBase()
+        if let pc88Screen = screen as? PC88ScreenBase, let memory = memory, let io = io {
             pc88Screen.connectMemory(memory)
             pc88Screen.connectIO(io)
             
@@ -187,14 +187,14 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                 print("ALPHA-MINI-DOSディスクが読み込まれているため、テスト画面をスキップします")
             } else {
                 // 通常のディスクまたはディスクがない場合はテスト画面を表示
-                if let pc88Screen = screen as? PC88Screen {
+                if let pc88Screen = screen as? PC88ScreenBase {
                     pc88Screen.displayTestScreen()
                     print("テスト画面を表示しました")
                 }
             }
         } else {
             // FDCが初期化されていない場合はテスト画面を表示
-            if let pc88Screen = screen as? PC88Screen {
+            if let pc88Screen = screen as? PC88ScreenBase {
                 pc88Screen.displayTestScreen()
                 print("テスト画面を表示しました")
             }
@@ -230,7 +230,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         }
         
         // テストテキストを表示（エミュレーション開始前に実行）
-        if let pc88Screen = screen as? PC88Screen {
+        if let pc88Screen = screen as? PC88ScreenBase {
             pc88Screen.displayTestScreen()
             print("テスト画面を表示しました")
             
@@ -470,7 +470,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             print("警告: PC88EmulatorCore.getScreen() - screenImageがnullです。テスト画面を表示して再生成します")
             
             // テスト画面を表示
-            if let pc88Screen = screen as? PC88Screen {
+            if let pc88Screen = screen as? PC88ScreenBase {
                 pc88Screen.displayTestScreen()
                 
                 // 画面を強制的に更新
@@ -1279,7 +1279,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     }
     
     /// フォントを設定
-    private func setupFonts(for screen: PC88Screen) {
+    private func setupFonts(for screen: PC88ScreenBase) {
         print("フォントデータの読み込みを開始します...")
         
         // フォントローダーを初期化
@@ -1357,7 +1357,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         }
         
         // 画面モードの初期化
-        if let pc88Screen = screen as? PC88Screen {
+        if let pc88Screen = screen as? PC88ScreenBase {
             // テキストモードを設定
             pc88Screen.writeIO(port: 0x30, value: 0x00) // テキストモード有効、グラフィックモード無効
             print("画面モードを初期化しました: テキストモード有効")
@@ -1411,7 +1411,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                     print("ALPHA-MINI-DOSの実行をトレースします")
                     
                     // 画面を強制的に更新
-                    if let pc88Screen = screen as? PC88Screen {
+                    if let pc88Screen = screen as? PC88ScreenBase {
                         // テスト画面を強制的に消す
                         pc88Screen.forceClearScreen()
                         
