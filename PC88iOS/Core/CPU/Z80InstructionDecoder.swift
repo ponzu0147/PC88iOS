@@ -437,3 +437,445 @@ class Z80InstructionDecoder {
         }
     }
 }
+
+/// Z80命令の基本プロトコル
+protocol Z80Instruction {
+    /// 命令を実行
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int
+    
+    /// 命令のサイズ（バイト数）
+    var size: UInt16 { get }
+    
+    /// 命令の実行に必要なサイクル数
+    var cycles: Int { get }
+    
+    /// 命令の詳細なサイクル情報
+    var cycleInfo: InstructionCycles { get }
+    
+    /// 命令の文字列表現
+    var description: String { get }
+}
+
+/// NOP命令
+struct NOPInstruction: Z80Instruction {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP }
+    var description: String { return "NOP" }
+}
+
+/// HALT命令
+struct HALTInstruction: Z80Instruction {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // CPUをホルト状態にする
+        cpu.halt()
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.HALT }
+    var description: String { return "HALT" }
+}
+
+/// DI命令（割り込み禁止）
+struct DISInstruction: Z80Instruction {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // 割り込み禁止（CPUExecutingプロトコルのメソッドを使用）
+        (cpu as CPUExecuting).setInterruptEnabled(false)
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.DI }
+    var description: String { return "DI" }
+}
+
+/// EI命令（割り込み許可）
+struct EIInstruction: Z80Instruction {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // 割り込み許可（CPUExecutingプロトコルのメソッドを使用）
+        (cpu as CPUExecuting).setInterruptEnabled(true)
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.EI }
+    var description: String { return "EI" }
+}
+
+/// 未実装命令
+struct UnimplementedInstruction: Z80Instruction {
+    let opcode: UInt8
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // PCの計算で整数オーバーフローを防止
+        let pc = registers.pc > 0 ? registers.pc - 1 : 0
+        PC88Logger.cpu.warning("未実装の命令 0x\(String(opcode, radix: 16, uppercase: true)) at PC=0x\(String(pc, radix: 16, uppercase: true))")
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP } // 未実装命令はNOPと同じサイクル情報を使用
+    var description: String { return "UNIMPLEMENTED \(String(format: "0x%02X", opcode))" }
+}
+
+/// POP命令 - スタックから値を取得してレジスタペアに格納
+struct POPInstruction: Z80Instruction {
+    let register: RegisterPairOperand
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // スタックから値を取得
+        let value = memory.readWord(at: registers.sp)
+        
+        // レジスタに設定
+        register.write(to: &registers, value: value)
+        
+        // SPを増加
+        if registers.sp < UInt16.max - 1 {
+            registers.sp += 2
+        } else {
+            // オーバーフローを防止
+            registers.sp = 0
+            PC88Logger.cpu.warning("スタックポインタがオーバーフローしました")
+        }
+        
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 10 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.RET } // POPはRETと同じサイクル情報
+    var description: String { return "POP \(register)" }
+}
+
+
+/// RLCA命令
+struct RLCAInstruction: Z80Instruction {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // Aレジスタを左に回転し、最上位ビットをキャリーフラグと最下位ビットに設定
+        let carry = (registers.a & 0x80) != 0
+        registers.a = (registers.a << 1) | (carry ? 1 : 0)
+        
+        // フラグを設定
+        if carry {
+            registers.f = (registers.f | 0x01) // キャリーフラグをセット
+        } else {
+            registers.f = (registers.f & 0xFE) // キャリーフラグをクリア
+        }
+        
+        // HとNフラグをクリア
+        registers.f &= ~0x12
+        
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP } // RLCAはNOPと同じサイクル情報
+    var description: String { return "RLCA" }
+}
+
+/// SBC A,B命令
+struct SBCInstruction: Z80Instruction {
+    let source: RegisterOperand
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // ソースの値を取得
+        let value = source.read(from: registers, memory: memory)
+        
+        // キャリーフラグの状態を取得
+        let carry: UInt8 = (registers.f & 0x01) != 0 ? 1 : 0
+        
+        // 減算とキャリーを実行
+        let result = registers.a &- value &- carry
+        
+        // フラグを設定
+        // ゼロフラグ
+        let zeroFlag: UInt8 = (result == 0) ? 0x40 : 0
+        
+        // サインフラグ
+        let signFlag: UInt8 = (result & 0x80) != 0 ? 0x80 : 0
+        
+        // キャリーフラグ
+        let carryFlag: UInt8 = (Int(registers.a) - Int(value) - Int(carry) < 0) ? 0x01 : 0
+        
+        // ハーフキャリーフラグ
+        let halfCarryFlag: UInt8 = (Int(registers.a & 0x0F) - Int(value & 0x0F) - Int(carry) < 0) ? 0x10 : 0
+        
+        // Nフラグは常に1
+        let nFlag: UInt8 = 0x02
+        
+        // パリティ/オーバーフローフラグ
+        let pFlag: UInt8 = ((registers.a ^ value) & 0x80) != 0 && ((value ^ result) & 0x80) != 0 ? 0x04 : 0
+        
+        // フラグを組み合わせて設定
+        registers.f = zeroFlag | signFlag | carryFlag | halfCarryFlag | nFlag | pFlag
+        
+        // 結果をAレジスタに設定
+        registers.a = result
+        
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.SBC_A_r }
+    var description: String { return "SBC A,\(source)" }
+}
+
+/// RRCA命令
+struct RRCAInstruction: Z80Instruction {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // Aレジスタを右に回転
+        let carry = registers.a & 0x01
+        registers.a = (registers.a >> 1) | (carry << 7)
+        
+        // フラグを設定
+        if carry != 0 {
+            registers.f = (registers.f | 0x01) // キャリーフラグをセット
+        } else {
+            registers.f = (registers.f & 0xFE) // キャリーフラグをクリア
+        }
+        
+        // HとNフラグをクリア
+        registers.f &= ~0x12
+        
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP } // RRCAはNOPと同じサイクル情報
+    var description: String { return "RRCA" }
+}
+
+/// EX AF,AF'命令
+struct EXAFInstruction: Z80Instruction {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // AFとAF'を交換
+        let tempA = registers.a
+        let tempF = registers.f
+        registers.a = registers.a_alt
+        registers.f = registers.f_alt
+        registers.a_alt = tempA
+        registers.f_alt = tempF
+        
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP } // EX AF,AF'はNOPと同じサイクル情報
+    var description: String { return "EX AF,AF'" }
+}
+
+/// PUSH命令
+struct PUSHInstruction: Z80Instruction {
+    let register: RegisterPairOperand
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        let value = register.read(from: registers)
+        // SPを減算
+        if registers.sp >= 2 {
+            registers.sp = registers.sp &- 2
+        } else {
+            registers.sp = 0xFFFF
+            PC88Logger.cpu.warning("スタックポインタがオーバーフローしました")
+        }
+        // メモリに書き込み
+        memory.writeWord(value, at: registers.sp)
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 11 }
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryWrites: 2) }
+    var description: String { return "PUSH \(register)" }
+}
+
+
+/// INCレジスタペア命令
+struct INCRegPairInstruction: Z80Instruction {
+    let register: RegisterPairOperand
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        let value = register.read(from: registers)
+        register.write(to: &registers, value: value &+ 1)
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 6 }
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) }
+    var description: String { return "INC \(register)" }
+}
+
+
+/// LD A,(nn)命令（直接アドレスからAレジスタへのロード）
+struct LDRegMemAddrInstruction: Z80Instruction {
+    let destination: RegisterOperand
+    let address: UInt16
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        let value = memory.readByte(at: address)
+        destination.write(to: &registers, value: value)
+        return cycles
+    }
+    
+    var size: UInt16 { return 3 }
+    var cycles: Int { return 13 }
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryReads: 3, internalCycles: 2) }
+    var description: String { return "LD \(destination),(\(String(address, radix: 16)))" }
+}
+
+/// レジスタペアのデクリメント命令
+struct DECRegPairInstruction: Z80Instruction {
+    let register: RegisterPairOperand
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        let value = register.read(from: registers)
+        register.write(to: &registers, value: value &- 1)
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 6 }
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) }
+    var description: String { return "DEC \(register)" }
+}
+
+/// LD直接メモリレジスタ命令
+struct LDDirectMemRegInstruction: Z80Instruction {
+    let address: UInt16
+    let source: RegisterOperand
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        let value = source.read(from: registers, memory: memory)
+        memory.writeByte(value, at: address)
+        return cycles
+    }
+    
+    var size: UInt16 { return 3 } // オペコード + アドレス(2バイト)
+    var cycles: Int { return 13 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LD_nn_A } // 直接メモリアドレスへの書き込み
+    var description: String { return "LD (\(String(format: "0x%04X", address))),\(source)" }
+}
+
+/// ADD HL,rr命令
+struct ADDHLInstruction: Z80Instruction {
+    let source: RegisterPairOperand
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        let hl = registers.hl
+        let value = source.read(from: registers)
+        let result = hl &+ value
+        
+        // フラグ設定
+        // キャリーフラグ
+        let carryFlag: UInt8 = ((UInt32(hl) + UInt32(value)) > 0xFFFF) ? 0x01 : 0
+        
+        // ハーフキャリーフラグ
+        let halfCarryFlag: UInt8 = (((hl & 0x0FFF) + (value & 0x0FFF)) > 0x0FFF) ? 0x10 : 0
+        
+        // Nフラグはリセット
+        registers.f = (registers.f & 0xC4) | carryFlag | halfCarryFlag
+        
+        registers.hl = result
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 11 }
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, internalCycles: 7) }
+    var description: String { return "ADD HL,\(source)" }
+}
+
+/// DJNZ命令
+struct DJNZInstruction: Z80Instruction {
+    let offset: Int8
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // Bレジスタをデクリメント
+        registers.b = registers.b &- 1
+        
+        // Bが0でなければジャンプ
+        if registers.b != 0 {
+            // PCにオフセットを加算
+            registers.pc = UInt16(Int(registers.pc) + Int(offset))
+            return 13 // ジャンプする場合のサイクル数
+        }
+        
+        return 8 // ジャンプしない場合のサイクル数
+    }
+    
+    var size: UInt16 { return 2 } // オペコード + オフセット
+    var cycles: Int { return 8 } // 非ジャンプ時のサイクル数
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 5) }
+    var description: String { return "DJNZ \(String(format: "%+d", offset))" }
+}
+
+/// IYプレフィックス命令
+/// CPL命令 - Aレジスタの全ビットを反転する
+struct CPLInstruction: Z80Instruction {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // Aレジスタの全ビットを反転
+        registers.a = ~registers.a
+        
+        // フラグの設定
+        // H, Nフラグをセット
+        registers.f = (registers.f & 0xC5) | 0x12 // 0x12 = (H | N)
+        
+        return cycles
+    }
+    
+    var size: UInt16 { return 1 }
+    var cycles: Int { return 4 }
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true) }
+    var description: String { return "CPL" }
+}
+
+struct IYPrefixedInstruction: Z80Instruction {
+    let instruction: Z80Instruction
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        // IYプレフィックス命令は通常の命令と同じように実行されるが、
+        // HLレジスタの代わりにIYレジスタを使用する
+        let savedHL = registers.hl
+        registers.hl = registers.iy
+        
+        let cycles = instruction.execute(cpu: cpu, registers: &registers, memory: memory, io: io)
+        
+        registers.iy = registers.hl
+        registers.hl = savedHL
+        
+        return cycles
+    }
+    
+    var size: UInt16 { return instruction.size + 1 } // プレフィックスバイトを追加
+    var cycles: Int { return instruction.cycles + 4 } // プレフィックス命令は通常の命令より4サイクル多く消費する
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true) }
+    var description: String { return "IY: \(instruction.description)" }
+}
+
+/// LD IY,nn命令
+struct LDIYInstruction: Z80Instruction {
+    let value: UInt16
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+        registers.iy = value
+        return cycles
+    }
+    
+    var size: UInt16 { return 4 } // FD + 21 + nn (2バイト)
+    var cycles: Int { return 14 } // LD HL,nnの10サイクル + プレフィックスの4サイクル
+    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) }
+    var description: String { return "LD IY,\(String(format: "0x%04X", value))" }
+}
