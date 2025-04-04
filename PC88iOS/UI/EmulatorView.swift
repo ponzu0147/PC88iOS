@@ -290,19 +290,19 @@ class EmulatorViewInternalModel: ObservableObject {
                     // エミュレーションが開始されているか確認
                     if self.emulatorCore?.getState() != .running {
                         self.emulatorCore?.start() // 再度開始を試みる
-                        print("エミュレーションを再度開始しました（初期化後0.5秒）")
+                        PC88Logger.app.debug("エミュレーションを再度開始しました（初期化後0.5秒）")
                     } else {
-                        print("エミュレーションは正常に実行中です（初期化後0.5秒）")
+                        PC88Logger.app.debug("エミュレーションは正常に実行中です（初期化後0.5秒）")
                     }
                     
                     // 画面を強制更新
                     self.forceScreenUpdate()
-                    print("画面を強制更新しました（初期化後0.5秒）")
+                    PC88Logger.app.debug("画面を強制更新しました（初期化後0.5秒）")
                     
                     // 4MHzモードを再設定して確実にエミュレーションを開始
                     if let core = self.emulatorCore as? PC88EmulatorCore {
                         core.setCPUClockMode(.mode4MHz)
-                        print("最終確認: クロックモードを4MHzに再設定しました")
+                        PC88Logger.app.debug("最終確認: クロックモードを4MHzに再設定しました")
                     }
                 }
             }
@@ -325,27 +325,27 @@ class EmulatorViewInternalModel: ObservableObject {
         // 強制的に画面を更新するための処理
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             self?.updateScreen()
-            print("画面を更新しました（初期化直後）")
+            PC88Logger.app.debug("画面を更新しました（初期化直後）")
         }
         
         // 少し待ってから再度更新
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             self?.updateScreen()
-            print("画面を更新しました（初期化後0.2秒）")
+            PC88Logger.app.debug("画面を更新しました（初期化後0.2秒）")
         }
         
         // エミュレーションループが確実に開始された後に再度更新
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self else { return }
             self.updateScreen()
-            print("エミュレーションを開始しました（初期化後0.5秒）")
+            PC88Logger.app.debug("エミュレーションを開始しました（初期化後0.5秒）")
             
             // 画面イメージが正しく生成されているか確認
             if self.screenImage == nil {
-                print("警告: 画面イメージがnilです。強制的に再生成を試みます")
+                PC88Logger.app.warning("画面イメージがnilです。強制的に再生成を試みます")
                 if let image = self.emulatorCore?.getScreen() {
                     self.screenImage = image
-                    print("画面イメージを強制的に再生成しました")
+                    PC88Logger.app.debug("画面イメージを強制的に再生成しました")
                 }
             }
         }
@@ -353,7 +353,7 @@ class EmulatorViewInternalModel: ObservableObject {
         // さらに遅らせて再度更新
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             self?.updateScreen()
-            print("画面を更新しました（初期化後1.0秒）")
+            PC88Logger.app.debug("画面を更新しました（初期化後1.0秒）")
         }
     }
     
@@ -386,7 +386,7 @@ class EmulatorViewInternalModel: ObservableObject {
         NotificationCenter.default.publisher(for: Notification.Name("ForceScreenUpdateNotification"))
             .sink { [weak self] _ in
                 self?.forceScreenUpdate()
-                print("強制画面更新通知を受信しました")
+                PC88Logger.app.debug("強制画面更新通知を受信しました")
             }
             .store(in: &backgroundObservers)
         
@@ -397,12 +397,12 @@ class EmulatorViewInternalModel: ObservableObject {
                 
                 // エミュレーションが開始されていない場合は開始する
                 if self.emulatorCore?.getState() != .running {
-                    print("エミュレータ開始通知を受信し、エミュレーションを開始します")
+                    PC88Logger.app.debug("エミュレータ開始通知を受信し、エミュレーションを開始します")
                     
                     // クロックモードを4MHzに再設定
                     if let core = self.emulatorCore as? PC88EmulatorCore {
                         core.setCPUClockMode(.mode4MHz)
-                        print("エミュレータ開始通知: クロックモードを4MHzに再設定しました")
+                        PC88Logger.app.debug("エミュレータ開始通知: クロックモードを4MHzに再設定しました")
                     }
                     
                     // エミュレーション開始
@@ -417,7 +417,7 @@ class EmulatorViewInternalModel: ObservableObject {
         // 購読設定後に強制的に画面更新を行う
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.forceScreenUpdate()
-            print("通知購読設定後に画面を強制更新しました")
+            PC88Logger.app.debug("通知購読設定後に画面を強制更新しました")
         }
     }
     
@@ -442,7 +442,7 @@ class EmulatorViewInternalModel: ObservableObject {
                 core.muteAudio()
             }
             
-            print("バックグラウンド移行によりエミュレータを一時停止しました")
+            PC88Logger.app.debug("バックグラウンド移行によりエミュレータを一時停止しました")
         }
     }
     
@@ -462,7 +462,7 @@ class EmulatorViewInternalModel: ObservableObject {
             let fps = currentFPS > 0 ? Double(currentFPS) : 30.0
             updateTimerInterval(fps: fps)
             
-            print("フォアグラウンド復帰によりエミュレータを再開しました")
+            PC88Logger.app.debug("フォアグラウンド復帰によりエミュレータを再開しました")
         }
     }
     
@@ -487,7 +487,7 @@ class EmulatorViewInternalModel: ObservableObject {
         // エミュレーションループが確実に開始されるように少し待ってから再度更新
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.updateScreen()
-            print("クロックモードを変更しました: " + (self?.clockFrequency ?? ""))
+            PC88Logger.app.debug("クロックモードを変更しました: " + (self?.clockFrequency ?? ""))
         }
     }
     
@@ -512,7 +512,7 @@ class EmulatorViewInternalModel: ObservableObject {
             // タイマーの間隔も更新
             updateTimerInterval(fps: fps)
             
-            print("フレームレートを\(currentFPS)fpsに切り替えました")
+            PC88Logger.app.debug("フレームレートを\(currentFPS)fpsに切り替えました")
         }
     }
     
@@ -555,11 +555,11 @@ class EmulatorViewInternalModel: ObservableObject {
         if let core = emulatorCore {
             if core.loadDiskImage(url: url, drive: drive) {
                 diskImagePath = url.lastPathComponent
-                print("ディスクイメージをロードしました: \(url.lastPathComponent)")
+                PC88Logger.disk.debug("ディスクイメージをロードしました: \(url.lastPathComponent)")
                 
                 // ディスクイメージがロードされたら自動的にリセットを行う
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    print("エミュレータをリセットします...")
+                    PC88Logger.app.debug("エミュレータをリセットします...")
                     
                     // 一時停止中なら再開
                     if self?.isPaused == true {
@@ -571,10 +571,10 @@ class EmulatorViewInternalModel: ObservableObject {
                     self?.emulatorCore?.reset()
                     
                     // リセット後にメッセージを表示
-                    print("IPLを実行してOSを起動します...")
+                    PC88Logger.app.debug("IPLを実行してOSを起動します...")
                 }
             } else {
-                print("ディスクイメージのロードに失敗しました: \(url.path)")
+                PC88Logger.disk.error("ディスクイメージのロードに失敗しました: \(url.path)")
             }
         }
     }
@@ -588,7 +588,7 @@ class EmulatorViewInternalModel: ObservableObject {
         if let image = emulatorCore?.getScreen() {
             screenImage = image
         } else {
-            print("警告: エミュレータコアから画面イメージを取得できませんでした")
+            PC88Logger.app.warning("警告: エミュレータコアから画面イメージを取得できませんでした")
         }
     }
     
@@ -597,7 +597,7 @@ class EmulatorViewInternalModel: ObservableObject {
         // エミュレータが初期化されていない場合は初期化する
         if emulatorCore == nil {
             startEmulator()
-            print("エミュレータを初期化しました")
+            PC88Logger.app.debug("エミュレータを初期化しました")
             return // 初期化後は startEmulator 内で画面更新が行われるため、ここでは終了
         }
         
@@ -605,7 +605,7 @@ class EmulatorViewInternalModel: ObservableObject {
         if isPaused {
             emulatorCore?.resume()
             isPaused = false
-            print("エミュレータを再開しました")
+            PC88Logger.app.debug("エミュレータを再開しました")
         }
         
         // 画面を即座に更新
@@ -613,7 +613,7 @@ class EmulatorViewInternalModel: ObservableObject {
         
         // 画面イメージが取得できない場合は、再度試行
         if screenImage == nil {
-            print("警告: 画面イメージがnilです。強制的に再生成を試みます")
+            PC88Logger.app.warning("警告: 画面イメージがnilです。強制的に再生成を試みます")
             if let core = emulatorCore as? PC88EmulatorCore {
                 // テスト画面を再表示するための代替処理
                 // PC88EmulatorCoreのgetScreen()メソッドを利用して内部でテスト画面を表示する
@@ -624,12 +624,12 @@ class EmulatorViewInternalModel: ObservableObject {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                     if let image = self?.emulatorCore?.getScreen() {
                         self?.screenImage = image
-                        print("画面イメージを強制的に再生成しました")
+                        PC88Logger.app.debug("画面イメージを強制的に再生成しました")
                     }
                 }
             }
         } else {
-            print("画面を強制更新しました")
+            PC88Logger.app.debug("画面を強制更新しました")
         }
     }
 }
