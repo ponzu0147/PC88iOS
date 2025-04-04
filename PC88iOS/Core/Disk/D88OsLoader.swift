@@ -116,15 +116,15 @@ class D88OsLoader {
             let decoder = JSONDecoder()
             let osInfo = try decoder.decode(OsInfo.self, from: data)
             
-            print("D88OsLoader.loadOsInfoFromJson: OSの情報をJSONから読み込みました")
-            print("  IPLサイズ: \(osInfo.ipl.size)バイト, ロード先アドレス: 0x\(String(format: "%04X", osInfo.ipl.loadAddress))")
-            print("  OSセクタ数: \(osInfo.os.sectorCount), 合計サイズ: \(osInfo.os.totalSize)バイト")
-            print("  OSロード先アドレス: 0x\(String(format: "%04X", osInfo.os.loadAddress)), 実行開始アドレス: 0x\(String(format: "%04X", osInfo.os.execAddress))")
+            PC88Logger.disk.debug("D88OsLoader.loadOsInfoFromJson: OSの情報をJSONから読み込みました")
+            PC88Logger.disk.debug("  IPLサイズ: \(osInfo.ipl.size)バイト, ロード先アドレス: 0x\(String(format: "%04X", osInfo.ipl.loadAddress))")
+            PC88Logger.disk.debug("  OSセクタ数: \(osInfo.os.sectorCount), 合計サイズ: \(osInfo.os.totalSize)バイト")
+            PC88Logger.disk.debug("  OSロード先アドレス: 0x\(String(format: "%04X", osInfo.os.loadAddress)), 実行開始アドレス: 0x\(String(format: "%04X", osInfo.os.execAddress))")
             
             // OSのロードと実行
             return loadAndExecuteOs(loadAddress: osInfo.os.loadAddress, execAddress: osInfo.os.execAddress)
         } catch {
-            print("D88OsLoader.loadOsInfoFromJson: JSONの読み込みに失敗しました: \(error)")
+            PC88Logger.disk.error("D88OsLoader.loadOsInfoFromJson: JSONの読み込みに失敗しました: \(error)")
             return false
         }
     }
