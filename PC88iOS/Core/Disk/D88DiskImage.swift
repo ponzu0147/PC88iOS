@@ -367,13 +367,13 @@ class D88DiskImage: DiskImageAccessing {
                         continue // 次のセクタへ
                     }
                 } else if theoreticalSize != sectorSize {
-                    print("警告: セクタサイズの不一致 - N=\(n) (理論値: \(theoreticalSize)バイト) vs 実際: \(sectorSize)バイト)")
+                    PC88Logger.disk.warning("セクタサイズの不一致 - N=\(n) (理論値: \(theoreticalSize)バイト) vs 実際: \(sectorSize)バイト)")
                 }
                 
                 // セクタIDの異常値チェック
                 let isValidID = c < 80 && h < 2 && r < 30 // 一般的な制限
                 if !isValidID {
-                    print("警告: セクタIDが異常です - C=\(c), H=\(h), R=\(r)")
+                    PC88Logger.disk.warning("セクタIDが異常です - C=\(c), H=\(h), R=\(r)")
                     
                     // ALPHA-MINI-DOSの場合、異常なセクタIDを修正
                     if isAlphaMiniDos() {
@@ -386,7 +386,7 @@ class D88DiskImage: DiskImageAccessing {
                         let correctedH = h > 1 ? UInt8(side) : h    // 異常な値の場合はサイド番号を使用
                         let correctedR = r > 26 ? UInt8(sectors.count + 1) : r // 異常な値の場合は連番を使用
                         
-                        print("  ALPHA-MINI-DOS: セクタIDを修正しました - C=\(correctedC), H=\(correctedH), R=\(correctedR)")
+                        PC88Logger.disk.debug("  ALPHA-MINI-DOS: セクタIDを修正しました - C=\(correctedC), H=\(correctedH), R=\(correctedR)")
                         
                         // 修正したセクタIDを使用
                         let sectorID = SectorID(cylinder: correctedC, head: correctedH, record: correctedR, size: n)
@@ -430,19 +430,19 @@ class D88DiskImage: DiskImageAccessing {
     func readSector(track: Int, sector: Int) -> [UInt8]? {
         // トラックとセクタの範囲チェック
         guard track >= 0 && track < maxTracks && sector >= 1 && sector <= maxSectorsPerTrack else {
-            print("トラックまたはセクタが範囲外: track=\(track), sector=\(sector)")
+            PC88Logger.disk.error("トラックまたはセクタが範囲外: track=\(track), sector=\(sector)")
             return nil
         }
         
         // ALPHA-MINI-DOSの特別処理: トラック0セクタ1のIPLを要求された場合
         if track == 0 && sector == 1 && isAlphaMiniDos() {
-            print("  ALPHA-MINI-DOSを検出しました。IPLを直接抽出します。")
+            PC88Logger.disk.debug("  ALPHA-MINI-DOSを検出しました。IPLを直接抽出します。")
             return extractAlphaMiniDosIpl()
         }
         
         // トラック0の場合は特別な処理を行う
         if track == 0 {
-            print("トラック0を検索: ディスクタイプ=\(getDiskTypeString()), 期待セクタ数=\(getExpectedSectorsPerTrack())")
+            PC88Logger.disk.debug("トラック0を検索: ディスクタイプ=\(getDiskTypeString()), 期待セクタ数=\(getExpectedSectorsPerTrack())")
             
             // 有効なセクタデータを保持する変数
             var validSectorData: Data? = nil
@@ -464,7 +464,7 @@ class D88DiskImage: DiskImageAccessing {
             
             // トラック0のデータを検索
             let track0Data = sectorData.filter { $0.track == 0 }
-            print("  トラック0のデータブロック数: \(track0Data.count)")
+            PC88Logger.disk.debug("  トラック0のデータブロック数: \(track0Data.count)")
             
             // トラック0のデータブロックをスキャン
             for trackData in track0Data {
@@ -472,12 +472,12 @@ class D88DiskImage: DiskImageAccessing {
                 // すべてのセクタをチェック
                 for (index, sectorInfo) in trackData.sectors.enumerated() {
                     let sectorSize = calculateSectorSizeFromN(sectorInfo.id.size)
-                    print("    セクタ\(index): C=\(sectorInfo.id.cylinder), H=\(sectorInfo.id.head), R=\(sectorInfo.id.record), N=\(sectorInfo.id.size) (\(sectorSize)バイト), データサイズ=\(sectorInfo.data.count)")
+                    PC88Logger.disk.debug("    セクタ\(index): C=\(sectorInfo.id.cylinder), H=\(sectorInfo.id.head), R=\(sectorInfo.id.record), N=\(sectorInfo.id.size) (\(sectorSize)バイト), データサイズ=\(sectorInfo.data.count)")
                     
                     // セクタIDの検証
                     let isValidID = sectorInfo.id.cylinder < 80 && sectorInfo.id.head < 2 && sectorInfo.id.record < 30
                     if !isValidID {
-                        print("    警告: 無効なセクタID - C=\(sectorInfo.id.cylinder), H=\(sectorInfo.id.head), R=\(sectorInfo.id.record)")
+                        PC88Logger.disk.warning("    無効なセクタID - C=\(sectorInfo.id.cylinder), H=\(sectorInfo.id.head), R=\(sectorInfo.id.record)")
                         continue // 無効なIDのセクタはスキップ
                     }
                     
@@ -485,7 +485,7 @@ class D88DiskImage: DiskImageAccessing {
                     let dataSize = sectorInfo.data.count
                     let isValidSize = dataSize > 0 && dataSize <= 8192 // 8KBを上限とする
                     if !isValidSize {
-                        print("    警告: 無効なデータサイズ - \(dataSize)バイト")
+                        PC88Logger.disk.warning("    無効なデータサイズ - \(dataSize)バイト")
                         continue // 無効なサイズのセクタはスキップ
                     }
                     
@@ -497,7 +497,7 @@ class D88DiskImage: DiskImageAccessing {
                     
                     if exactMatch || recordOnlyMatch {
                         let matchType = exactMatch ? "完全一致" : "レコード番号のみ一致"
-                        print("  トラック0のセクタ\(sector)が見つかりました (\(matchType)): データサイズ=\(dataSize)")
+                        PC88Logger.disk.debug("  トラック0のセクタ\(sector)が見つかりました (\(matchType)): データサイズ=\(dataSize)")
                         
                         // データが全てFFで埋められているかチェック
                         let allFF = sectorInfo.data.allSatisfy { $0 == 0xFF }
@@ -516,31 +516,31 @@ class D88DiskImage: DiskImageAccessing {
                         // 優先順位に基づいてセクタを選択
                         if exactMatch && hasValidContent && matchesExpectedSize {
                             // 最高優先度: 完全一致、有効なコンテンツ、期待サイズ
-                            print("  最適なセクタを発見しました: 完全一致、有効なコンテンツ、期待サイズ (N=\(sectorInfo.id.size), \(dataSize)バイト)")
+                            PC88Logger.disk.debug("  最適なセクタを発見しました: 完全一致、有効なコンテンツ、期待サイズ (N=\(sectorInfo.id.size), \(dataSize)バイト)")
                             // validSectorFound変数は不要なので削除
                             return [UInt8](sectorInfo.data)
                         } else if exactMatch && !allFF && matchesExpectedSize {
                             // 高優先度: 完全一致、FFでない、期待サイズ
-                            print("  有効なデータを含むセクタを発見しました (N=\(sectorInfo.id.size), \(dataSize)バイト)")
+                            PC88Logger.disk.debug("  有効なデータを含むセクタを発見しました (N=\(sectorInfo.id.size), \(dataSize)バイト)")
                             validSectorData = sectorInfo.data
                             validSectorSize = dataSize
                             validSectorN = sectorInfo.id.size
                             // validSectorFound変数は不要なので削除
                         } else if exactMatch && !allFF {
                             // 中優先度: 完全一致、FFでない
-                            print("  有効なデータを含むセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
+                            PC88Logger.disk.debug("  有効なデータを含むセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
                             validSectorData = sectorInfo.data
                             validSectorSize = dataSize
                             validSectorN = sectorInfo.id.size
                         } else if recordOnlyMatch && !allFF && validSectorData == nil {
                             // 低優先度: レコード番号のみ一致、FFでない
-                            print("  レコード番号のみ一致するセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
+                            PC88Logger.disk.debug("  レコード番号のみ一致するセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
                             validSectorData = sectorInfo.data
                             validSectorSize = dataSize
                             validSectorN = sectorInfo.id.size
                         } else if exactMatch && allFF && matchesExpectedSize && validSectorData == nil {
                             // 最低優先度: 完全一致、FF、期待サイズ
-                            print("  FFで埋められたセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
+                            PC88Logger.disk.debug("  FFで埋められたセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
                             validSectorData = sectorInfo.data
                             validSectorSize = dataSize
                             validSectorN = sectorInfo.id.size
@@ -580,10 +580,10 @@ class D88DiskImage: DiskImageAccessing {
                                 let matchesExpectedSize = expectedSectorSize == 0 || dataSize == expectedSectorSize
                                 
                                 if hasValidContent && matchesExpectedSize {
-                                    print("  物理トラック1の最適なセクタ\(sector)を発見しました: N=\(sectorInfo.id.size) (\(sectorSize)バイト), データサイズ=\(dataSize)")
+                                    PC88Logger.disk.debug("  物理トラック1の最適なセクタ\(sector)を発見しました: N=\(sectorInfo.id.size) (\(sectorSize)バイト), データサイズ=\(dataSize)")
                                     return [UInt8](sectorInfo.data)
                                 } else if !allFF && matchesExpectedSize {
-                                    print("  物理トラック1の有効なセクタ\(sector)を発見しました: N=\(sectorInfo.id.size) (\(sectorSize)バイト), データサイズ=\(dataSize)")
+                                    PC88Logger.disk.debug("  物理トラック1の有効なセクタ\(sector)を発見しました: N=\(sectorInfo.id.size) (\(sectorSize)バイト), データサイズ=\(dataSize)")
                                     validSectorData = sectorInfo.data
                                     validSectorSize = dataSize
                                     validSectorN = sectorInfo.id.size
@@ -592,12 +592,12 @@ class D88DiskImage: DiskImageAccessing {
                                     validSectorData = sectorInfo.data
                                     validSectorSize = dataSize
                                     validSectorN = sectorInfo.id.size
-                                    print("  物理トラック1の有効なデータを含むセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
+                                    PC88Logger.disk.debug("  物理トラック1の有効なデータを含むセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
                                 } else if allFF && matchesExpectedSize && validSectorData == nil {
                                     validSectorData = sectorInfo.data
                                     validSectorSize = dataSize
                                     validSectorN = sectorInfo.id.size
-                                    print("  物理トラック1のFFで埋められたセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
+                                    PC88Logger.disk.debug("  物理トラック1のFFで埋められたセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
                                 }
                             }
                         }
@@ -609,12 +609,12 @@ class D88DiskImage: DiskImageAccessing {
             if validSectorData == nil {
                 // ALPHA-MINI-DOSの特別処理を試みる
                 if isAlphaMiniDos() {
-                    print("  ALPHA-MINI-DOSを検出しました。IPLを直接抽出します。")
+                    PC88Logger.disk.debug("  ALPHA-MINI-DOSを検出しました。IPLを直接抽出します。")
                     return extractAlphaMiniDosIpl()
                 }
                 
                 // レコード番号が一致するセクタを探す（最後の手段）
-                print("  レコード番号のみで検索します")
+                PC88Logger.disk.debug("  レコード番号のみで検索します")
                 
                 // すべてのトラックから、レコード番号が一致するセクタを収集
                 var matchingSectors: [(trackIndex: Int, sectorInfo: SectorData)] = []
@@ -635,7 +635,7 @@ class D88DiskImage: DiskImageAccessing {
                     }
                 }
                 
-                print("  レコード番号\(sector)に一致するセクタ数: \(matchingSectors.count)")
+                PC88Logger.disk.debug("  レコード番号\(sector)に一致するセクタ数: \(matchingSectors.count)")
                 
                 // 有効なセクタを選択
                 if !matchingSectors.isEmpty {
@@ -646,7 +646,7 @@ class D88DiskImage: DiskImageAccessing {
                         // 有効なデータを含むセクタが見つかった場合
                         let (trackIndex, sectorInfo) = nonEmptySectors.first!
                         let dataSize = sectorInfo.data.count
-                        print("  トラック\(sectorData[trackIndex].track)で有効なセクタ\(sector)を発見しました: データサイズ=\(dataSize)")
+                        PC88Logger.disk.debug("  トラック\(sectorData[trackIndex].track)で有効なセクタ\(sector)を発見しました: データサイズ=\(dataSize)")
                         validSectorData = sectorInfo.data
                         validSectorSize = dataSize
                         validSectorN = sectorInfo.id.size
@@ -654,7 +654,7 @@ class D88DiskImage: DiskImageAccessing {
                         // すべてFFで埋められている場合、最初のセクタを使用
                         let (trackIndex, sectorInfo) = matchingSectors.first!
                         let dataSize = sectorInfo.data.count
-                        print("  トラック\(sectorData[trackIndex].track)でFFで埋められたセクタ\(sector)を発見しました: データサイズ=\(dataSize)")
+                        PC88Logger.disk.debug("  トラック\(sectorData[trackIndex].track)でFFで埋められたセクタ\(sector)を発見しました: データサイズ=\(dataSize)")
                         validSectorData = sectorInfo.data
                         validSectorSize = dataSize
                         validSectorN = sectorInfo.id.size
@@ -664,31 +664,31 @@ class D88DiskImage: DiskImageAccessing {
             
             // 有効なセクタが見つかった場合は返す
             if let data = validSectorData {
-                print("  トラック0のセクタ\(sector)の候補を使用します: N=\(validSectorN) (\(calculateSectorSizeFromN(validSectorN))バイト), データサイズ=\(validSectorSize)")
+                PC88Logger.disk.debug("  トラック0のセクタ\(sector)の候補を使用します: N=\(validSectorN) (\(calculateSectorSizeFromN(validSectorN))バイト), データサイズ=\(validSectorSize)")
                 return [UInt8](data)
             }
             
             // 最後の手段: デフォルトのIPLセクタを返す
-            print("  警告: 有効なセクタが見つかりませんでした。デフォルトのIPLセクタを使用します。")
+            PC88Logger.disk.warning("  警告: 有効なセクタが見つかりませんでした。デフォルトのIPLセクタを使用します。")
             return [UInt8](defaultIPLSector)
         }
         
         // トラック0以外の場合は通常の検索を行う
-        print("  トラック\(track)を検索します")
+        PC88Logger.disk.debug("  トラック\(track)を検索します")
         
         // 指定されたトラックのデータを検索
         let targetTrackData = sectorData.filter { $0.track == track }
-        print("  トラック\(track)のデータブロック数: \(targetTrackData.count)")
+        PC88Logger.disk.debug("  トラック\(track)のデータブロック数: \(targetTrackData.count)")
         
         // 指定されたトラックのデータが見つかった場合
         if !targetTrackData.isEmpty {
             // トラックデータをスキャン
             for trackData in targetTrackData {
-                print("  トラックデータ: track=\(trackData.track), side=\(trackData.side), sectors=\(trackData.sectors.count)")
+                PC88Logger.disk.debug("  トラックデータ: track=\(trackData.track), side=\(trackData.side), sectors=\(trackData.sectors.count)")
                 
                 // セクタのID情報を表示
                 for (index, sectorInfo) in trackData.sectors.enumerated() {
-                    print("    セクタ\(index): C=\(sectorInfo.id.cylinder), H=\(sectorInfo.id.head), R=\(sectorInfo.id.record), N=\(sectorInfo.id.size), データサイズ=\(sectorInfo.data.count)")
+                    PC88Logger.disk.debug("    セクタ\(index): C=\(sectorInfo.id.cylinder), H=\(sectorInfo.id.head), R=\(sectorInfo.id.record), N=\(sectorInfo.id.size), データサイズ=\(sectorInfo.data.count)")
                 }
                 
                 // セクタを検索 - レコード番号(R)で検索
@@ -696,22 +696,22 @@ class D88DiskImage: DiskImageAccessing {
                     if sectorInfo.id.record == UInt8(sector) {
                         let dataSize = sectorInfo.data.count
                         if dataSize > 0 && dataSize <= 8192 { // セクタサイズの妥当性チェック
-                            print("  セクタ\(sector)が見つかりました: データサイズ=\(dataSize)")
+                            PC88Logger.disk.debug("  セクタ\(sector)が見つかりました: データサイズ=\(dataSize)")
                             // DataをUInt8配列に変換して返す
                             return [UInt8](sectorInfo.data)
                         } else {
-                            print("  セクタ\(sector)のサイズが異常です: \(dataSize)バイト")
+                            PC88Logger.disk.warning("  セクタ\(sector)のサイズが異常です: \(dataSize)バイト")
                         }
                     }
                 }
             }
             
-            print("  トラック\(track)にセクタ\(sector)が見つかりませんでした")
+            PC88Logger.disk.debug("  トラック\(track)にセクタ\(sector)が見つかりませんでした")
             return nil
         }
         
         // 物理トラック番号で見つからなかった場合、シリンダ番号(C)で再検索
-        print("  物理トラック\(track)が見つかりませんでした。シリンダ番号で再検索します。")
+        PC88Logger.disk.debug("  物理トラック\(track)が見つかりませんでした。シリンダ番号で再検索します。")
         
         // シリンダ番号で検索
         for trackData in sectorData {
@@ -723,15 +723,15 @@ class D88DiskImage: DiskImageAccessing {
             if let sectorInfo = matchingSectors.first {
                 let dataSize = sectorInfo.data.count
                 if dataSize > 0 && dataSize <= 8192 { // セクタサイズの妥当性チェック
-                    print("  シリンダ\(track)、セクタ\(sector)が見つかりました: データサイズ=\(dataSize)")
+                    PC88Logger.disk.debug("  シリンダ\(track)、セクタ\(sector)が見つかりました: データサイズ=\(dataSize)")
                     return [UInt8](sectorInfo.data)
                 } else {
-                    print("  シリンダ\(track)、セクタ\(sector)のサイズが異常です: \(dataSize)バイト")
+                    PC88Logger.disk.warning("  シリンダ\(track)、セクタ\(sector)のサイズが異常です: \(dataSize)バイト)")
                 }
             }
         }
         
-        print("  トラック\(track)、セクタ\(sector)が見つかりませんでした")
+        PC88Logger.disk.debug("  トラック\(track)、セクタ\(sector)が見つかりませんでした")
         return nil
     }
     
@@ -803,7 +803,7 @@ class D88DiskImage: DiskImageAccessing {
         
         // IPLオフセットからデータを抽出
         guard alphaMiniDosIplOffset + iplSize <= diskData.count else {
-            print("ALPHA-MINI-DOSのIPL抽出に失敗: ディスクイメージが小さすぎます")
+            PC88Logger.disk.error("ALPHA-MINI-DOSのIPL抽出に失敗: ディスクイメージが小さすぎます")
             return getDefaultIplSector()
         }
         
@@ -822,7 +822,7 @@ class D88DiskImage: DiskImageAccessing {
         }
         
         // IPLが無効な場合、ディスクイメージ内を検索して有効なIPLを見つける
-        print("有効なIPLを検索中...")
+        PC88Logger.disk.debug("有効なIPLを検索中...")
         
         // ディスクイメージ内の複数の場所を検索
         let possibleOffsets = [0x02C0, 0x0000, 0x0100, 0x0200, 0x0300, 0x0400]
@@ -835,7 +835,7 @@ class D88DiskImage: DiskImageAccessing {
                 if candidateData.count >= 4 && 
                    candidateData[0] == 0xF3 && 
                    (candidateData[1] == 0xC3 || candidateData[1] == 0x3A) {
-                    print("オフセット0x\(String(format: "%04X", offset))で有効なIPLを発見")
+                    PC88Logger.disk.debug("オフセット0x\(String(format: "%04X", offset))で有効なIPLを発見")
                     return candidateData
                 }
             }
@@ -852,7 +852,7 @@ class D88DiskImage: DiskImageAccessing {
             modifiedIpl[3] = 0x01  // アドレス上位バイト（0x0100にジャンプ）
         }
         
-        print("IPLを修正しました")
+        PC88Logger.disk.debug("IPLを修正しました")
         return modifiedIpl
     }
     
@@ -867,27 +867,27 @@ class D88DiskImage: DiskImageAccessing {
         
         // OSオフセットからデータを抽出
         guard alphaMiniDosOsOffset + osSize <= diskData.count else {
-            print("  ALPHA-MINI-DOSのOS抽出に失敗: ディスクイメージが小さすぎます")
+            PC88Logger.disk.error("  ALPHA-MINI-DOSのOS抽出に失敗: ディスクイメージが小さすぎます")
             return nil
         }
         
         // OS部分のデータを取得
         let osData = [UInt8](diskData.subdata(in: alphaMiniDosOsOffset..<alphaMiniDosOsOffset + osSize))
         
-        print("  ALPHA-MINI-DOSのOS部分を抽出しました: オフセット=0x\(String(format: "%04X", alphaMiniDosOsOffset)), サイズ=\(osData.count)バイト")
+        PC88Logger.disk.debug("  ALPHA-MINI-DOSのOS部分を抽出しました: オフセット=0x\(String(format: "%04X", alphaMiniDosOsOffset)), サイズ=\(osData.count)バイト")
         
         // OS部分の最初の32バイトを表示
-        print("  OS部分の最初の32バイト:")
+        PC88Logger.disk.debug("  OS部分の最初の32バイト:")
         for i in 0..<min(32, osData.count) {
             if i % 16 == 0 && i > 0 {
-                print("")
+                PC88Logger.disk.debug("")
             }
-            print(String(format: "%02X ", osData[i]), terminator: "")
+            PC88Logger.disk.debug(String(format: "%02X ", osData[i]), terminator: "")
         }
-        print("")
+        PC88Logger.disk.debug("")
         
         // OS部分の特徴を確認
-        print("  OS部分の特徴を確認中...")
+        PC88Logger.disk.debug("  OS部分の特徴を確認中...")
         
         // 有効なコードか確認
         var validCodeFound = false
@@ -899,9 +899,9 @@ class D88DiskImage: DiskImageAccessing {
         }
         
         if validCodeFound {
-            print("  OS部分に有効なコードを確認しました")
+            PC88Logger.disk.debug("  OS部分に有効なコードを確認しました")
         } else {
-            print("  警告: OS部分に有効なコードが見つかりません")
+            PC88Logger.disk.warning("  警告: OS部分に有効なコードが見つかりません")
         }
         
         return osData
@@ -910,7 +910,7 @@ class D88DiskImage: DiskImageAccessing {
     /// D88ディスクイメージからOSセクタを読み込む
     /// - Returns: 読み込まれたOSセクタのデータ配列、失敗した場合はnil
     func loadOsSectors() -> [[UInt8]]? {
-        print("D88DiskImage.loadOsSectors: OSセクタの読み込みを開始します")
+        PC88Logger.disk.debug("D88DiskImage.loadOsSectors: OSセクタの読み込みを開始します")
         
         // ALPHA-MINI-DOSの場合は特殊処理
         if isAlphaMiniDos() {
@@ -921,13 +921,13 @@ class D88DiskImage: DiskImageAccessing {
         // トラック0のデータを検索
         let track0Data = sectorData.filter { $0.track == 0 }
         if track0Data.isEmpty {
-            print("  トラック0のデータが見つかりません")
+            PC88Logger.disk.error("  トラック0のデータが見つかりません")
             return nil
         }
         
         // ALPHA-MINI-DOSの特別処理
         if isAlphaMiniDos() {
-            print("  ALPHA-MINI-DOSを検出しました。OS部分を直接抽出します。")
+            PC88Logger.disk.debug("  ALPHA-MINI-DOSを検出しました。OS部分を直接抽出します。")
             if let osData = extractAlphaMiniDosOs() {
                 return [osData]
             }
@@ -937,24 +937,24 @@ class D88DiskImage: DiskImageAccessing {
         var osSectors: [[UInt8]] = []
         let maxSectors = getExpectedSectorsPerTrack()
         
-        print("  トラック0のセクタ2から連続読み込みを試行します (最大\(maxSectors)セクタ)")
+        PC88Logger.disk.debug("  トラック0のセクタ2から連続読み込みを試行します (最大\(maxSectors)セクタ)")
         
         for sectorNumber in 2...maxSectors {
             if let sectorData = readSector(track: 0, sector: sectorNumber) {
-                print("  セクタ\(sectorNumber)を読み込みました (\(sectorData.count)バイト)")
+                PC88Logger.disk.debug("  セクタ\(sectorNumber)を読み込みました (\(sectorData.count)バイト)")
                 osSectors.append(sectorData)
             } else {
-                print("  セクタ\(sectorNumber)の読み込みに失敗したため、読み込みを終了します")
+                PC88Logger.disk.debug("  セクタ\(sectorNumber)の読み込みに失敗したため、読み込みを終了します")
                 break
             }
         }
         
         if osSectors.isEmpty {
-            print("  OSセクタの読み込みに失敗しました")
+            PC88Logger.disk.error("  OSセクタの読み込みに失敗しました")
             return nil
         }
         
-        print("  OSセクタの読み込みが完了しました: \(osSectors.count)セクタ")
+        PC88Logger.disk.debug("  OSセクタの読み込みが完了しました: \(osSectors.count)セクタ")
         return osSectors
     }
     
@@ -965,7 +965,7 @@ class D88DiskImage: DiskImageAccessing {
     /// - Returns: ロードされたOSデータの合計サイズ、失敗した場合は0
     func loadOsToMemory(memoryAddress: Int, memory: MemoryAccessing? = nil) -> Int {
         guard let osSectors = loadOsSectors() else {
-            print("  OSセクタが読み込めないため、メモリへのロードに失敗しました")
+            PC88Logger.disk.error("  OSセクタが読み込めないため、メモリへのロードに失敗しました")
             return 0
         }
         
@@ -973,7 +973,7 @@ class D88DiskImage: DiskImageAccessing {
         var totalSize = 0
         
         for (index, sectorData) in osSectors.enumerated() {
-            print("  セクタ\(index + 1)をメモリアドレス0x\(String(format: "%04X", currentAddress))にロード (\(sectorData.count)バイト)")
+            PC88Logger.disk.debug("  セクタ\(index + 1)をメモリアドレス0x\(String(format: "%04X", currentAddress))にロード (\(sectorData.count)バイト)")
             
             // 実際のメモリに書き込み（メモリアクセサが提供されている場合）
             if let memory = memory {
@@ -983,7 +983,7 @@ class D88DiskImage: DiskImageAccessing {
                     if address < 0x10000 {
                         memory.writeByte(byte, at: UInt16(address))
                     } else {
-                        print("  警告: メモリアドレス0x\(String(format: "%04X", address))が64KB範囲を超えています")
+                        PC88Logger.disk.warning("  警告: メモリアドレス0x\(String(format: "%04X", address))が64KB範囲を超えています")
                         break
                     }
                 }
@@ -994,7 +994,7 @@ class D88DiskImage: DiskImageAccessing {
             totalSize += sectorData.count
         }
         
-        print("  OSデータをメモリアドレス0x\(String(format: "%04X", memoryAddress))にロードしました (合計\(totalSize)バイト)")
+        PC88Logger.disk.debug("  OSデータをメモリアドレス0x\(String(format: "%04X", memoryAddress))にロードしました (合計\(totalSize)バイト)")
         return totalSize
     }
     
@@ -1002,7 +1002,7 @@ class D88DiskImage: DiskImageAccessing {
     /// - Parameter startAddress: OS実行開始アドレス
     /// - Returns: 実行開始の成否
     func executeOs(startAddress: Int) -> Bool {
-        print("D88DiskImage.executeOs: OSの実行を開始します (開始アドレス: 0x\(String(format: "%04X", startAddress)))")
+        PC88Logger.disk.debug("D88DiskImage.executeOs: OSの実行を開始します (開始アドレス: 0x\(String(format: "%04X", startAddress)))")
         
         // ここでは実際の実行は行わず、成功したことにする
         // 実際のエミュレータ実装では、Z80のプログラムカウンタを設定し実行を開始する処理が必要
@@ -1015,7 +1015,7 @@ class D88DiskImage: DiskImageAccessing {
     /// ALPHA-MINI-DOS用のOS部分を読み込む特殊処理
     /// - Returns: OSセクタデータの配列、失敗した場合はnil
     private func loadAlphaMiniDosOsSectors() -> [[UInt8]]? {
-        print("  ALPHA-MINI-DOS用のOS部分を特殊処理で読み込みます")
+        PC88Logger.disk.debug("  ALPHA-MINI-DOS用のOS部分を特殊処理で読み込みます")
         
         // ALPHA-MINI-DOSの場合、トラック0のセクタ2から連続してOSが格納されている
         var osSectors: [[UInt8]] = []
@@ -1027,10 +1027,10 @@ class D88DiskImage: DiskImageAccessing {
                 // データが有効か確認（全てFFで埋められていないか）
                 let isValidData = !directData.allSatisfy { $0 == 0xFF }
                 if isValidData {
-                    print("  ALPHA-MINI-DOS: セクタ\(sectorNumber)を直接読み込みました (\(directData.count)バイト)")
+                    PC88Logger.disk.debug("  ALPHA-MINI-DOS: セクタ\(sectorNumber)を直接読み込みました (\(directData.count)バイト)")
                     osSectors.append(directData)
                 } else {
-                    print("  ALPHA-MINI-DOS: セクタ\(sectorNumber)はデータが無効（全てFF）のため、スキップします")
+                    PC88Logger.disk.debug("  ALPHA-MINI-DOS: セクタ\(sectorNumber)はデータが無効（全てFF）のため、スキップします")
                 }
                 continue
             }
@@ -1040,23 +1040,23 @@ class D88DiskImage: DiskImageAccessing {
                 // データが有効か確認
                 let isValidData = !sectorData.allSatisfy { $0 == 0xFF }
                 if isValidData {
-                    print("  ALPHA-MINI-DOS: セクタ\(sectorNumber)を通常方法で読み込みました (\(sectorData.count)バイト)")
+                    PC88Logger.disk.debug("  ALPHA-MINI-DOS: セクタ\(sectorNumber)を通常方法で読み込みました (\(sectorData.count)バイト)")
                     osSectors.append(sectorData)
                 } else {
-                    print("  ALPHA-MINI-DOS: セクタ\(sectorNumber)はデータが無効（全てFF）のため、スキップします")
+                    PC88Logger.disk.debug("  ALPHA-MINI-DOS: セクタ\(sectorNumber)はデータが無効（全てFF）のため、スキップします")
                 }
             } else {
-                print("  ALPHA-MINI-DOS: セクタ\(sectorNumber)の読み込みに失敗したため、読み込みを終了します")
+                PC88Logger.disk.debug("  ALPHA-MINI-DOS: セクタ\(sectorNumber)の読み込みに失敗したため、読み込みを終了します")
                 break
             }
         }
         
         if osSectors.isEmpty {
-            print("  ALPHA-MINI-DOS: OS部分の読み込みに失敗しました")
+            PC88Logger.disk.error("  ALPHA-MINI-DOS: OS部分の読み込みに失敗しました")
             return nil
         }
         
-        print("  ALPHA-MINI-DOS: OS部分の読み込みが完了しました: \(osSectors.count)セクタ")
+        PC88Logger.disk.debug("  ALPHA-MINI-DOS: OS部分の読み込みが完了しました: \(osSectors.count)セクタ")
         return osSectors
     }
     
