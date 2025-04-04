@@ -82,7 +82,7 @@ class EmulatorViewModel: ObservableObject {
         if emulatorCore.loadDiskImage(url: url, drive: drive) {
             diskImagePath = url.lastPathComponent
         } else {
-            print("ディスクイメージのロードに失敗しました: \(url.path)")
+            PC88Logger.app.debug("ディスクイメージのロードに失敗しました: \(url.path)")
         }
     }
     

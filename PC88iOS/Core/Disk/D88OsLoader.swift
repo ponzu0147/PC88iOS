@@ -56,7 +56,7 @@ class D88OsLoader {
     ///   - execAddress: OS実行開始アドレス（省略時はデフォルト値）
     /// - Returns: 実行開始の成否
     func loadAndExecuteOs(loadAddress: Int? = nil, execAddress: Int? = nil) -> Bool {
-        print("D88OsLoader.loadAndExecuteOs: OSのロードと実行を開始します")
+        PC88Logger.disk.debug("D88OsLoader.loadAndExecuteOs: OSのロードと実行を開始します")
         
         // ロード先アドレスと実行開始アドレスの設定
         let osLoadAddress = loadAddress ?? defaultOsLoadAddress
@@ -64,7 +64,7 @@ class D88OsLoader {
         
         // OSセクタの読み込み
         guard let osSectors = diskImage.loadOsSectors() else {
-            print("  OSセクタの読み込みに失敗しました")
+            PC88Logger.disk.error("  OSセクタの読み込みに失敗しました")
             return false
         }
         
@@ -74,7 +74,7 @@ class D88OsLoader {
             var currentAddress = osLoadAddress
             
             for (index, sectorData) in osSectors.enumerated() {
-                print("  セクタ\(index + 1)をメモリアドレス0x\(String(format: "%04X", currentAddress))にロード (\(sectorData.count)バイト)")
+                PC88Logger.disk.debug("  セクタ\(index + 1)をメモリアドレス0x\(String(format: "%04X", currentAddress))にロード (\(sectorData.count)バイト)")
                 
                 // メモリに書き込み
                 for (offset, byte) in sectorData.enumerated() {
@@ -86,23 +86,23 @@ class D88OsLoader {
                 currentAddress += sectorData.count
             }
             
-            print("  OSデータをメモリにロード完了 (合計\(currentAddress - osLoadAddress)バイト)")
+            PC88Logger.disk.debug("  OSデータをメモリにロード完了 (合計\(currentAddress - osLoadAddress)バイト)")
         } else {
             // メモリアクセサが設定されていない場合は、サイズのみ計算
             let totalSize = osSectors.reduce(0) { $0 + $1.count }
-            print("  メモリアクセサが設定されていないため、実際のメモリへのロードはスキップします (合計\(totalSize)バイト)")
+            PC88Logger.disk.warning("  メモリアクセサが設定されていないため、実際のメモリへのロードはスキップします (合計\(totalSize)バイト)")
         }
         
         // OSの実行開始
         if let cpuController = cpuController {
             // 実際のCPUでの実行開始
-            print("  OSの実行を開始します (開始アドレス: 0x\(String(format: "%04X", osExecAddress)))")
+            PC88Logger.disk.debug("  OSの実行を開始します (開始アドレス: 0x\(String(format: "%04X", osExecAddress)))")
             cpuController.setProgramCounter(address: osExecAddress)
             cpuController.startExecution()
             return true
         } else {
             // CPU制御が設定されていない場合は、仮想的な実行開始
-            print("  CPU制御が設定されていないため、実際の実行はスキップします (開始アドレス: 0x\(String(format: "%04X", osExecAddress)))")
+            PC88Logger.disk.warning("  CPU制御が設定されていないため、実際の実行はスキップします (開始アドレス: 0x\(String(format: "%04X", osExecAddress)))")
             return diskImage.executeOs(startAddress: osExecAddress)
         }
     }

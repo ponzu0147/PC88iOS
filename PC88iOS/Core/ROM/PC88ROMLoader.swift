@@ -56,10 +56,10 @@ class PC88ROMLoader {
                 do {
                     let romData = try Data(contentsOf: fileURL)
                     romCache[type] = romData
-                    print("ROM loaded from Documents: \(type.rawValue)")
+                    PC88Logger.core.debug("ROM loaded from Documents: \(type.rawValue)")
                     return romData
                 } catch {
-                    print("Failed to load ROM from Documents \(type.rawValue): \(error)")
+                    PC88Logger.core.error("Failed to load ROM from Documents \(type.rawValue): \(error)")
                 }
             }
         }
@@ -69,10 +69,10 @@ class PC88ROMLoader {
             do {
                 let romData = try Data(contentsOf: url)
                 romCache[type] = romData
-                print("ROM loaded from Bundle: \(type.rawValue)")
+                PC88Logger.core.debug("ROM loaded from Bundle: \(type.rawValue)")
                 return romData
             } catch {
-                print("Failed to load ROM from Bundle \(type.rawValue): \(error)")
+                PC88Logger.core.error("Failed to load ROM from Bundle \(type.rawValue): \(error)")
             }
         }
         
@@ -81,10 +81,10 @@ class PC88ROMLoader {
             do {
                 let romData = try Data(contentsOf: url)
                 romCache[type] = romData
-                print("ROM loaded from Resources: \(type.rawValue)")
+                PC88Logger.core.debug("ROM loaded from Resources: \(type.rawValue)")
                 return romData
             } catch {
-                print("Failed to load ROM from Resources \(type.rawValue): \(error)")
+                PC88Logger.core.error("Failed to load ROM from Resources \(type.rawValue): \(error)")
             }
         }
         
@@ -96,14 +96,14 @@ class PC88ROMLoader {
             do {
                 let romData = try Data(contentsOf: fileURL)
                 romCache[type] = romData
-                print("ROM loaded from direct path: \(type.rawValue)")
+                PC88Logger.core.debug("ROM loaded from direct path: \(type.rawValue)")
                 return romData
             } catch {
-                print("Failed to load ROM from direct path \(type.rawValue): \(error)")
+                PC88Logger.core.error("Failed to load ROM from direct path \(type.rawValue): \(error)")
             }
         }
         
-        print("ROM file not found: \(type.rawValue)")
+        PC88Logger.core.error("ROM file not found: \(type.rawValue)")
         return nil
     }
     

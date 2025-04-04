@@ -28,7 +28,7 @@ enum RegisterOperand {
             if let memory = memory {
                 return memory.readByte(at: registers.hl)
             } else {
-                print("警告: memoryが指定されていません")
+                PC88Logger.cpu.debug("警告: memoryが指定されていません")
                 return 0
             }
         }
@@ -45,12 +45,12 @@ enum RegisterOperand {
         case .regL: registers.l = value
         case .regF: registers.f = value
         case .immediate: 
-            print("警告: immediate値に書き込みが行われました")
+            PC88Logger.cpu.debug("警告: immediate値に書き込みが行われました")
         case .memory:
             if let memory = memory {
                 memory.writeByte(value, at: registers.hl)
             } else {
-                print("警告: memoryが指定されていません")
+                PC88Logger.cpu.debug("警告: memoryが指定されていません")
             }
         }
     }

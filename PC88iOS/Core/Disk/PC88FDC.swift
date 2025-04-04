@@ -191,7 +191,7 @@ class PC88FDC: FDCEmulating {
             
         default:
             // 未実装コマンド
-            print("未実装のFDCコマンド: \(command)")
+            PC88Logger.disk.debug("未実装のFDCコマンド: \(command)")
             completeCommand()
         }
     }
@@ -529,7 +529,7 @@ class PC88FDC: FDCEmulating {
             return nil
         }
         
-        print("FDC: トラック\(track)、セクタ\(sector)を読み込みます")
+        PC88Logger.disk.debug("FDC: トラック\(track)、セクタ\(sector)を読み込みます")
         
         // セクタデータを読み込む
         return diskImage.readSector(track: track, sector: sector)

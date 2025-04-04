@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os.log
 
 /// ALPHA-MINI-DOSディスクイメージを専用に読み込むためのクラス
 /// 
@@ -242,6 +243,6 @@ class AlphaMiniDosLoader {
         guard loggingEnabled else { return }
         
         let prefix = isError ? "ALPHA-MINI-DOSローダー [エラー]: " : "ALPHA-MINI-DOSローダー: "
-        print(prefix + message)
+        PC88Logger.disk.debug("\(prefix)\(message)")
     }
 }

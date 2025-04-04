@@ -637,7 +637,7 @@ struct UnimplementedInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
         // PCの計算で整数オーバーフローを防止
         let pc = registers.pc > 0 ? registers.pc - 1 : 0
-        print("警告: 未実装の命令 0x\(String(opcode, radix: 16, uppercase: true)) at PC=0x\(String(pc, radix: 16, uppercase: true))")
+        PC88Logger.cpu.warning("未実装の命令 0x\(String(opcode, radix: 16, uppercase: true)) at PC=0x\(String(pc, radix: 16, uppercase: true))")
         return cycles
     }
     
@@ -664,7 +664,7 @@ struct POPInstruction: Z80Instruction {
         } else {
             // オーバーフローを防止
             registers.sp = 0
-            print("警告: スタックポインタがオーバーフローしました")
+            PC88Logger.cpu.warning("スタックポインタがオーバーフローしました")
         }
         
         return cycles
@@ -809,7 +809,7 @@ struct PUSHInstruction: Z80Instruction {
             registers.sp = registers.sp &- 2
         } else {
             registers.sp = 0xFFFF
-            print("警告: スタックポインタがオーバーフローしました")
+            PC88Logger.cpu.warning("スタックポインタがオーバーフローしました")
         }
         // メモリに書き込み
         memory.writeWord(value, at: registers.sp)

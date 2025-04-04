@@ -105,7 +105,7 @@ class PC88SoundChip: SoundChipEmulating {
         do {
             try audioEngine.start()
         } catch {
-            print("オーディオエンジンの開始に失敗: \(error)")
+            PC88Logger.sound.error("オーディオエンジンの開始に失敗: \(error)")
         }
     }
     
@@ -165,7 +165,7 @@ class PC88SoundChip: SoundChipEmulating {
                 setupAudio()
                 startAudio()
             }
-            print("サウンド品質モードを高品質に設定しました")
+            PC88Logger.sound.debug("サウンド品質モードを高品質に設定しました")
             
         case .medium:
             // 中品質モードの設定
@@ -176,7 +176,7 @@ class PC88SoundChip: SoundChipEmulating {
                 setupAudio()
                 startAudio()
             }
-            print("サウンド品質モードを中品質に設定しました")
+            PC88Logger.sound.debug("サウンド品質モードを中品質に設定しました")
             
         case .low:
             // 低品質モードの設定
@@ -187,7 +187,7 @@ class PC88SoundChip: SoundChipEmulating {
                 setupAudio()
                 startAudio()
             }
-            print("サウンド品質モードを低品質に設定しました")
+            PC88Logger.sound.debug("サウンド品質モードを低品質に設定しました")
         }
     }
     

@@ -74,7 +74,7 @@ class D88DiskImage: DiskImageAccessing {
             let data = try Data(contentsOf: url)
             return loadFromData(data)
         } catch {
-            print("ディスクイメージの読み込みに失敗: \(error)")
+            PC88Logger.disk.error("ディスクイメージの読み込みに失敗: \(error)")
             return false
         }
     }
@@ -227,7 +227,7 @@ class D88DiskImage: DiskImageAccessing {
     /// データからディスクイメージをロード
     private func loadFromData(_ data: Data) -> Bool {
         guard data.count >= headerSize else {
-            print("ディスクイメージデータが小さすぎます")
+            PC88Logger.disk.error("ディスクイメージデータが小さすぎます")
             return false
         }
         
@@ -238,15 +238,15 @@ class D88DiskImage: DiskImageAccessing {
         let nameData = data.subdata(in: 0..<16)
         diskName = String(data: nameData, encoding: .shiftJIS) ?? ""
         diskName = diskName.trimmingCharacters(in: .controlCharacters)
-        print("ディスク名: \(diskName)")
+        PC88Logger.disk.debug("ディスク名: \(diskName)")
         
         // 書き込み保護フラグ
         writeProtected = data[0x1A] != 0
-        print("書き込み保護: \(writeProtected)")
+        PC88Logger.disk.debug("書き込み保護: \(writeProtected)")
         
         // ディスクの種類
         diskType = data[0x1B]
-        print("ディスクタイプ: \(getDiskTypeString()) (\(diskType))")
+        PC88Logger.disk.debug("ディスクタイプ: \(getDiskTypeString()) (\(diskType))")
         
         // トラックテーブルの読み取り
         for i in 0..<maxTracks {
@@ -319,13 +319,13 @@ class D88DiskImage: DiskImageAccessing {
                 let isValidSectorSize = sectorSize > 0 && sectorSize <= 8192 // 8KBを上限とする
                 
                 if !isValidSectorSize {
-                    print("警告: セクタサイズが異常です - N=\(n) (理論値: \(theoreticalSize)バイト) vs 実際: \(sectorSize)バイト)")
+                    PC88Logger.disk.warning("セクタサイズが異常です - N=\(n) (理論値: \(theoreticalSize)バイト) vs 実際: \(sectorSize)バイト)")
                     
                     // ALPHA-MINI-DOSの特別処理
                     if isAlphaMiniDos() {
                         // IPLセクタ（トラック0、セクタ1）またはその他の重要なセクタの場合
                         if (c == 0 && r == 1) || (track == 0 && side == 0) {
-                            print("  ALPHA-MINI-DOSの重要セクタを検出しました。特別処理を適用します。")
+                            PC88Logger.disk.debug("  ALPHA-MINI-DOSの重要セクタを検出しました。特別処理を適用します。")
                             // 固定サイズ（256バイト）を使用 - 標準的なセクタサイズ
                             let specialSize = 256
                             let safeOffset = min(dataOffset, data.count - 1)
@@ -340,7 +340,7 @@ class D88DiskImage: DiskImageAccessing {
                             let sectorID = SectorID(cylinder: correctedC, head: correctedH, record: correctedR, size: correctedN)
                             let sector = SectorData(id: sectorID, data: data.subdata(in: safeOffset..<(safeOffset + safeSize)))
                             sectors.append(sector)
-                            print("  修正されたセクタID: C=\(correctedC), H=\(correctedH), R=\(correctedR), N=\(correctedN) (\(safeSize)バイト)")
+                            PC88Logger.disk.debug("  修正されたセクタID: C=\(correctedC), H=\(correctedH), R=\(correctedR), N=\(correctedN) (\(safeSize)バイト)")
                             currentOffset += 0x10 + sectorSize
                             continue // 次のセクタへ
                         }
@@ -348,7 +348,7 @@ class D88DiskImage: DiskImageAccessing {
                     
                     // 異常なセクタサイズの場合、理論値を使用
                     if theoreticalSize > 0 && theoreticalSize <= 8192 {
-                        print("  理論値を使用します: \(theoreticalSize)バイト")
+                        PC88Logger.disk.debug("  理論値を使用します: \(theoreticalSize)バイト")
                         // 理論値を使用
                         let correctedSize = min(theoreticalSize, data.count - dataOffset)
                         let sectorID = SectorID(cylinder: c, head: h, record: r, size: n)
@@ -358,7 +358,7 @@ class D88DiskImage: DiskImageAccessing {
                         continue // 次のセクタへ
                     } else {
                         // 理論値も異常な場合は、固定の安全な値を使用
-                        print("  理論値も異常なため、安全な固定値（256バイト）を使用します")
+                        PC88Logger.disk.warning("  理論値も異常なため、安全な固定値（256バイト）を使用します")
                         let safeSize = min(256, data.count - dataOffset)
                         let sectorID = SectorID(cylinder: c, head: h, record: r, size: 1) // N=1 (256バイト)
                         let sector = SectorData(id: sectorID, data: data.subdata(in: dataOffset..<(dataOffset + safeSize)))

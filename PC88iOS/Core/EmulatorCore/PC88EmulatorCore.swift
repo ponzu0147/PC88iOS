@@ -71,7 +71,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     func getScreen() -> CGImage? {
         // 画面イメージがnullの場合はテスト画面を表示して再生成を試みる
         if screenImage == nil {
-            print("警告: PC88EmulatorCore.getScreen() - screenImageがnullです。テスト画面を表示して再生成します")
+            PC88Logger.screen.warning("PC88EmulatorCore.getScreen() - screenImageがnullです。テスト画面を表示して再生成します")
             
             // テスト画面を表示
             if let pc88Screen = screen as? PC88ScreenBase {
@@ -164,12 +164,12 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     private func initializeROM() {
         // ROMの読み込み
         if !loadROMs() {
-            print("警告: ROMの読み込みに失敗しました")
+            PC88Logger.core.warning("ROMの読み込みに失敗しました")
         }
         
         // リズム音源の読み込み
         if !loadRhythmSounds() {
-            print("警告: リズム音源の読み込みに失敗しました")
+            PC88Logger.sound.warning("リズム音源の読み込みに失敗しました")
         }
     }
     
@@ -276,7 +276,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             let diskName = pc88FDC.getDiskName(drive: 0) ?? ""
             if diskName.contains("ALPHA-MINI") {
                 // ALPHA-MINI-DOSの場合はテスト画面を表示しない
-                print("ALPHA-MINI-DOSディスクが読み込まれているため、テスト画面をスキップします")
+                PC88Logger.core.debug("ALPHA-MINI-DOSディスクが読み込まれているため、テスト画面をスキップします")
                 return
             }
         }
@@ -284,13 +284,13 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         // ディスクがないか、ALPHA-MINI-DOS以外の場合はテスト画面を表示
         if let pc88Screen = screen as? PC88ScreenBase {
             pc88Screen.displayTestScreen()
-            print("テスト画面を表示しました")
+            PC88Logger.screen.debug("テスト画面を表示しました")
         }
     }
     
     func start() {
         guard state == .initialized || state == .paused else { 
-            print("警告: エミュレータの状態が開始可能ではありません: \(state)")
+            PC88Logger.core.warning("エミュレータの状態が開始可能ではありません: \(state)")
             return 
         }
         
@@ -309,7 +309,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         // テストテキストを表示（エミュレーション開始前に実行）
         if let pc88Screen = screen as? PC88ScreenBase {
             pc88Screen.displayTestScreen()
-            print("テスト画面を表示しました")
+            PC88Logger.screen.debug("テスト画面を表示しました")
             
             // 画面更新を強制的に行う
             updateScreen()
@@ -317,7 +317,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         // IPLを実行してOSを起動
         executeIPL()
-        print("IPLを実行しました")
+        PC88Logger.core.debug("IPLを実行しました")
         
         // クロックモードの設定を確認してログ出力
         let frequency = currentClockMode == .mode4MHz ? 4_000_000 : 8_000_000
@@ -328,9 +328,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         let startupLog = "[クロックモード: \(clockModeStr)] FPS: \(String(format: "%.2f", targetFPS)), 平均フレーム時間: \(String(format: "%.2f", (1.0/targetFPS) * 1000)) ms, サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(frequency) Hz"
         
         // コンソールにログを出力
-        print("\n\n")
-        print(startupLog)
-        print("\n")
+        PC88Logger.core.debug("\n\n\(startupLog)\n")
         fflush(stdout)
         
         // システムログにも出力
@@ -349,14 +347,14 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         // 状態を実行中に変更
         state = .running
-        print("エミュレーションを開始しました（PC88EmulatorCore.start()）")
+        PC88Logger.core.debug("エミュレーションを開始しました（PC88EmulatorCore.start()）")
         
         // 定期的にパフォーマンス情報を表示するタイマーを設定（状態変更後に設定）
         startLogTimer()
         
         // 開始後に再度画面を更新
         updateScreen()
-        print("エミュレーション開始後に画面を更新しました")
+        PC88Logger.screen.debug("エミュレーション開始後に画面を更新しました")
         
         // 画面更新タイマーの開始
         updateEmulationTimer()
@@ -379,7 +377,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         // フレームスキップを設定（2フレームに1回描画）
         setFrameSkip(1)
         
-        print("PC-88エミュレーションを開始しました（最適化設定適用済み）")
+        PC88Logger.core.debug("PC-88エミュレーションを開始しました（最適化設定適用済み）")
         
         // 状態を実行中に変更
         changeState(to: .running)
@@ -427,7 +425,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             if let soundChip = soundChip {
                 soundChip.pause()
             }
-            print("PC-88エミュレーションを一時停止しました")
+            PC88Logger.core.debug("PC-88エミュレーションを一時停止しました")
             
         case (.paused, .running):
             // 一時停止から実行中に変更
@@ -436,7 +434,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             }
             logPerformanceMetrics(forceLog: true)
             startLogTimer()
-            print("PC-88エミュレーションを再開しました")
+            PC88Logger.core.debug("PC-88エミュレーションを再開しました")
             
             // ログタイマーの開始を冗長化（信頼性向上のため）
             scheduleLogTimerStarts()
@@ -446,11 +444,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             if let soundChip = soundChip {
                 soundChip.pause()
             }
-            print("PC-88エミュレーションを停止しました")
+            PC88Logger.core.debug("PC-88エミュレーションを停止しました")
             
         case (.initialized, .running):
             // 初期化済みから実行中に変更
-            print("PC-88エミュレーションを開始しました")
+            PC88Logger.core.debug("PC-88エミュレーションを開始しました")
             
         default:
             break
@@ -499,7 +497,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             soundChip.setVolume(0.0)
         }
         
-        print("バックグラウンド移行によりオーディオをミュートしました")
+        PC88Logger.sound.debug("バックグラウンド移行によりオーディオをミュートしました")
     }
     
     /// オーディオのミュート解除（フォアグラウンド復帰時に呼び出される）
@@ -515,7 +513,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             soundChip.setVolume(1.0) // デフォルト音量
         }
         
-        print("フォアグラウンド復帰によりオーディオのミュートを解除しました")
+        PC88Logger.sound.debug("フォアグラウンド復帰によりオーディオのミュートを解除しました")
     }
     
     func reset() {
@@ -574,7 +572,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             return
         }
         
-        print("\nクロックモード変更開始: \(currentClockMode) -> \(mode)\n")
+        PC88Logger.cpu.debug("\nクロックモード変更開始: \(currentClockMode) -> \(mode)\n")
         
         // 現在の状態を保存
         let wasRunning = state == .running
@@ -636,7 +634,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// フレームスキップを設定
     func setFrameSkip(_ skip: Int) {
         frameSkip = max(0, min(skip, 10)) // 0〜10の範囲に制限
-        print("フレームスキップを設定: \(frameSkip)")
+        PC88Logger.core.debug("フレームスキップを設定: \(frameSkip)")
         shouldResetMetrics = true
     }
     
@@ -670,7 +668,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                 soundChip.setQualityMode(SoundQualityMode.medium)
             }
             
-            print("省電力モードを有効化しました（フレームレート: \(targetFPS)fps）")
+            PC88Logger.core.debug("省電力モードを有効化しました（フレームレート: \(targetFPS)fps）")
         } else {
             // 省電力モード無効時の設定
             setFrameSkip(0) // すべてのフレームを描画
@@ -685,7 +683,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                 soundChip.setQualityMode(SoundQualityMode.high)
             }
             
-            print("省電力モードを無効化しました")
+            PC88Logger.core.debug("省電力モードを無効化しました")
         }
     }
     
@@ -699,7 +697,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     func setFrameRate(_ fps: Double) {
         // 有効な値かチェック
         guard fps == 60.0 || fps == 30.0 || fps == 15.0 else {
-            print("無効なフレームレート値: \(fps)")
+            PC88Logger.core.warning("無効なフレームレート値: \(fps)")
             return
         }
         
@@ -738,7 +736,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             cpuClock.adjustSleepTimeForMode4MHz(frameRate: fps)
         }
         
-        print("フレームレートを\(fps)fpsに設定しました")
+        PC88Logger.core.debug("フレームレートを\(fps)fpsに設定しました")
     }
     
     /// エミュレーションタイマーを更新

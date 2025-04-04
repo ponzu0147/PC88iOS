@@ -102,7 +102,7 @@ class PC88CPUClock {
         // コールバックを呼び出し
         onModeChanged?(currentMode)
         
-        print("CPUクロックモードを変更: \(mode == .mode4MHz ? "4MHz" : "8MHz")")
+        PC88Logger.cpu.debug("CPUクロックモードを変更: \(mode == .mode4MHz ? "4MHz" : "8MHz")")
     }
     
     /// 4MHzモードに設定

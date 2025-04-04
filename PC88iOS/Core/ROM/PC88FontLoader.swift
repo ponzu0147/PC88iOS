@@ -37,63 +37,63 @@ class PC88FontLoader {
         // フォントROMを読み込む
         if let fontROMData = loadFontROMDirectly() {
             // データサイズを確認
-            print("フォントROMデータサイズ: \(fontROMData.count) バイト")
+            PC88Logger.core.debug("フォントROMデータサイズ: \(fontROMData.count) バイト")
             
             // 8x8フォントデータを抽出
             if fontROMData.count >= 2048 {
                 font8x8 = Array(fontROMData.prefix(2048))
-                print("8x8フォントデータを読み込みました (サイズ: \(font8x8?.count ?? 0) バイト)")
+                PC88Logger.core.debug("8x8フォントデータを読み込みました (サイズ: \(font8x8?.count ?? 0) バイト)")
             } else {
-                print("8x8フォントデータの読み込みに失敗しました: データサイズ不足")
+                PC88Logger.core.error("8x8フォントデータの読み込みに失敗しました: データサイズ不足")
                 return false
             }
             
             // 8x16フォントデータを抽出
             if fontROMData.count >= 4096 {
                 font8x16 = Array(fontROMData.suffix(from: 2048))
-                print("8x16フォントデータを読み込みました (サイズ: \(font8x16?.count ?? 0) バイト)")
+                PC88Logger.core.debug("8x16フォントデータを読み込みました (サイズ: \(font8x16?.count ?? 0) バイト)")
                 
                 // デバッグ用に最初の数バイトを表示
                 if let font = font8x16, !font.isEmpty {
-                    print("最初の数バイト: \(font.prefix(16).map { String(format: "%02X", $0) }.joined(separator: " "))")
+                    PC88Logger.core.debug("最初の数バイト: \(font.prefix(16).map { String(format: "%02X", $0) }.joined(separator: " "))")
                 }
             } else {
-                print("8x16フォントデータの読み込みに失敗しました: データサイズ不足")
+                PC88Logger.core.error("8x16フォントデータの読み込みに失敗しました: データサイズ不足")
                 return false
             }
             
-            print("フォントROMを読み込みました")
+            PC88Logger.core.debug("フォントROMを読み込みました")
             return true
         }
         
         // PC88ROMLoaderからの読み込みを試す
         if let fontROMData = PC88ROMLoader.shared.loadROM(.font) {
-            print("フォントROMデータサイズ (PC88ROMLoader): \(fontROMData.count) バイト")
+            PC88Logger.core.debug("フォントROMデータサイズ (PC88ROMLoader): \(fontROMData.count) バイト")
             
             // 8x8フォントデータを抽出
             if fontROMData.count >= 2048 {
                 font8x8 = Array(fontROMData.prefix(2048))
-                print("8x8フォントデータを読み込みました (サイズ: \(font8x8?.count ?? 0) バイト)")
+                PC88Logger.core.debug("8x8フォントデータを読み込みました (サイズ: \(font8x8?.count ?? 0) バイト)")
             } else {
-                print("8x8フォントデータの読み込みに失敗しました: データサイズ不足")
+                PC88Logger.core.error("8x8フォントデータの読み込みに失敗しました: データサイズ不足")
                 return false
             }
             
             // 8x16フォントデータを抽出
             if fontROMData.count >= 4096 {
                 font8x16 = Array(fontROMData.suffix(from: 2048))
-                print("8x16フォントデータを読み込みました (サイズ: \(font8x16?.count ?? 0) バイト)")
+                PC88Logger.core.debug("8x16フォントデータを読み込みました (サイズ: \(font8x16?.count ?? 0) バイト)")
             } else {
-                print("8x16フォントデータの読み込みに失敗しました: データサイズ不足")
+                PC88Logger.core.error("8x16フォントデータの読み込みに失敗しました: データサイズ不足")
                 return false
             }
             
-            print("フォントROMをPC88ROMLoaderから読み込みました")
+            PC88Logger.core.debug("フォントROMをPC88ROMLoaderから読み込みました")
             return true
         }
         
         // フォントデータをハードコードして作成
-        print("フォントROMの読み込みに失敗しました。デフォルトフォントを使用します")
+        PC88Logger.core.warning("フォントROMの読み込みに失敗しました。デフォルトフォントを使用します")
         createDefaultFont()
         return true
     }
@@ -108,10 +108,10 @@ class PC88FontLoader {
             if FileManager.default.fileExists(atPath: fileURL.path) {
                 do {
                     let romData = try Data(contentsOf: fileURL)
-                    print("フォントROMをDocumentsから読み込みました: font.rom")
+                    PC88Logger.core.debug("フォントROMをDocumentsから読み込みました: font.rom")
                     return romData
                 } catch {
-                    print("フォントROMの読み込みに失敗しました(Documents): \(error)")
+                    PC88Logger.core.error("フォントROMの読み込みに失敗しました(Documents): \(error)")
                 }
             }
         }
@@ -120,10 +120,10 @@ class PC88FontLoader {
         if let url = Bundle.main.url(forResource: "font", withExtension: "rom") {
             do {
                 let romData = try Data(contentsOf: url)
-                print("フォントROMをバンドルから読み込みました: font.rom")
+                PC88Logger.core.debug("フォントROMをバンドルから読み込みました: font.rom")
                 return romData
             } catch {
-                print("フォントROMの読み込みに失敗しました(バンドル): \(error)")
+                PC88Logger.core.error("フォントROMの読み込みに失敗しました(バンドル): \(error)")
             }
         }
         
@@ -131,10 +131,10 @@ class PC88FontLoader {
         if let url = Bundle.main.url(forResource: "font", withExtension: "rom", subdirectory: "Resources") {
             do {
                 let romData = try Data(contentsOf: url)
-                print("フォントROMをResourcesから読み込みました: font.rom")
+                PC88Logger.core.debug("フォントROMをResourcesから読み込みました: font.rom")
                 return romData
             } catch {
-                print("フォントROMの読み込みに失敗しました(Resources): \(error)")
+                PC88Logger.core.error("フォントROMの読み込みに失敗しました(Resources): \(error)")
             }
         }
         
@@ -145,10 +145,10 @@ class PC88FontLoader {
         if FileManager.default.fileExists(atPath: resourcePath) {
             do {
                 let romData = try Data(contentsOf: fileURL)
-                print("フォントROMを直接パスから読み込みました: \(resourcePath)")
+                PC88Logger.core.debug("フォントROMを直接パスから読み込みました: \(resourcePath)")
                 return romData
             } catch {
-                print("フォントROMの読み込みに失敗しました(直接パス): \(error)")
+                PC88Logger.core.error("フォントROMの読み込みに失敗しました(直接パス): \(error)")
             }
         }
         

@@ -236,7 +236,7 @@ class PC88Memory: MemoryAccessing {
         
         // アドレス範囲のチェック
         guard addr + size <= memorySize else {
-            print("ROMデータがメモリ範囲を超えています")
+            PC88Logger.memory.debug("ROMデータがメモリ範囲を超えています")
             return
         }
         
@@ -249,7 +249,7 @@ class PC88Memory: MemoryAccessing {
             mainMemory[addr + i] = data[i]
         }
         
-        print("ROMを読み込みました: アドレス 0x\(String(format: "%04X", address)), サイズ \(size) バイト")
+        PC88Logger.memory.debug("ROMを読み込みました: アドレス 0x\(String(format: "%04X", address)), サイズ \(size) バイト")
     }
     
     // MARK: - プライベートメソッド
