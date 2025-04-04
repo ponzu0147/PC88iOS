@@ -11,7 +11,7 @@ class PC88ScreenTest {
     /// テスト画面を表示
     func displayTestScreen() {
         // カラーモードを有効化
-        screen.isColorMode = true
+        screen.settings.isColorMode = true
         
         // テキストVRAMに文字を書き込む（1行目）
         let title = "PC-88 Screen Test"
