@@ -67,10 +67,10 @@ class PC88RhythmSound {
                     let audioPlayer = try AVAudioPlayer(contentsOf: fileURL)
                     audioPlayer.prepareToPlay()
                     audioPlayers[type] = audioPlayer
-                    print("Rhythm sound loaded from Documents: \(type.rawValue).wav")
+                    PC88Logger.sound.debug("Rhythm sound loaded from Documents: \(type.rawValue).wav")
                     return true
                 } catch {
-                    print("Failed to load rhythm sound from Documents \(type.rawValue): \(error)")
+                    PC88Logger.sound.debug("Failed to load rhythm sound from Documents \(type.rawValue): \(error)")
                 }
             }
         }
@@ -81,10 +81,10 @@ class PC88RhythmSound {
                 let audioPlayer = try AVAudioPlayer(contentsOf: url)
                 audioPlayer.prepareToPlay()
                 audioPlayers[type] = audioPlayer
-                print("Rhythm sound loaded from Bundle: \(type.rawValue).wav")
+                PC88Logger.sound.debug("Rhythm sound loaded from Bundle: \(type.rawValue).wav")
                 return true
             } catch {
-                print("Failed to load rhythm sound from Bundle \(type.rawValue): \(error)")
+                PC88Logger.sound.debug("Failed to load rhythm sound from Bundle \(type.rawValue): \(error)")
             }
         }
         
@@ -94,10 +94,10 @@ class PC88RhythmSound {
                 let audioPlayer = try AVAudioPlayer(contentsOf: url)
                 audioPlayer.prepareToPlay()
                 audioPlayers[type] = audioPlayer
-                print("Rhythm sound loaded from Resources: \(type.rawValue).wav")
+                PC88Logger.sound.debug("Rhythm sound loaded from Resources: \(type.rawValue).wav")
                 return true
             } catch {
-                print("Failed to load rhythm sound from Resources \(type.rawValue): \(error)")
+                PC88Logger.sound.debug("Failed to load rhythm sound from Resources \(type.rawValue): \(error)")
             }
         }
         
@@ -110,14 +110,14 @@ class PC88RhythmSound {
                 let audioPlayer = try AVAudioPlayer(contentsOf: fileURL)
                 audioPlayer.prepareToPlay()
                 audioPlayers[type] = audioPlayer
-                print("Rhythm sound loaded from direct path: \(type.rawValue).wav")
+                PC88Logger.sound.debug("Rhythm sound loaded from direct path: \(type.rawValue).wav")
                 return true
             } catch {
-                print("Failed to load rhythm sound from direct path \(type.rawValue): \(error)")
+                PC88Logger.sound.debug("Failed to load rhythm sound from direct path \(type.rawValue): \(error)")
             }
         }
         
-        print("Rhythm sound file not found: \(type.rawValue).wav")
+        PC88Logger.sound.debug("Rhythm sound file not found: \(type.rawValue).wav")
         return false
     }
     
@@ -125,7 +125,7 @@ class PC88RhythmSound {
     /// - Parameter type: リズム音源の種類
     func playRhythmSound(_ type: RhythmType) {
         guard let player = audioPlayers[type] else {
-            print("Rhythm sound player not found: \(type.rawValue)")
+            PC88Logger.sound.debug("Rhythm sound player not found: \(type.rawValue)")
             return
         }
         

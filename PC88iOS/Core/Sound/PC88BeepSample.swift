@@ -84,7 +84,7 @@ class PC88BeepSample {
         // 各音を1秒ずつ鳴らす
         for noteName in noteNames {
             if let frequency = notes[noteName] {
-                print("演奏中: \(noteName) (\(frequency) Hz)")
+                PC88Logger.sound.debug("演奏中: \(noteName) (\(frequency) Hz)")
                 
                 // ビープ音ON
                 beep(frequency: frequency)
@@ -100,6 +100,6 @@ class PC88BeepSample {
             }
         }
         
-        print("演奏終了")
+        PC88Logger.sound.debug("演奏終了")
     }
 }

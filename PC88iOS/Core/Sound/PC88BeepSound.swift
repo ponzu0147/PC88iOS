@@ -109,7 +109,7 @@ class PC88BeepSound: SoundChipEmulating {
         case controlRegisterPort:
             // 制御レジスタ - モード設定など
             // 0xB6 = 10110110B (チャネル2、モード3、バイナリカウント)
-            print("制御レジスタ書き込み: 0x\(String(format: "%02X", value))")
+            PC88Logger.sound.debug("制御レジスタ書き込み: 0x\(String(format: "%02X", value))")
             break
             
         case dataPort:
@@ -118,12 +118,12 @@ class PC88BeepSound: SoundChipEmulating {
                 // 下位バイトを保存
                 self.lowByte = value
                 self.isFirstByte = false
-                print("データポート下位バイト書き込み: 0x\(String(format: "%02X", value))")
+                PC88Logger.sound.debug("データポート下位バイト書き込み: 0x\(String(format: "%02X", value))")
             } else {
                 // 上位バイトと組み合わせて周波数値を設定
                 let highByte = value
                 frequencyValue = UInt16(highByte) << 8 | UInt16(self.lowByte)
-                print("データポート上位バイト書き込み: 0x\(String(format: "%02X", value)), 周波数値: \(frequencyValue)")
+                PC88Logger.sound.debug("データポート上位バイト書き込み: 0x\(String(format: "%02X", value)), 周波数値: \(frequencyValue)")
                 updateFrequency()
                 self.isFirstByte = true
             }
@@ -136,7 +136,7 @@ class PC88BeepSound: SoundChipEmulating {
             // 周波数値が0の場合はスピーカーを有効にしない
             // これにより8秒おきのプツっという音を防止
             if frequencyValue == 0 && newState {
-                print("周波数値が0のためスピーカーを有効にしません")
+                PC88Logger.sound.debug("周波数値が0のためスピーカーを有効にしません")
                 return
             }
             
@@ -166,7 +166,7 @@ class PC88BeepSound: SoundChipEmulating {
                 }
                 
                 speakerEnabled = newState
-                print("スピーカー状態変更: \(speakerEnabled ? "有効" : "無効")")
+                PC88Logger.sound.debug("スピーカー状態変更: \(speakerEnabled ? "有効" : "無効")")
             }
             break
             
@@ -299,7 +299,7 @@ class PC88BeepSound: SoundChipEmulating {
         do {
             try audioEngine?.start()
         } catch {
-            print("オーディオエンジンの開始に失敗しました: \(error)")
+            PC88Logger.sound.debug("オーディオエンジンの開始に失敗しました: \(error)")
         }
     }
     
@@ -327,7 +327,7 @@ class PC88BeepSound: SoundChipEmulating {
         // 位相増分を計算
         phaseIncrement = frequency / sampleRate
         
-        print("周波数を更新: \(frequency)Hz, 分周器値: \(frequencyValue)")
+        PC88Logger.sound.debug("周波数を更新: \(frequency)Hz, 分周器値: \(frequencyValue)")
     }
     
     /// オーディオエンジンのセットアップ
@@ -402,9 +402,9 @@ class PC88BeepSound: SoundChipEmulating {
                     }
                 }
                 
-                print("オーディオエンジンが正常に起動しました")
+                PC88Logger.sound.debug("オーディオエンジンが正常に起動しました")
             } catch {
-                print("オーディオエンジンの準備に失敗: \(error.localizedDescription)")
+                PC88Logger.sound.debug("オーディオエンジンの準備に失敗: \(error.localizedDescription)")
             }
         }
     }

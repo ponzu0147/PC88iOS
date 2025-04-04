@@ -48,7 +48,7 @@ class PC88DiskImage: DiskImageAccessing {
             
             return true
         } catch {
-            print("ディスクイメージの読み込みに失敗: \(error)")
+            PC88Logger.disk.debug("ディスクイメージの読み込みに失敗: \(error)")
             return false
         }
     }

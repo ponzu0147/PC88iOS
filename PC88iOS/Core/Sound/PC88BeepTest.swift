@@ -65,7 +65,7 @@ class PC88BeepTest {
         io.writePort(0x75, value: 0x00)
         io.writePort(0x75, value: 0x00)
         
-        print("ビープテストを初期化しました")
+        PC88Logger.sound.debug("ビープテストを初期化しました")
     }
     
     /// ビープテストを停止する
@@ -74,14 +74,14 @@ class PC88BeepTest {
         let speakerControl = io.readPort(0x42)
         io.writePort(0x42, value: speakerControl & ~0x03)
         
-        print("ビープテストを停止しました")
+        PC88Logger.sound.debug("ビープテストを停止しました")
     }
     
     /// ドレミファソラシドの音階を鳴らす
     func playScale() {
         // 再生中なら何もしない
         if isPlaying {
-            print("すでにビープ音が再生中です")
+            PC88Logger.sound.debug("すでにビープ音が再生中です")
             return
         }
         
@@ -125,7 +125,7 @@ class PC88BeepTest {
             // 再生中フラグをリセット
             DispatchQueue.main.async {
                 self.isPlaying = false
-                print("ビープ音の再生が完了しました")
+                PC88Logger.sound.debug("ビープ音の再生が完了しました")
             }
         }
     }
@@ -137,11 +137,11 @@ class PC88BeepTest {
     private func calculateDuration() -> Double {
         // クロックモードを確認
         let mode = cpuClock.currentMode
-        print("現在のクロックモード: \(mode == .mode8MHz ? "8MHz" : "4MHz")")
+        PC88Logger.sound.debug("現在のクロックモード: \(mode == .mode8MHz ? "8MHz" : "4MHz")")
         
         // 8MHzモードでは0.25秒、4MHzモードでは0.5秒
         let duration = mode == .mode8MHz ? noteDuration : noteDuration * 2.0
-        print("音の長さ: \(duration)秒")
+        PC88Logger.sound.debug("音の長さ: \(duration)秒")
         return duration
     }
 }

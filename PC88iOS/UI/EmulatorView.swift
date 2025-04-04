@@ -218,50 +218,50 @@ class EmulatorViewInternalModel: ObservableObject {
     private var timer: Timer?
     
     func startEmulator() {
-        print("エミュレータの初期化を開始します")
+        PC88Logger.app.debug("エミュレータの初期化を開始します")
         // エミュレータコアの初期化
         emulatorCore = PC88EmulatorCore()
         emulatorCore?.initialize()
         
         // スクリーンテストを表示（必ず最初に表示する）
         if let core = emulatorCore as? PC88EmulatorCore {
-            print("エミュレータコアの初期化が完了しました")
+            PC88Logger.app.debug("エミュレータコアの初期化が完了しました")
             
             // 初期クロックモードを4MHzに設定
             core.setCPUClockMode(.mode4MHz)
             clockMode = .mode4MHz
             clockFrequency = "4MHz"
-            print("初期クロックモードを4MHzに設定しました")
+            PC88Logger.app.debug("初期クロックモードを4MHzに設定しました")
             
             // 4MHzボタンを押した時と同じ処理を行う
             resetEmulator()
-            print("エミュレータをリセットしました")
+            PC88Logger.app.debug("エミュレータをリセットしました")
             
             // スクリーンテストの表示を強制
             updateScreen()
-            print("スクリーンテストを表示しました")
+            PC88Logger.app.debug("スクリーンテストを表示しました")
             
             // エミュレータを開始
             emulatorCore?.start()
-            print("エミュレータを開始しました（初期化直後）")
+            PC88Logger.app.debug("エミュレータを開始しました（初期化直後）")
             
             // 画面を即座に更新
             forceScreenUpdate()
-            print("画面を強制更新しました（開始直後）")
+            PC88Logger.app.debug("画面を強制更新しました（開始直後）")
             
             // クロックモードを再設定してリセット（これが重要）
             core.setCPUClockMode(.mode4MHz)
-            print("クロックモードを再設定しました: 4MHz")
+            PC88Logger.app.debug("クロックモードを再設定しました: 4MHz")
             
             // 画面更新のタイミングを調整
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                 self?.forceScreenUpdate()
-                print("画面を強制更新しました（初期化後0.1秒）")
+                PC88Logger.app.debug("画面を強制更新しました（初期化後0.1秒）")
                 
                 // エミュレーションが開始されているか確認
                 if self?.emulatorCore?.getState() != .running {
                     self?.emulatorCore?.start()
-                    print("エミュレーションを再度開始しました（初期化後0.1秒）")
+                    PC88Logger.app.debug("エミュレーションを再度開始しました（初期化後0.1秒）")
                 }
             }
             
@@ -270,17 +270,17 @@ class EmulatorViewInternalModel: ObservableObject {
                 if let self = self, let core = self.emulatorCore as? PC88EmulatorCore {
                     // クロックモードを再設定
                     core.setCPUClockMode(.mode4MHz)
-                    print("クロックモードを再設定しました: 4MHz（初期化後0.3秒）")
+                    PC88Logger.app.debug("クロックモードを再設定しました: 4MHz（初期化後0.3秒）")
                     
                     // エミュレーションが開始されているか確認
                     if self.emulatorCore?.getState() != .running {
                         self.emulatorCore?.start()
-                        print("エミュレーションを再度開始しました（初期化後0.3秒）")
+                        PC88Logger.app.debug("エミュレーションを再度開始しました（初期化後0.3秒）")
                     }
                     
                     // 画面を強制更新
                     self.forceScreenUpdate()
-                    print("画面を強制更新しました（初期化後0.3秒）")
+                    PC88Logger.app.debug("画面を強制更新しました（初期化後0.3秒）")
                 }
             }
             

@@ -142,7 +142,7 @@ class YM2203Emulator: SoundChipEmulating {
         if let audioEngine = audioEngine, !audioEngine.isRunning {
             startAudio()
         }
-        print("YM2203サウンドチップを開始しました")
+        PC88Logger.sound.debug("YM2203サウンドチップを開始しました")
     }
     
     /// サウンドチップを停止
@@ -164,7 +164,7 @@ class YM2203Emulator: SoundChipEmulating {
             ssgChannels[i] = SSGChannelState()
         }
         
-        print("YM2203サウンドチップを停止しました")
+        PC88Logger.sound.debug("YM2203サウンドチップを停止しました")
     }
     
     /// サウンドチップを一時停止
@@ -173,7 +173,7 @@ class YM2203Emulator: SoundChipEmulating {
         if let audioEngine = audioEngine, audioEngine.isRunning {
             audioEngine.pause()
         }
-        print("YM2203サウンドチップを一時停止しました")
+        PC88Logger.sound.debug("YM2203サウンドチップを一時停止しました")
     }
     
     /// サウンドチップを再開
@@ -182,7 +182,7 @@ class YM2203Emulator: SoundChipEmulating {
         if let audioEngine = audioEngine, !audioEngine.isRunning {
             startAudio()
         }
-        print("YM2203サウンドチップを再開しました")
+        PC88Logger.sound.debug("YM2203サウンドチップを再開しました")
     }
     
     /// サウンドチップの更新
@@ -212,7 +212,7 @@ class YM2203Emulator: SoundChipEmulating {
                 setupAudio()
                 startAudio()
             }
-            print("YM2203サウンド品質モードを高品質に設定しました")
+            PC88Logger.sound.debug("YM2203サウンド品質モードを高品質に設定しました")
             
         case .medium:
             // 中品質モードの設定
@@ -223,7 +223,7 @@ class YM2203Emulator: SoundChipEmulating {
                 setupAudio()
                 startAudio()
             }
-            print("YM2203サウンド品質モードを中品質に設定しました")
+            PC88Logger.sound.debug("YM2203サウンド品質モードを中品質に設定しました")
             
         case .low:
             // 低品質モードの設定
@@ -234,7 +234,7 @@ class YM2203Emulator: SoundChipEmulating {
                 setupAudio()
                 startAudio()
             }
-            print("YM2203サウンド品質モードを低品質に設定しました")
+            PC88Logger.sound.debug("YM2203サウンド品質モードを低品質に設定しました")
         }
     }
     
@@ -300,7 +300,7 @@ class YM2203Emulator: SoundChipEmulating {
         do {
             try audioEngine.start()
         } catch {
-            print("オーディオエンジンの開始に失敗: \(error)")
+            PC88Logger.sound.error("オーディオエンジンの開始に失敗: \(error)")
         }
     }
     
