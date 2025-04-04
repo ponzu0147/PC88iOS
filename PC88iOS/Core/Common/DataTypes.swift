@@ -25,14 +25,14 @@ typealias InterruptVector = UInt8
 /// CPUレジスタ
 enum CPURegister: String, CaseIterable {
     // 8ビットレジスタ
-    case a, b, c, d, e, h, l
-    case f  // フラグレジスタ
+    case regA, regB, regC, regD, regE, regH, regL
+    case regF  // フラグレジスタ
     
     // 16ビットレジスタペア
-    case af, bc, de, hl
-    case ix, iy  // インデックスレジスタ
-    case sp      // スタックポインタ
-    case pc      // プログラムカウンタ
+    case regAF, regBC, regDE, regHL
+    case regIX, regIY  // インデックスレジスタ
+    case regSP      // スタックポインタ
+    case regPC      // プログラムカウンタ
 }
 
 /// CPUフラグ

@@ -11,34 +11,34 @@ import Foundation
 struct Note {
     /// 音名
     enum NoteName: Int, CaseIterable {
-        case c = 0
+        case noteC = 0
         case cSharp = 1
-        case d = 2
+        case noteD = 2
         case dSharp = 3
-        case e = 4
-        case f = 5
+        case noteE = 4
+        case noteF = 5
         case fSharp = 6
-        case g = 7
+        case noteG = 7
         case gSharp = 8
-        case a = 9
+        case noteA = 9
         case aSharp = 10
-        case b = 11
+        case noteB = 11
         
         /// 文字列表現
         var description: String {
             switch self {
-            case .c: return "C"
+            case .noteC: return "C"
             case .cSharp: return "C#"
-            case .d: return "D"
+            case .noteD: return "D"
             case .dSharp: return "D#"
-            case .e: return "E"
-            case .f: return "F"
+            case .noteE: return "E"
+            case .noteF: return "F"
             case .fSharp: return "F#"
-            case .g: return "G"
+            case .noteG: return "G"
             case .gSharp: return "G#"
-            case .a: return "A"
+            case .noteA: return "A"
             case .aSharp: return "A#"
-            case .b: return "B"
+            case .noteB: return "B"
             }
         }
         
@@ -73,9 +73,9 @@ struct Note {
     /// 周波数を取得
     var frequency: Double {
         // A4 (440Hz) を基準とする
-        let a4 = 440.0
-        let n = Double(name.rawValue - NoteName.a.rawValue) + Double(octave - 4) * 12.0
-        return a4 * pow(2.0, n / 12.0)
+        let baseFreq = 440.0
+        let semitoneOffset = Double(name.rawValue - NoteName.noteA.rawValue) + Double(octave - 4) * 12.0
+        return baseFreq * pow(2.0, semitoneOffset / 12.0)
     }
     
     /// MIDIノート番号を取得

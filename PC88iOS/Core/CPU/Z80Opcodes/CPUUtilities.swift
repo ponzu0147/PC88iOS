@@ -11,11 +11,11 @@ import Foundation
 
 /// パリティチェック（偶数なら真）
 func parityEven(_ value: UInt8) -> Bool {
-    var v = value
-    v ^= v >> 4
-    v ^= v >> 2
-    v ^= v >> 1
-    return (v & 1) == 0
+    var bitValue = value
+    bitValue ^= bitValue >> 4
+    bitValue ^= bitValue >> 2
+    bitValue ^= bitValue >> 1
+    return (bitValue & 1) == 0
 }
 
 /// Z80 CPUのマシンサイクル種類
@@ -92,9 +92,15 @@ struct InstructionCycles {
     }
     
     /// 一般的な命令パターンのサイクル情報を作成
-    static func standard(opcodeFetch: Bool = true, memoryReads: Int = 0, memoryWrites: Int = 0, 
-                         ioReads: Int = 0, ioWrites: Int = 0, internalCycles: Int = 0,
-                         interruptAcknowledge: Bool = false) -> InstructionCycles {
+    static func standard(
+        opcodeFetch: Bool = true, 
+        memoryReads: Int = 0, 
+        memoryWrites: Int = 0, 
+        ioReads: Int = 0, 
+        ioWrites: Int = 0, 
+        internalCycles: Int = 0,
+        interruptAcknowledge: Bool = false
+    ) -> InstructionCycles {
         var cycleInfos: [CycleInfo] = []
         
         // オペコードフェッチサイクル（M1）
@@ -139,93 +145,129 @@ struct InstructionCycles {
 /// Z80 CPUの命令サイクル定義
 struct Z80InstructionCycles {
     // 8ビット転送命令のサイクル
-    static let LD_r_r = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let LD_r_n = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let LD_r_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let LD_HL_r = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 1) // 2M, 7T
-    static let LD_HL_n = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1) // 3M, 10T
-    static let LD_A_BC = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let LD_A_DE = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let LD_A_nn = InstructionCycles.standard(opcodeFetch: true, memoryReads: 3) // 4M, 13T
-    static let LD_BC_A = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 1) // 2M, 7T
-    static let LD_DE_A = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 1) // 2M, 7T
-    static let LD_nn_A = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 1) // 4M, 13T
+    static let loadRegToReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let loadRegToVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let loadRegToHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let loadHLToReg = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 1) // 2M, 7T
+    static let loadHLToVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1) // 3M, 10T
+    static let loadAToBC = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let loadAToDE = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let loadAToAddr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 3) // 4M, 13T
+    static let loadBCToA = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 1) // 2M, 7T
+    static let loadDEToA = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 1) // 2M, 7T
+    static let loadAddrToA = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 1) // 4M, 13T
+    static let loadAddrToHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 2) // 5M, 16T
+    static let loadHLToAddr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 2) // 5M, 16T
     
     // 16ビット転送命令のサイクル
-    static let LD_rr_nn = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
-    static let LD_HL_nn = InstructionCycles.standard(opcodeFetch: true, memoryReads: 5) // 6M, 16T
-    static let LD_nn_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 2) // 5M, 16T
-    static let LD_SP_HL = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
+    static let loadRegPairToVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    static let loadHLToAddr16 = InstructionCycles.standard(opcodeFetch: true, memoryReads: 5) // 6M, 16T
+    static let loadAddr16ToHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 2) // 5M, 16T
+    static let loadSPToHL = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
     
     // 算術演算命令のサイクル
-    static let ADD_A_r = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let ADD_A_n = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let ADD_A_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let ADC_A_r = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let ADC_A_n = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let ADC_A_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let SUB_r = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let SUB_n = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let SUB_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let SBC_A_r = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let SBC_A_n = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let SBC_A_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let INC_r = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let INC_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1) // 3M, 11T
-    static let DEC_r = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let DEC_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1) // 3M, 11T
+    static let addAToReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let addAToVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let addAToHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let addWithCarryAToReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let addWithCarryAToVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let addWithCarryAToHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let subtractReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let subtractVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let subtractHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let subtractWithCarryAToReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let subtractWithCarryAToVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let subtractWithCarryAToHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let incrementReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let incrementHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1) // 3M, 11T
+    static let decrementReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let decrementHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1) // 3M, 11T
     
     // 論理演算命令のサイクル
-    static let AND_r = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let AND_n = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let AND_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let OR_r = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let OR_n = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let OR_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let XOR_r = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let XOR_n = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let XOR_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let CP_r = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let CP_n = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
-    static let CP_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let logicalAndReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let logicalAndVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let logicalAndHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let logicalOrReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let logicalOrVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let logicalOrHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let logicalXorReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let logicalXorVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let logicalXorHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let compareReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let compareVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let compareHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
     
     // スタック操作命令のサイクル
-    static let PUSH_rr = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 2) // 3M, 11T
-    static let POP_rr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    static let pushRegPair = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 2) // 3M, 11T
+    static let popRegPair = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
     
     // レジスタペア操作命令のサイクル
-    static let INC_rr = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
-    static let DEC_rr = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
-    static let ADD_HL_rr = InstructionCycles.standard(opcodeFetch: true, internalCycles: 7) // 3M, 11T
+    static let incrementRegPair = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
+    static let decrementRegPair = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
+    static let addHLToRegPair = InstructionCycles.standard(opcodeFetch: true, internalCycles: 7) // 3M, 11T
     
     // ジャンプ命令のサイクル
-    static let JP_nn = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
-    static let JP_cc_nn = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
-    static let JR_e = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 5) // 3M, 12T
-    static let JR_cc_e = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 5) // 3M, 12T
-    static let DJNZ_e = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 5) // 3M, 13T
+    static let jumpToAddr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    static let jumpCondToAddr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    static let jumpRelative = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 5) // 3M, 12T
+    static let jumpRelativeCond = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 5) // 3M, 12T
+    static let decrJumpNotZero = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 5) // 3M, 13T
     
     // その他の命令のサイクル
-    static let NOP = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let CPL = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let RET = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    static let noOperation = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let complementA = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let returnFromSub = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
     
     // プレフィックス命令のサイクル
-    static let IX_PREFIX = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let IY_PREFIX = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let LD_IY_nn = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 4M, 14T
+    static let indexXPrefix = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let indexYPrefix = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let loadIYToVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 4M, 14T
     
     // 制御命令のサイクル
-    static let CALL_nn = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 2, internalCycles: 1) // 5M, 17T
-    static let CALL_cc_nn = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T (条件不成立時)
-    static let CALL_cc_nn_taken = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 2, internalCycles: 1) // 5M, 17T (条件成立時)
-    static let RET_cc = InstructionCycles.standard(opcodeFetch: true, internalCycles: 1) // 1M, 5T (条件不成立時)
-    static let RET_cc_taken = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, internalCycles: 1) // 3M, 11T (条件成立時)
+    // サブルーチン呼び出し: 5M, 17T
+    static let callSubroutine = InstructionCycles.standard(
+        opcodeFetch: true, 
+        memoryReads: 2, 
+        memoryWrites: 2, 
+        internalCycles: 1
+    )
+    // 条件付きサブルーチン呼び出し（条件不成立時）: 3M, 10T
+    static let callCondSubroutine = InstructionCycles.standard(
+        opcodeFetch: true, 
+        memoryReads: 2
+    )
+    // 条件成立時の呼び出し: 5M, 17T
+    static let callCondSubroutineTaken = InstructionCycles.standard(
+        opcodeFetch: true, 
+        memoryReads: 2, 
+        memoryWrites: 2, 
+        internalCycles: 1
+    )
+    // 条件付き戻り（条件不成立時）: 1M, 5T
+    static let returnCond = InstructionCycles.standard(
+        opcodeFetch: true, 
+        internalCycles: 1
+    )
+    // 条件付き戻り（条件成立時）: 3M, 11T
+    static let returnCondTaken = InstructionCycles.standard(
+        opcodeFetch: true, 
+        memoryReads: 2, 
+        internalCycles: 1
+    )
     
     // その他の命令のサイクル
-    static let HALT = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let DI = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let EI = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
-    static let IN_A_n = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, ioReads: 1) // 3M, 11T
-    static let OUT_n_A = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, ioWrites: 1) // 3M, 11T
+    // CPU停止: 1M, 4T
+    static let haltCPU = InstructionCycles.standard(opcodeFetch: true)
+    // 割り込み無効化: 1M, 4T
+    static let disableInterrupt = InstructionCycles.standard(opcodeFetch: true)
+    // 割り込み有効化: 1M, 4T
+    static let enableInterrupt = InstructionCycles.standard(opcodeFetch: true)
+    static let inputAFromPort = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, ioReads: 1) // 3M, 11T
+    static let outputAToPort = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, ioWrites: 1) // 3M, 11T
+    
+    // 旧定数名（互換性のため）
+    static let NOP = noOperation
+    static let HALT = haltCPU
+    static let DI = disableInterrupt
+    static let EI = enableInterrupt
 }

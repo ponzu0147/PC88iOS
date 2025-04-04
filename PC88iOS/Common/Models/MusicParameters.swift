@@ -36,7 +36,7 @@ struct MusicParameters {
     /// 初期化
     init(title: String? = nil, composer: String? = nil, tempo: Int = 120,
          timeSignature: TimeSignature = TimeSignature(beats: 4, beatType: 4),
-         key: MusicKey = MusicKey(note: Note.NoteName.c, isMinor: false),
+         key: MusicKey = MusicKey(note: Note.NoteName.noteC, isMinor: false),
          parts: [PartInfo] = [], loopInfo: LoopInfo? = nil, voiceData: [VoiceData] = []) {
         self.title = title
         self.composer = composer

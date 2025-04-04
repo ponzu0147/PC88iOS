@@ -13,13 +13,13 @@ struct OUTInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
         // PC-88の実装ではポート番号は8ビットであるため、ポート番号のみを使用
-        io.writePort(port, value: registers.a)
+        io.writePort(port, value: registers.regA)
         return cycles
     }
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 11 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.OUT_n_A }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.outputAToPort }
     var description: String { return "OUT (\(String(format: "0x%02X", port))),A" }
 }
 
@@ -29,12 +29,12 @@ struct INInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
         // PC-88の実装ではポート番号は8ビットであるため、ポート番号のみを使用
-        registers.a = io.readPort(port)
+        registers.regA = io.readPort(port)
         return cycles
     }
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 11 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.IN_A_n }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.inputAFromPort }
     var description: String { return "IN A,(\(String(format: "0x%02X", port)))" }
 }

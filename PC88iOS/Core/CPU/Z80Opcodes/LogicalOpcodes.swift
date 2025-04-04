@@ -13,7 +13,7 @@ struct ANDInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.AND_r }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.logicalAndReg }
     var description: String { return "AND A," + sourceDescription() }
     
     private func sourceDescription() -> String {
@@ -31,16 +31,16 @@ struct ANDInstruction: Z80Instruction {
         switch source {
         case .register(let reg):
             switch reg {
-            case .a: value = registers.a
-            case .b: value = registers.b
-            case .c: value = registers.c
-            case .d: value = registers.d
-            case .e: value = registers.e
-            case .h: value = registers.h
-            case .l: value = registers.l
+            case .regA: value = registers.regA
+            case .regB: value = registers.regB
+            case .regC: value = registers.regC
+            case .regD: value = registers.regD
+            case .regE: value = registers.regE
+            case .regH: value = registers.regH
+            case .regL: value = registers.regL
             }
         case .memory:
-            value = memory.readByte(at: registers.hl)
+            value = memory.readByte(at: registers.regHL)
             cycles = 7
         case .immediate(let imm):
             value = imm
@@ -48,13 +48,13 @@ struct ANDInstruction: Z80Instruction {
         }
         
         // 結果の設定
-        registers.a &= value
+        registers.regA &= value
         
         // フラグの設定
-        registers.setFlag(Z80Registers.Flags.zero, value: registers.a == 0)
-        registers.setFlag(Z80Registers.Flags.sign, value: (registers.a & 0x80) != 0)
+        registers.setFlag(Z80Registers.Flags.zero, value: registers.regA == 0)
+        registers.setFlag(Z80Registers.Flags.sign, value: (registers.regA & 0x80) != 0)
         registers.setFlag(Z80Registers.Flags.halfCarry, value: true)
-        registers.setFlag(Z80Registers.Flags.parity, value: parityEven(registers.a))
+        registers.setFlag(Z80Registers.Flags.parity, value: parityEven(registers.regA))
         registers.setFlag(Z80Registers.Flags.subtract, value: false)
         registers.setFlag(Z80Registers.Flags.carry, value: false)
         
@@ -70,7 +70,7 @@ struct ORInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.OR_r }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.logicalOrReg }
     var description: String { return "OR A," + sourceDescription() }
     
     private func sourceDescription() -> String {
@@ -88,16 +88,16 @@ struct ORInstruction: Z80Instruction {
         switch source {
         case .register(let reg):
             switch reg {
-            case .a: value = registers.a
-            case .b: value = registers.b
-            case .c: value = registers.c
-            case .d: value = registers.d
-            case .e: value = registers.e
-            case .h: value = registers.h
-            case .l: value = registers.l
+            case .regA: value = registers.regA
+            case .regB: value = registers.regB
+            case .regC: value = registers.regC
+            case .regD: value = registers.regD
+            case .regE: value = registers.regE
+            case .regH: value = registers.regH
+            case .regL: value = registers.regL
             }
         case .memory:
-            value = memory.readByte(at: registers.hl)
+            value = memory.readByte(at: registers.regHL)
             cycles = 7
         case .immediate(let imm):
             value = imm
@@ -105,13 +105,13 @@ struct ORInstruction: Z80Instruction {
         }
         
         // 結果の設定
-        registers.a |= value
+        registers.regA |= value
         
         // フラグの設定
-        registers.setFlag(Z80Registers.Flags.zero, value: registers.a == 0)
-        registers.setFlag(Z80Registers.Flags.sign, value: (registers.a & 0x80) != 0)
+        registers.setFlag(Z80Registers.Flags.zero, value: registers.regA == 0)
+        registers.setFlag(Z80Registers.Flags.sign, value: (registers.regA & 0x80) != 0)
         registers.setFlag(Z80Registers.Flags.halfCarry, value: false)
-        registers.setFlag(Z80Registers.Flags.parity, value: parityEven(registers.a))
+        registers.setFlag(Z80Registers.Flags.parity, value: parityEven(registers.regA))
         registers.setFlag(Z80Registers.Flags.subtract, value: false)
         registers.setFlag(Z80Registers.Flags.carry, value: false)
         
@@ -127,7 +127,7 @@ struct XORInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.XOR_r }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.logicalXorReg }
     var description: String { return "XOR A," + sourceDescription() }
     
     private func sourceDescription() -> String {
@@ -145,16 +145,16 @@ struct XORInstruction: Z80Instruction {
         switch source {
         case .register(let reg):
             switch reg {
-            case .a: value = registers.a
-            case .b: value = registers.b
-            case .c: value = registers.c
-            case .d: value = registers.d
-            case .e: value = registers.e
-            case .h: value = registers.h
-            case .l: value = registers.l
+            case .regA: value = registers.regA
+            case .regB: value = registers.regB
+            case .regC: value = registers.regC
+            case .regD: value = registers.regD
+            case .regE: value = registers.regE
+            case .regH: value = registers.regH
+            case .regL: value = registers.regL
             }
         case .memory:
-            value = memory.readByte(at: registers.hl)
+            value = memory.readByte(at: registers.regHL)
             cycles = 7
         case .immediate(let imm):
             value = imm
@@ -162,13 +162,13 @@ struct XORInstruction: Z80Instruction {
         }
         
         // 結果の設定
-        registers.a ^= value
+        registers.regA ^= value
         
         // フラグの設定
-        registers.setFlag(Z80Registers.Flags.zero, value: registers.a == 0)
-        registers.setFlag(Z80Registers.Flags.sign, value: (registers.a & 0x80) != 0)
+        registers.setFlag(Z80Registers.Flags.zero, value: registers.regA == 0)
+        registers.setFlag(Z80Registers.Flags.sign, value: (registers.regA & 0x80) != 0)
         registers.setFlag(Z80Registers.Flags.halfCarry, value: false)
-        registers.setFlag(Z80Registers.Flags.parity, value: parityEven(registers.a))
+        registers.setFlag(Z80Registers.Flags.parity, value: parityEven(registers.regA))
         registers.setFlag(Z80Registers.Flags.subtract, value: false)
         registers.setFlag(Z80Registers.Flags.carry, value: false)
         
@@ -184,7 +184,7 @@ struct CPInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.CP_r }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.compareReg }
     var description: String { return "CP A," + sourceDescription() }
     
     private func sourceDescription() -> String {
@@ -202,16 +202,16 @@ struct CPInstruction: Z80Instruction {
         switch source {
         case .register(let reg):
             switch reg {
-            case .a: value = registers.a
-            case .b: value = registers.b
-            case .c: value = registers.c
-            case .d: value = registers.d
-            case .e: value = registers.e
-            case .h: value = registers.h
-            case .l: value = registers.l
+            case .regA: value = registers.regA
+            case .regB: value = registers.regB
+            case .regC: value = registers.regC
+            case .regD: value = registers.regD
+            case .regE: value = registers.regE
+            case .regH: value = registers.regH
+            case .regL: value = registers.regL
             }
         case .memory:
-            value = memory.readByte(at: registers.hl)
+            value = memory.readByte(at: registers.regHL)
             cycles = 7
         case .immediate(let imm):
             value = imm
@@ -219,13 +219,13 @@ struct CPInstruction: Z80Instruction {
         }
         
         // ハーフキャリーの計算
-        let halfCarry = (registers.a & 0x0F) < (value & 0x0F)
+        let halfCarry = (registers.regA & 0x0F) < (value & 0x0F)
         
         // キャリーの計算
-        let carry = registers.a < value
+        let carry = registers.regA < value
         
         // 結果の計算（Aは変更しない）
-        let result = registers.a &- value
+        let result = registers.regA &- value
         
         // フラグの設定
         registers.setFlag(Z80Registers.Flags.zero, value: result == 0)

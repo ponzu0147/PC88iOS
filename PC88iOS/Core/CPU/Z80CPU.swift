@@ -6,6 +6,38 @@
 //
 
 import Foundation
+import os.log
+
+/// アイドルループ検出用のフィルタプロトコル
+protocol InstructionTraceFilterProtocol {
+    func shouldTrace(programCounter: UInt16) -> Bool
+}
+
+/// A temporary filter that limits trace count
+class TemporaryTraceFilter: InstructionTraceFilterProtocol {
+    weak var cpu: Z80CPU?
+    let maxCount: Int
+    let originalFilter: InstructionTraceFilterProtocol?
+    let originalTraceEnabled: Bool
+    
+    init(cpu: Z80CPU, maxCount: Int, originalFilter: InstructionTraceFilterProtocol?, originalTraceEnabled: Bool) {
+        self.cpu = cpu
+        self.maxCount = maxCount
+        self.originalFilter = originalFilter
+        self.originalTraceEnabled = originalTraceEnabled
+    }
+    
+    func shouldTrace(programCounter: UInt16) -> Bool {
+        guard let cpu = cpu else { return false }
+        cpu.instructionTraceCount += 1
+        if cpu.instructionTraceCount >= maxCount {
+            cpu.instructionTraceEnabled = originalTraceEnabled
+            cpu.instructionTraceFilter = originalFilter
+            return false
+        }
+        return true
+    }
+}
 
 /// Z80 CPUの実装
 class Z80CPU: CPUExecuting {
@@ -16,7 +48,7 @@ class Z80CPU: CPUExecuting {
     private let memory: MemoryAccessing
     
     // I/Oアクセス
-    private let io: IOAccessing
+    private let ioDevice: IOAccessing
     
     // 命令デコーダ
     private let decoder = Z80InstructionDecoder()
@@ -39,13 +71,13 @@ class Z80CPU: CPUExecuting {
     private var idleLoopCycles: Int = 0
     private var idleLoopCounter: Int = 0
     private var instructionHistory: [(pc: UInt16, opcode: UInt8)] = []
-    private var idleLoopStartTime: Date? = nil
+    private var idleLoopStartTime: Date?
     private var idleLoopDuration: TimeInterval = 0
-    private var idleLoopLastReportTime: Date? = nil
+    private var idleLoopLastReportTime: Date?
     private var idleLoopReportInterval: TimeInterval = 5.0 // 5秒ごとにレポート
     
     // 命令トレース用プロパティ
-    private var instructionTraceFilter: ((UInt16) -> Bool)? = nil
+    private var instructionTraceFilter: InstructionTraceFilterProtocol?
     
     // アイドル検出の閾値（小さいほど検出しやすい）
     private var idleDetectionThreshold: Int = 5
@@ -77,9 +109,9 @@ class Z80CPU: CPUExecuting {
     private var currentInstructionCycles: InstructionCycles?
     
     /// 初期化
-    init(memory: MemoryAccessing, io: IOAccessing, cpuClock: PC88CPUClock = PC88CPUClock()) {
+    init(memory: MemoryAccessing, ioDevice: IOAccessing, cpuClock: PC88CPUClock = PC88CPUClock()) {
         self.memory = memory
-        self.io = io
+        self.ioDevice = ioDevice
         self.cpuClock = cpuClock
         
         // クロックモード変更時の処理を設定
@@ -118,7 +150,7 @@ class Z80CPU: CPUExecuting {
         // 命令実行タイミングをリセット
         resetInstructionTiming()
         
-        print("CPUがクロックモード変更を検出: \(mode == .mode4MHz ? "4MHz" : "8MHz")")
+        PC88Logger.cpu.info("CPUがクロックモード変更を検出: \(mode == .mode4MHz ? "4MHz" : "8MHz")")
     }
     
     /// 命令実行タイミングをリセット
@@ -180,53 +212,17 @@ class Z80CPU: CPUExecuting {
         
         // アイドルループが検出されている場合
         if idleLoopDetected {
-            // アイドルループのサイクル数を消費して、実際の命令実行をスキップ
-            totalCycles = totalCycles &+ UInt64(idleLoopCycles)
-            idleLoopCounter += 1
-            
-            // 定期的にアイドルループの状態を報告
-            if idleLoopCounter % 1000 == 0 {
-                printIdleLoopInfo()
-            }
-            
-            // 定期的にアイドルループから抜け出して実際の状態を確認（500回に1回）
-            if idleLoopCounter >= 500 {
-                print("アイドルループから一時的に抜け出して状態を確認します (\(idleLoopCounter)回実行後)")
-                idleLoopDetected = false
-                idleLoopCounter = 0
-                
-                // 命令トレースを一時的に有効化して状態を確認
-                let wasTraceEnabled = instructionTraceEnabled
-                instructionTraceEnabled = true
-                instructionTraceCount = 0
-                
-                // 20命令後に自動的にトレースを元の状態に戻すフィルタを設定
-                let originalFilter = instructionTraceFilter
-                instructionTraceFilter = { _ in
-                    self.instructionTraceCount += 1
-                    if self.instructionTraceCount >= 20 {
-                        self.instructionTraceEnabled = wasTraceEnabled
-                        self.instructionTraceFilter = originalFilter
-                        return false
-                    }
-                    return true
-                }
-            } else if idleLoopCounter > 10 {
-                // アイドル状態では設定された時間だけスリープしてCPU負荷を下げる
-                Thread.sleep(forTimeInterval: idleSleepTime)
-            }
-            
-            return idleLoopCycles
+            return handleIdleLoop()
         }
         
         // 命令フェッチ
-        let pc = registers.pc
-        let opcode = memory.readByte(at: pc)
-        registers.pc = registers.pc &+ 1 // 安全な加算を使用
+        let programCounter = registers.regPC
+        let opcode = memory.readByte(at: programCounter)
+        registers.regPC = registers.regPC &+ 1 // 安全な加算を使用
         
         // アイドル検出のための履歴更新
         if idleDetectionEnabled {
-            updateInstructionHistory(pc: pc, opcode: opcode)
+            updateInstructionHistory(programCounter: programCounter, opcode: opcode)
         }
         
         // 命令実行
@@ -294,7 +290,7 @@ class Z80CPU: CPUExecuting {
         
         // 安全カウンタが上限に達した場合は警告を出す
         if safetyCounter >= maxIterations {
-            print("警告: CPU実行の安全上限に達しました")
+            PC88Logger.cpu.warning("警告: CPU実行の安全上限に達しました")
         }
         
         return executedCycles
@@ -319,19 +315,19 @@ class Z80CPU: CPUExecuting {
     func enableInstructionTrace() {
         instructionTraceEnabled = true
         instructionTraceCount = 0
-        print("\n*** 命令トレースを開始します (PC=\(String(format: "%04X", registers.pc))) ***\n")
+        PC88Logger.cpu.debug("*** 命令トレースを開始します (PC=\(String(format: "%04X", self.registers.regPC))) ***")
     }
     
     /// 命令トレースを無効化
     func disableInstructionTrace() {
         instructionTraceEnabled = false
-        print("\n*** 命令トレースを停止しました ***\n")
+        PC88Logger.cpu.debug("*** 命令トレースを停止しました ***")
     }
     
     /// プログラムカウンタを設定
     func setProgramCounter(_ address: UInt16) {
-        registers.pc = address
-        print("プログラムカウンタを設定: 0x\(String(format: "%04X", address))")
+        registers.regPC = address
+        PC88Logger.cpu.debug("プログラムカウンタを設定: 0x\(String(format: "%04X", address))")
     }
     
     /// クロックモードに基づいてサイクル数を調整
@@ -365,6 +361,50 @@ class Z80CPU: CPUExecuting {
     /// CPUがホルト状態かどうかを取得
     func isHalted() -> Bool {
         return halted
+    }
+    
+    /// アイドルループを処理する
+    private func handleIdleLoop() -> Int {
+        // アイドルループのサイクル数を消費して、実際の命令実行をスキップ
+        totalCycles = totalCycles &+ UInt64(idleLoopCycles)
+        idleLoopCounter += 1
+        
+        // 定期的にアイドルループの状態を報告
+        if idleLoopCounter % 1000 == 0 {
+            printIdleLoopInfo()
+        }
+        
+        // 定期的にアイドルループから抜け出して実際の状態を確認（500回に1回）
+        if self.idleLoopCounter >= 500 {
+            exitIdleLoopForStateCheck()
+        } else if idleLoopCounter > 10 {
+            // アイドル状態では設定された時間だけスリープしてCPU負荷を下げる
+            Thread.sleep(forTimeInterval: idleSleepTime)
+        }
+        
+        return idleLoopCycles
+    }
+    
+    /// アイドルループから一時的に抜け出して状態を確認する
+    private func exitIdleLoopForStateCheck() {
+        PC88Logger.cpu.info("アイドルループから一時的に抜け出して状態を確認します (\(self.idleLoopCounter)回実行後)")
+        idleLoopDetected = false
+        idleLoopCounter = 0
+        
+        // 命令トレースを一時的に有効化して状態を確認
+        let wasTraceEnabled = instructionTraceEnabled
+        instructionTraceEnabled = true
+        instructionTraceCount = 0
+        
+        // 20命令後に自動的にトレースを元の状態に戻すフィルタを設定
+        let originalFilter = instructionTraceFilter
+        
+        instructionTraceFilter = TemporaryTraceFilter(
+            cpu: self,
+            maxCount: 20,
+            originalFilter: originalFilter,
+            originalTraceEnabled: wasTraceEnabled
+        )
     }
     
     /// アイドル検出の有効/無効を設定
@@ -409,7 +449,7 @@ class Z80CPU: CPUExecuting {
     /// 相対ジャンプ
     func jump(by offset: Int8) {
         // PCにオフセットを加算
-        registers.pc = UInt16(Int(registers.pc) + Int(offset))
+        registers.regPC = UInt16(Int(registers.regPC) + Int(offset))
     }
     
     // MARK: - Private Methods
@@ -417,70 +457,14 @@ class Z80CPU: CPUExecuting {
     /// 命令実行
     private func executeInstruction(_ opcode: UInt8) -> Int {
         // デコード
-        let instruction = decoder.decode(opcode, memory: memory, pc: registers.pc)
-                // 命令トレース機能
-        if instructionTraceEnabled && instructionTraceCount < maxInstructionTraceCount {
-            // フィルタが設定されている場合はそれを適用
-            let shouldTrace = instructionTraceFilter?(registers.pc) ?? true
-            
-            if shouldTrace {
-                // 命令の詳細を表示
-                let pc = registers.pc
-                let opcodeStr = String(format: "%02X", opcode)
-                let instructionDesc = instruction.description
-                let regA = String(format: "%02X", registers.a)
-                let regBC = String(format: "%04X", registers.bc)
-                let regDE = String(format: "%04X", registers.de)
-                let regHL = String(format: "%04X", registers.hl)
-                let regSP = String(format: "%04X", registers.sp)
-                let regF = String(format: "%02X", registers.f)
-                
-                // メモリ内容も表示（PC周辺の数バイト）
-                var memoryDump = ""
-                for offset in 0..<4 {
-                    let addr = pc &+ UInt16(offset)
-                    if addr < 0xFFFF {
-                        let byte = memory.readByte(at: addr)
-                        memoryDump += String(format: "%02X ", byte)
-                    }
-                }
-                
-                print("TRACE[\(instructionTraceCount)]: PC=\(String(format: "%04X", pc)) OP=\(opcodeStr) \(instructionDesc) | A=\(regA) F=\(regF) BC=\(regBC) DE=\(regDE) HL=\(regHL) SP=\(regSP) | MEM=[\(memoryDump)]")
-                
-                instructionTraceCount += 1
-                
-                // トレース数が最大に達したら無効化
-                if instructionTraceCount >= maxInstructionTraceCount {
-                    print("\n命令トレースを終了しました（最大数に達しました）\n")
-                    instructionTraceEnabled = false
-                }
-            }
-        }
+        let instruction = decoder.decode(opcode, memory: memory, programCounter: registers.regPC)
+        
+        // トレース処理
+        handleInstructionTrace(opcode, instruction)
         
         // 未実装命令の場合は特別処理
         if let unimplemented = instruction as? UnimplementedInstruction {
-            // 安全なPCの計算
-            let previousPC = registers.pc > 0 ? registers.pc - 1 : 0
-            
-            // 詳細なデバッグ情報を出力
-            print("警告: 未実装の命令 0x\(String(opcode, radix: 16, uppercase: true)) at PC=0x\(String(previousPC, radix: 16, uppercase: true))")
-            
-            // 周辺のメモリ内容を表示（命令列を確認するため）
-            let startAddr = max(0, Int(previousPC) - 5)
-            let endAddr = min(0xFFFF, Int(previousPC) + 10)
-            var memoryDump = "メモリダンプ ["
-            for addr in startAddr...endAddr {
-                let byte = memory.readByte(at: UInt16(addr))
-                memoryDump += "\(addr == Int(previousPC) ? "[" : "")0x\(String(byte, radix: 16, uppercase: true))\(addr == Int(previousPC) ? "]" : "") "
-            }
-            memoryDump += "]" 
-            print(memoryDump)
-            
-            // レジスタ状態も表示
-            print("レジスタ状態: A=0x\(String(registers.a, radix: 16)) BC=0x\(String(UInt16(registers.b) << 8 | UInt16(registers.c), radix: 16)) DE=0x\(String(UInt16(registers.d) << 8 | UInt16(registers.e), radix: 16)) HL=0x\(String(registers.hl, radix: 16)) SP=0x\(String(registers.sp, radix: 16))")
-            
-            // PCを進めて次の命令に進む
-            return unimplemented.cycles
+            return handleUnimplementedInstruction(opcode, unimplemented)
         }
         
         // 命令の詳細なサイクル情報を取得
@@ -488,7 +472,7 @@ class Z80CPU: CPUExecuting {
         currentMCycle = 0
         
         // 実行
-        let cycles = instruction.execute(cpu: self, registers: &registers, memory: memory, io: io)
+        let cycles = instruction.execute(cpu: self, registers: &registers, memory: memory, io: ioDevice)
         
         // サイクル情報をリセット
         currentInstructionCycles = nil
@@ -496,6 +480,127 @@ class Z80CPU: CPUExecuting {
         currentTState = 0
         
         return cycles
+    }
+    
+    /// 命令トレース処理
+    private func handleInstructionTrace(_ opcode: UInt8, _ instruction: Z80Instruction) {
+        guard instructionTraceEnabled && instructionTraceCount < maxInstructionTraceCount else { return }
+        
+        // フィルタが設定されている場合はそれを適用
+        let shouldTrace = instructionTraceFilter?.shouldTrace(programCounter: registers.regPC) ?? true
+        guard shouldTrace else { return }
+        
+        // トレースメッセージを生成して出力
+        let traceMessage = generateTraceMessage(opcode: opcode, instruction: instruction)
+        PC88Logger.cpu.debug(traceMessage)
+        
+        instructionTraceCount += 1
+        
+        // トレース数が最大に達したら無効化
+        checkAndDisableTraceIfNeeded()
+    }
+    
+    /// トレースメッセージを生成
+    private func generateTraceMessage(opcode: UInt8, instruction: Z80Instruction) -> String {
+        let programCounter = registers.regPC
+        let opcodeStr = String(format: "%02X", opcode)
+        let instructionDesc = instruction.description
+        
+        // レジスタ情報をフォーマット
+        let registerInfo = formatRegisterInfo()
+        
+        // メモリダンプを取得
+        let memoryDump = getMemoryDumpAroundPC(programCounter: programCounter)
+        
+        return "TRACE[\(instructionTraceCount)]: PC=\(String(format: "%04X", programCounter)) " +
+               "OP=\(opcodeStr) \(instructionDesc) | " +
+               "\(registerInfo) | MEM=[\(memoryDump)]"
+    }
+    
+    /// レジスタ情報をフォーマットした文字列を返す
+    private func formatRegisterInfo() -> String {
+        let regA = String(format: "%02X", registers.regA)
+        let regBC = String(format: "%04X", registers.regBC)
+        let regDE = String(format: "%04X", registers.regDE)
+        let regHL = String(format: "%04X", registers.regHL)
+        let regSP = String(format: "%04X", registers.regSP)
+        let regF = String(format: "%02X", registers.regF)
+        
+        return "A=\(regA) F=\(regF) BC=\(regBC) DE=\(regDE) HL=\(regHL) SP=\(regSP)"
+    }
+    
+    /// PC周辺のメモリダンプを取得
+    private func getMemoryDumpAroundPC(programCounter: UInt16) -> String {
+        var memoryDump = ""
+        for offset in 0..<4 {
+            let addr = programCounter &+ UInt16(offset)
+            if addr < 0xFFFF {
+                let byte = memory.readByte(at: addr)
+                memoryDump += String(format: "%02X ", byte)
+            }
+        }
+        return memoryDump
+    }
+    
+    /// トレース数が最大に達したか確認し、必要に応じて無効化
+    private func checkAndDisableTraceIfNeeded() {
+        if instructionTraceCount >= maxInstructionTraceCount {
+            PC88Logger.cpu.debug("命令トレースを終了しました（最大数に達しました）")
+            instructionTraceEnabled = false
+        }
+    }
+    
+    /// 未実装命令の処理
+    private func handleUnimplementedInstruction(_ opcode: UInt8, _ instruction: UnimplementedInstruction) -> Int {
+        // 安全なPCの計算
+        let previousPC = registers.regPC > 0 ? registers.regPC - 1 : 0
+        
+        // 詳細なデバッグ情報を出力
+        logUnimplementedInstructionWarning(opcode: opcode, pc: previousPC)
+        
+        // 周辺のメモリ内容を表示（命令列を確認するため）
+        logMemoryDump(aroundAddress: previousPC)
+        
+        // レジスタ状態も表示
+        logRegisterState()
+        
+        // PCを進めて次の命令に進む
+        return instruction.cycles
+    }
+    
+    /// 未実装命令の警告をログに出力
+    private func logUnimplementedInstructionWarning(opcode: UInt8, pc: UInt16) {
+        let opcodeStr = String(opcode, radix: 16, uppercase: true)
+        let pcStr = String(pc, radix: 16, uppercase: true)
+        PC88Logger.cpu.warning("警告: 未実装の命令 0x\(opcodeStr) at PC=0x\(pcStr)")
+    }
+    
+    /// 指定アドレスの周辺メモリをダンプしてログに出力
+    private func logMemoryDump(aroundAddress address: UInt16) {
+        let startAddr = max(0, Int(address) - 5)
+        let endAddr = min(0xFFFF, Int(address) + 10)
+        var memoryDump = "メモリダンプ ["
+        
+        for addr in startAddr...endAddr {
+            let byte = memory.readByte(at: UInt16(addr))
+            let prefix = addr == Int(address) ? "[" : ""
+            let suffix = addr == Int(address) ? "]" : ""
+            let byteStr = "0x\(String(byte, radix: 16, uppercase: true))"
+            memoryDump += "\(prefix)\(byteStr)\(suffix) "
+        }
+        
+        memoryDump += "]"
+        PC88Logger.cpu.debug("\(memoryDump)")
+    }
+    
+    /// レジスタ状態をログに出力
+    private func logRegisterState() {
+        let regState = "A=0x\(String(registers.regA, radix: 16)) " +
+                      "BC=0x\(String(registers.regBC, radix: 16)) " +
+                      "DE=0x\(String(registers.regDE, radix: 16)) " +
+                      "HL=0x\(String(registers.regHL, radix: 16)) " +
+                      "SP=0x\(String(registers.regSP, radix: 16))"
+        PC88Logger.cpu.debug("レジスタ状態: \(regState)")
     }
     
     /// 割り込み処理
@@ -512,8 +617,8 @@ class Z80CPU: CPUExecuting {
                 memoryWrites: 2,
                 internalCycles: 1
             )
-            pushWord(registers.pc)
-            registers.pc = 0x0066
+            pushWord(registers.regPC)
+            registers.regPC = 0x0066
             return cycles.tStates
             
         case .int:
@@ -526,8 +631,8 @@ class Z80CPU: CPUExecuting {
                     memoryWrites: 2,
                     internalCycles: 2
                 )
-                pushWord(registers.pc)
-                registers.pc = 0x0038
+                pushWord(registers.regPC)
+                registers.regPC = 0x0038
                 return cycles.tStates
             }
             return 0
@@ -537,38 +642,39 @@ class Z80CPU: CPUExecuting {
     /// スタックにワード値をプッシュ
     func pushWord(_ value: UInt16, to registers: inout Z80Registers, memory: MemoryAccessing) {
         // 安全な減算処理
-        if registers.sp >= 2 {
-            registers.sp = registers.sp &- 2
+        if registers.regSP >= 2 {
+            registers.regSP = registers.regSP &- 2
         } else {
             // オーバーフローを防止するため、スタックポインタをメモリの最上部に設定
-            registers.sp = 0xFFFF
-            print("警告: スタックポインタがオーバーフローしました")
+            registers.regSP = 0xFFFF
+            PC88Logger.cpu.warning("警告: スタックポインタがオーバーフローしました")
         }
-        memory.writeWord(value, at: registers.sp)
+        memory.writeWord(value, at: registers.regSP)
     }
     
     /// スタックにワード値をプッシュ (内部用)
     private func pushWord(_ value: UInt16) {
         // 安全な減算処理
-        if registers.sp >= 2 {
-            registers.sp = registers.sp &- 2
+        if registers.regSP >= 2 {
+            registers.regSP = registers.regSP &- 2
         } else {
             // オーバーフローを防止するため、スタックポインタをメモリの最上部に設定
-            registers.sp = 0xFFFF
-            print("警告: スタックポインタがオーバーフローしました")
+            registers.regSP = 0xFFFF
+            PC88Logger.cpu.warning("警告: スタックポインタがオーバーフローしました")
         }
-        memory.writeWord(value, at: registers.sp)
+        memory.writeWord(value, at: registers.regSP)
     }
     
     // MARK: - アイドル検出関連
     
     /// 命令履歴を更新
-    private func updateInstructionHistory(pc: UInt16, opcode: UInt8) {
+    private func updateInstructionHistory(programCounter: UInt16, opcode: UInt8) {
         // 履歴に追加
-        instructionHistory.append((pc: pc, opcode: opcode))
+        instructionHistory.append((programCounter: programCounter, opcode: opcode))
         
         // 履歴が長すぎる場合は古いものを削除
-        if instructionHistory.count > 20 { // 最大20命令を記録
+        let maxHistorySize = 20 // 最大20命令を記録
+        if instructionHistory.count > maxHistorySize {
             instructionHistory.removeFirst()
         }
         
@@ -576,154 +682,117 @@ class Z80CPU: CPUExecuting {
         detectIdleLoop()
     }
     
-    /// アイドルループを検出
+}
+
+// MARK: - Z80CPU Extension for Idle Loop Detection
+extension Z80CPU {
+    /// アイドルループを検出する
     private func detectIdleLoop() {
         // 履歴が少なすぎる場合は検出しない
         guard instructionHistory.count >= idleDetectionThreshold * 2 else { return }
         
         // 短いループを検出（閾値に基づいて検出範囲を調整）
-        for loopLength in 2...idleDetectionThreshold {
-            // 履歴が十分にある場合のみ
-            if instructionHistory.count >= loopLength * 2 {
-                // 最新のloopLength命令と、その前のloopLength命令を比較
-                let recentInstructions = Array(instructionHistory.suffix(loopLength))
-                let previousInstructions = Array(instructionHistory.suffix(loopLength * 2).prefix(loopLength))
-                
-                // PCとオペコードが一致するか確認
-                var isLoop = true
-                for i in 0..<loopLength {
-                    if recentInstructions[i].pc != previousInstructions[i].pc || 
-                       recentInstructions[i].opcode != previousInstructions[i].opcode {
-                        isLoop = false
-                        break
-                    }
-                }
-                
-                // ループが検出された場合
-                if isLoop {
-                    // 最初のPCを記録
-                    idleLoopPC = recentInstructions[0].pc
-                    idleLoopLength = loopLength
-                    
-                    // ループの命令を記録
-                    idleLoopInstructions = recentInstructions.map { $0.opcode }
-                    
-                    // ループのサイクル数を計算
-                    calculateIdleLoopCycles()
-                    
-                    // ループを検出したことを記録
-                    idleLoopDetected = true
-                    idleLoopCounter = 0
-                    idleLoopStartTime = Date()
-                    idleLoopLastReportTime = idleLoopStartTime
-                    
-                    // ループの周辺メモリ状態を記録
-                    captureIdleLoopContext()
-                    
-                    // ループ情報を出力
-                    printIdleLoopInfo(isInitialDetection: true)
-                    return
+        // 履歴が十分にある場合のみ
+        for loopLength in 2...idleDetectionThreshold where instructionHistory.count >= loopLength * 2 {
+            // 最新のloopLength命令と、その前のloopLength命令を比較
+            let recentInstructions = Array(instructionHistory.suffix(loopLength))
+            let previousInstructions = Array(instructionHistory.suffix(loopLength * 2).prefix(loopLength))
+            
+            // PCとオペコードが一致するか確認
+            var isLoop = true
+            for index in 0..<loopLength {
+                if recentInstructions[index].pc != previousInstructions[index].pc || 
+                   recentInstructions[index].opcode != previousInstructions[index].opcode {
+                    isLoop = false
+                    break
                 }
             }
+            
+            // ループが検出された場合
+            if isLoop {
+                // 最初のPCを記録
+                idleLoopPC = recentInstructions[0].pc
+                idleLoopLength = loopLength
+                
+                // ループの命令を記録
+                idleLoopInstructions = recentInstructions.map { $0.opcode }
+                
+                // ループのサイクル数を計算
+                calculateIdleLoopCycles()
+                
+                // ループを検出したことを記録
+                idleLoopDetected = true
+                idleLoopCounter = 0
+                idleLoopStartTime = Date()
+                idleLoopLastReportTime = idleLoopStartTime
+                
+                // ループの周辺メモリ状態を記録
+                captureIdleLoopContext()
+                
+                // ループ情報を出力
+                printIdleLoopInfo(isInitialDetection: true)
+                return
+            }
         }
+    
     }
     
     /// アイドルループの周辺コンテキストを取得
     private func captureIdleLoopContext() {
         // レジスタ状態を記録
         idleLoopContext["registers"] = [
-            "a": registers.a,
-            "bc": registers.bc,
-            "de": registers.de,
-            "hl": registers.hl,
-            "sp": registers.sp,
+            "a": registers.regA,
+            "bc": registers.regBC,
+            "de": registers.regDE,
+            "hl": registers.regHL,
+            "sp": registers.regSP,
             "pc": idleLoopPC,
-            "ix": registers.ix,
-            "iy": registers.iy,
-            "flags": registers.f
+            "ix": registers.regIX,
+            "iy": registers.regIY
+            // Shadow registers are not directly accessible
         ]
         
-        // ループ内の命令を記録
-        var loopInstructions: [[String: Any]] = []
-        var currentPC = idleLoopPC
+        // フラグ状態を記録
+        let flags = registers.regF
+        idleLoopContext["flags"] = [
+            "s": (flags & 0x80) != 0,
+            "z": (flags & 0x40) != 0,
+            "h": (flags & 0x10) != 0,
+            "p": (flags & 0x04) != 0,
+            "n": (flags & 0x02) != 0,
+            "c": (flags & 0x01) != 0
+        ]
+        
+        // 周辺メモリの状態を記録
+        var memoryDump: [String: UInt8] = [:]
+        let memoryRangeStart = max(0, Int(idleLoopPC) - 16)
+        let memoryRangeEnd = min(0xFFFF, Int(idleLoopPC) + 16)
+        
+        for addr in memoryRangeStart...memoryRangeEnd {
+            memoryDump[String(format: "0x%04X", addr)] = readMemory(address: UInt16(addr))
+        }
+        idleLoopContext["memory"] = memoryDump
+        
+        // スタックの状態を記録（SPから数バイト）
+        var stackDump: [String: UInt8] = [:]
+        let stackStart = Int(registers.regSP)
+        let stackEnd = min(0xFFFF, stackStart + 16)
+        
+        for addr in stackStart...stackEnd {
+            stackDump[String(format: "0x%04X", addr)] = readMemory(address: UInt16(addr))
+        }
+        idleLoopContext["stack"] = stackDump
+    }
+    
+    /// アイドルループのサイクル数を計算
+    private func calculateIdleLoopCycles() {
+        idleLoopCycles = 0
         
         for opcode in idleLoopInstructions {
-            let instruction = decoder.decode(opcode, memory: memory, pc: currentPC)
-            loopInstructions.append([
-                "pc": currentPC,
-                "opcode": opcode,
-                "description": instruction.description
-            ])
-            
-            // 次の命令のPCを計算（簡易的な実装）
-            currentPC = currentPC &+ 1
+            // 命令を実行せずにサイクル数だけ取得
+            let instruction = decoder.decode(opcode, memory: memory, programCounter: 0)
+            idleLoopCycles += instruction.cycles
         }
-        idleLoopContext["instructions"] = loopInstructions
-        
-        // スタック内容を記録（最大16バイト）
-        var stackContents: [UInt8] = []
-        for offset in 0..<16 {
-            let stackAddr = registers.sp &+ UInt16(offset)
-            if stackAddr < 0xFFFF {
-                stackContents.append(memory.readByte(at: stackAddr))
-            }
-        }
-        idleLoopContext["stack"] = stackContents
-        
-        // ループ周辺のメモリ内容を記録
-        var memoryContents: [UInt8] = []
-        let startAddr = max(0, Int(idleLoopPC) - 16)
-        let endAddr = min(0xFFFF, Int(idleLoopPC) + 32)
-        
-        for addr in startAddr...endAddr {
-            memoryContents.append(memory.readByte(at: UInt16(addr)))
-        }
-        idleLoopContext["memory"] = memoryContents
-        idleLoopContext["memoryStart"] = startAddr
-        
-        // ALPHA-MINI-DOS関連の重要なメモリ領域を記録
-        // ディスクパラメータテーブル (0xF800-0xF80F)
-        var diskParamTable: [UInt8] = []
-        for addr in 0xF800...0xF80F {
-            diskParamTable.append(memory.readByte(at: UInt16(addr)))
-        }
-        idleLoopContext["diskParamTable"] = diskParamTable
-        
-        // ディスクコントロールレジスタ (0x00D8-0x00DF)
-        var diskControlRegs: [UInt8] = []
-        for addr in 0x00D8...0x00DF {
-            diskControlRegs.append(memory.readByte(at: UInt16(addr)))
-        }
-        idleLoopContext["diskControlRegs"] = diskControlRegs
-        
-        // BIOSワークエリア (0x0000-0x0100)
-        var biosWorkArea: [UInt8] = []
-        for addr in 0x0000...0x00FF {
-            biosWorkArea.append(memory.readByte(at: UInt16(addr)))
-        }
-        idleLoopContext["biosWorkArea"] = biosWorkArea
-        
-        // ディスクI/Oポートの状態をシミュレートして取得
-        // 実際のポート状態は取得できないため、メモリの値から推測
-        var diskStatus: [String: Any] = [:]
-        
-        // ディスクステータスレジスタの推測値
-        let inferredStatus = memory.readByte(at: 0x00D8)
-        diskStatus["status"] = inferredStatus
-        
-        // ディスクコマンドレジスタの推測値
-        let inferredCommand = memory.readByte(at: 0x00D9)
-        diskStatus["command"] = inferredCommand
-        
-        // トラックレジスタの推測値
-        let inferredTrack = memory.readByte(at: 0x00DA)
-        diskStatus["track"] = inferredTrack
-        
-        // セクタレジスタの推測値
-        let inferredSector = memory.readByte(at: 0x00DB)
-        diskStatus["sector"] = inferredSector
-        
-        idleLoopContext["diskStatus"] = diskStatus
     }
     
     /// アイドルループ情報を出力
@@ -732,82 +801,49 @@ class Z80CPU: CPUExecuting {
         
         // 初回検出時または一定間隔でのみ詳細情報を出力
         if isInitialDetection || idleLoopLastReportTime == nil || 
-           now.timeIntervalSince(idleLoopLastReportTime!) >= idleLoopReportInterval {
+           (idleLoopLastReportTime.map { now.timeIntervalSince($0) } ?? 0) >= idleLoopReportInterval {
             
             // 経過時間を計算
-            var durationInfo = ""
             if let startTime = idleLoopStartTime {
-                let duration = now.timeIntervalSince(startTime)
-                idleLoopDuration = duration
-                durationInfo = String(format: "経過時間: %.2f秒", duration)
+                idleLoopDuration = now.timeIntervalSince(startTime)
             }
             
-            print("\n===== アイドルループ情報 =====")
-            print("PC: 0x\(String(idleLoopPC, radix: 16, uppercase: true))")
-            print("長さ: \(idleLoopLength) 命令")
-            print("サイクル数: \(idleLoopCycles)")
-            print("実行回数: \(idleLoopCounter)")
-            print(durationInfo)
+            // ループ情報を出力
+            PC88Logger.cpu.info("===== IDLE LOOP DETECTED =====")
+            PC88Logger.cpu.info("PC: \(String(format: "0x%04X", self.idleLoopPC))")
+            PC88Logger.cpu.info("Loop Length: \(self.idleLoopLength) instructions")
+            PC88Logger.cpu.info("Loop Cycles: \(self.idleLoopCycles) cycles")
+            PC88Logger.cpu.info("Duration: \(String(format: "%.2f", self.idleLoopDuration)) seconds")
+            PC88Logger.cpu.info("Iterations: \(self.idleLoopCounter)")
             
-            // レジスタ情報を出力
+            // 命令列を出力
+            PC88Logger.cpu.info("Instructions:")
+            for (index, opcode) in idleLoopInstructions.enumerated() {
+                let programCounter = (idleLoopPC + UInt16(index)) & 0xFFFF
+                let instruction = decoder.decode(opcode, memory: memory, programCounter: programCounter)
+                PC88Logger.cpu.info("  \(String(format: "0x%04X", programCounter)): \(String(format: "%02X", opcode)) - \(instruction.description)")
+            }
+            
+            // レジスタ状態を出力
             if let registers = idleLoopContext["registers"] as? [String: Any] {
-                print("\nレジスタ状態:")
-                print("A: 0x\(String(format: "%02X", registers["a"] as? UInt8 ?? 0))")
-                print("BC: 0x\(String(format: "%04X", registers["bc"] as? UInt16 ?? 0))")
-                print("DE: 0x\(String(format: "%04X", registers["de"] as? UInt16 ?? 0))")
-                print("HL: 0x\(String(format: "%04X", registers["hl"] as? UInt16 ?? 0))")
-                print("SP: 0x\(String(format: "%04X", registers["sp"] as? UInt16 ?? 0))")
-                print("Flags: 0x\(String(format: "%02X", registers["flags"] as? UInt8 ?? 0))")
-            }
-            
-            // 命令情報を出力
-            if let instructions = idleLoopContext["instructions"] as? [[String: Any]] {
-                print("\nループ内の命令:")
-                for inst in instructions {
-                    let pc = inst["pc"] as? UInt16 ?? 0
-                    let opcode = inst["opcode"] as? UInt8 ?? 0
-                    let desc = inst["description"] as? String ?? "不明"
-                    print("0x\(String(format: "%04X", pc)): 0x\(String(format: "%02X", opcode)) - \(desc)")
-                }
-            }
-            
-            // メモリ内容を出力
-            if let memory = idleLoopContext["memory"] as? [UInt8],
-               let memoryStart = idleLoopContext["memoryStart"] as? Int {
-                print("\n周辺メモリ内容:")
-                var line = ""
-                for (index, byte) in memory.enumerated() {
-                    let addr = memoryStart + index
-                    if index % 8 == 0 {
-                        if !line.isEmpty {
-                            print(line)
-                        }
-                        line = "0x\(String(format: "%04X", addr)): "
+                PC88Logger.cpu.info("Registers:")
+                for (reg, value) in registers {
+                    if let val = value as? UInt16 {
+                        PC88Logger.cpu.info("  \(reg): \(String(format: "0x%04X", val))")
+                    } else if let val = value as? UInt8 {
+                        PC88Logger.cpu.info("  \(reg): \(String(format: "0x%02X", val))")
+                    } else if let val = value as? Bool {
+                        PC88Logger.cpu.info("  \(reg): \(val)")
                     }
-                    let highlight = addr == Int(idleLoopPC) ? "[" : " "
-                    let endHighlight = addr == Int(idleLoopPC) ? "]" : " "
-                    line += "\(highlight)\(String(format: "%02X", byte))\(endHighlight)"
-                }
-                if !line.isEmpty {
-                    print(line)
                 }
             }
             
-            print("=============================\n")
+            PC88Logger.cpu.info("==============================")
             
-            // 最終レポート時間を更新
+            // レポート時間を更新
             idleLoopLastReportTime = now
         }
     }
-    
-    /// アイドルループのサイクル数を計算
-    private func calculateIdleLoopCycles() {
-        // 簡易的な計算: 各命令の平均サイクル数 * ループ長
-        // 実際には各命令のサイクル数を正確に計算する必要がある
-        idleLoopCycles = 4 * idleLoopLength // 仮の値として平均4サイクルと仮定
-    }
-    
-    // アイドル検出の有効/無効設定と状態取得メソッドは上部で定義済み
 }
 
 // MARK: - Z80CPU Extension for Memory and IO Access
@@ -843,23 +879,23 @@ extension Z80CPU {
     }
     
     /// I/Oポートから読み込み
-    func readIO(port: UInt16) -> UInt8 {
+    func readIO(port portAddress: UInt16) -> UInt8 {
         // クロックモードに応じたI/Oアクセス時間の調整
         _ = cpuClock.getClockImpact(for: .ioPort)
         // I/Oポートアクセスは完全にクロックの影響を受ける
         
         // UInt8にキャストしてポート番号を渡す
-        return io.readPort(UInt8(port & 0xFF))
+        return ioDevice.readPort(UInt8(portAddress & 0xFF))
     }
     
     /// I/Oポートに書き込み
-    func writeIO(port: UInt16, value: UInt8) {
+    func writeIO(port portAddress: UInt16, value: UInt8) {
         // クロックモードに応じたI/Oアクセス時間の調整
         _ = cpuClock.getClockImpact(for: .ioPort)
         // I/Oポートアクセスは完全にクロックの影響を受ける
         
         // UInt8にキャストしてポート番号を渡す
-        io.writePort(UInt8(port & 0xFF), value: value)
+        ioDevice.writePort(UInt8(portAddress & 0xFF), value: value)
     }
     
     /// アドレスがVRAM領域かどうかを判定
@@ -877,39 +913,39 @@ extension Z80CPU {
     /// レジスタ値の取得（命令実装から使用）
     func getRegister(_ reg: RegisterType) -> UInt16 {
         switch reg {
-        case .af: return registers.af
-        case .bc: return registers.bc
-        case .de: return registers.de
-        case .hl: return registers.hl
-        case .ix: return registers.ix
-        case .iy: return registers.iy
-        case .sp: return registers.sp
-        case .pc: return registers.pc
+        case .afPair: return registers.regAF
+        case .bcPair: return registers.regBC
+        case .dePair: return registers.regDE
+        case .hlPair: return registers.regHL
+        case .ixPair: return registers.regIX
+        case .iyPair: return registers.regIY
+        case .stackPointer: return registers.regSP
+        case .programCounter: return registers.regPC
         }
     }
     
     /// レジスタ値の設定（命令実装から使用）
     func setRegister(_ reg: RegisterType, value: UInt16) {
         switch reg {
-        case .af: registers.af = value
-        case .bc: registers.bc = value
-        case .de: registers.de = value
-        case .hl: registers.hl = value
-        case .ix: registers.ix = value
-        case .iy: registers.iy = value
-        case .sp: registers.sp = value
-        case .pc: registers.pc = value
+        case .afPair: registers.regAF = value
+        case .bcPair: registers.regBC = value
+        case .dePair: registers.regDE = value
+        case .hlPair: registers.regHL = value
+        case .ixPair: registers.regIX = value
+        case .iyPair: registers.regIY = value
+        case .stackPointer: registers.regSP = value
+        case .programCounter: registers.regPC = value
         }
     }
     
     /// プログラムカウンタ（PC）を設定
     func setPC(_ value: UInt16) {
-        registers.pc = value
+        registers.regPC = value
     }
     
     /// スタックポインタ（SP）を設定
     func setSP(_ value: UInt16) {
-        registers.sp = value
+        registers.regSP = value
     }
     
     /// ホルト状態を設定
@@ -919,16 +955,16 @@ extension Z80CPU {
     
     /// 現在のプログラムカウンタ（PC）を取得
     func getPC() -> UInt16 {
-        return registers.pc
+        return registers.regPC
     }
     
     /// 現在のスタックポインタ（SP）を取得
     func getSP() -> UInt16 {
-        return registers.sp
+        return registers.regSP
     }
 }
 
 /// レジスタタイプ
 enum RegisterType {
-    case af, bc, de, hl, ix, iy, sp, pc
+    case afPair, bcPair, dePair, hlPair, ixPair, iyPair, stackPointer, programCounter
 }

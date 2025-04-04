@@ -5,9 +5,9 @@
 //  Created by 越川将人 on 2025/03/29.
 //
 
-import SwiftUI
-import Foundation
 import Combine
+import Foundation
+import SwiftUI
 
 /// エミュレータアプリの状態管理クラス
 class EmulatorAppState: ObservableObject {
@@ -49,13 +49,13 @@ struct PC88EmulatorApp: App {
                         // EmulatorViewの初期化が完了するのを待ってから通知を送信
                         // 最初のエミュレータ開始通知（これが重要）
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            print("アプリ起動時: エミュレータ開始通知を送信します")
+                            PC88Logger.app.info("アプリ起動時: エミュレータ開始通知を送信します")
                             NotificationCenter.default.post(name: emulatorStartNotification, object: nil)
                         }
                         
                         // 最初の画面更新通知（EmulatorViewのonAppearが呼ばれた後）
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            print("アプリ起動時: 最初の画面更新通知を送信します")
+                            PC88Logger.app.info("アプリ起動時: 最初の画面更新通知を送信します")
                             NotificationCenter.default.post(name: forceUpdateNotification, object: nil)
                             // エミュレータ開始通知も再度送信
                             NotificationCenter.default.post(name: emulatorStartNotification, object: nil)
@@ -63,7 +63,7 @@ struct PC88EmulatorApp: App {
                         
                         // 少し遅らせて再度更新（EmulatorViewInternalModelの初期化完了後）
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                            print("アプリ起動時: 2回目の画面更新通知を送信します")
+                            PC88Logger.app.info("アプリ起動時: 2回目の画面更新通知を送信します")
                             NotificationCenter.default.post(name: forceUpdateNotification, object: nil)
                             // エミュレータ開始通知も再度送信
                             NotificationCenter.default.post(name: emulatorStartNotification, object: nil)
@@ -71,7 +71,7 @@ struct PC88EmulatorApp: App {
                         
                         // さらに遅らせて再度更新（エミュレータコアの初期化完了後）
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            print("アプリ起動時: 3回目の画面更新通知を送信します")
+                            PC88Logger.app.info("アプリ起動時: 3回目の画面更新通知を送信します")
                             NotificationCenter.default.post(name: forceUpdateNotification, object: nil)
                             // エミュレータ開始通知も再度送信
                             NotificationCenter.default.post(name: emulatorStartNotification, object: nil)
@@ -79,7 +79,7 @@ struct PC88EmulatorApp: App {
                         
                         // 最終確認の更新通知
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            print("アプリ起動時: 最終確認の画面更新通知を送信します")
+                            PC88Logger.app.info("アプリ起動時: 最終確認の画面更新通知を送信します")
                             NotificationCenter.default.post(name: forceUpdateNotification, object: nil)
                             // エミュレータ開始通知も再度送信
                             NotificationCenter.default.post(name: emulatorStartNotification, object: nil)
@@ -89,7 +89,7 @@ struct PC88EmulatorApp: App {
                     }
                 }
         }
-        .onChange(of: scenePhase) { _, newPhase in
+        .onChange(of: scenePhase) { newPhase in
             appState.scenePhase = newPhase
             handleScenePhaseChange(newPhase)
         }
@@ -100,19 +100,19 @@ struct PC88EmulatorApp: App {
         switch newPhase {
         case .active:
             // フォアグラウンドに戻ったとき
-            print("アプリがフォアグラウンドに戻りました")
+            PC88Logger.app.info("アプリがフォアグラウンドに戻りました")
             appState.isInBackground = false
             NotificationCenter.default.post(name: .emulatorResumeNotification, object: nil)
             
         case .background:
             // バックグラウンドに移行したとき
-            print("アプリがバックグラウンドに移行しました")
+            PC88Logger.app.info("アプリがバックグラウンドに移行しました")
             appState.isInBackground = true
             NotificationCenter.default.post(name: .emulatorPauseNotification, object: nil)
             
         case .inactive:
             // 非アクティブ状態（例：マルチタスク画面表示中）
-            print("アプリが非アクティブになりました")
+            PC88Logger.app.info("アプリが非アクティブになりました")
             
         @unknown default:
             break
@@ -123,7 +123,7 @@ struct PC88EmulatorApp: App {
     private func copyResourceFilesToDocuments() {
         // Documentsディレクトリのパスを取得
         guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            print("Documentsディレクトリの取得に失敗しました")
+            PC88Logger.app.error("Documentsディレクトリの取得に失敗しました")
             return
         }
         
@@ -138,7 +138,7 @@ struct PC88EmulatorApp: App {
             // ファイル名から拡張子を分離
             let fileComponents = fileName.split(separator: ".")
             if fileComponents.count != 2 {
-                print("無効なファイル名: \(fileName)")
+                PC88Logger.app.warning("無効なファイル名: \(fileName)")
                 continue
             }
             
@@ -147,7 +147,7 @@ struct PC88EmulatorApp: App {
             
             // バンドルからリソースURLを取得
             guard let sourceURL = Bundle.main.url(forResource: name, withExtension: ext) else {
-                print("リソースが見つかりません: \(fileName)")
+                PC88Logger.app.warning("リソースが見つかりません: \(fileName)")
                 continue
             }
             
@@ -160,12 +160,12 @@ struct PC88EmulatorApp: App {
                 }
                 
                 try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
-                print("ファイルをコピーしました: \(fileName)")
+                PC88Logger.app.info("ファイルをコピーしました: \(fileName)")
             } catch {
-                print("ファイルのコピー中にエラーが発生しました: \(fileName) - \(error)")
+                PC88Logger.app.error("ファイルのコピー中にエラーが発生しました: \(fileName) - \(error.localizedDescription)")
             }
         }
         
-        print("リソースファイルのコピー処理が完了しました")
+        PC88Logger.app.info("リソースファイルのコピー処理が完了しました")
     }
 }

@@ -31,13 +31,13 @@ struct ADDInstruction: Z80Instruction {
         switch source {
         case .register(let reg):
             switch reg {
-            case .a: value = registers.a
-            case .b: value = registers.b
-            case .c: value = registers.c
-            case .d: value = registers.d
-            case .e: value = registers.e
-            case .h: value = registers.h
-            case .l: value = registers.l
+            case .regA: value = registers.a
+            case .regB: value = registers.b
+            case .regC: value = registers.c
+            case .regD: value = registers.d
+            case .regE: value = registers.e
+            case .regH: value = registers.h
+            case .regL: value = registers.l
             }
         case .memory:
             value = memory.readByte(at: registers.hl)
@@ -95,13 +95,13 @@ struct ADCInstruction: Z80Instruction {
         switch source {
         case .register(let reg):
             switch reg {
-            case .a: value = registers.a
-            case .b: value = registers.b
-            case .c: value = registers.c
-            case .d: value = registers.d
-            case .e: value = registers.e
-            case .h: value = registers.h
-            case .l: value = registers.l
+            case .regA: value = registers.a
+            case .regB: value = registers.b
+            case .regC: value = registers.c
+            case .regD: value = registers.d
+            case .regE: value = registers.e
+            case .regH: value = registers.h
+            case .regL: value = registers.l
             }
         case .memory:
             value = memory.readByte(at: registers.hl)
@@ -161,13 +161,13 @@ struct SUBInstruction: Z80Instruction {
         switch source {
         case .register(let reg):
             switch reg {
-            case .a: value = registers.a
-            case .b: value = registers.b
-            case .c: value = registers.c
-            case .d: value = registers.d
-            case .e: value = registers.e
-            case .h: value = registers.h
-            case .l: value = registers.l
+            case .regA: value = registers.a
+            case .regB: value = registers.b
+            case .regC: value = registers.c
+            case .regD: value = registers.d
+            case .regE: value = registers.e
+            case .regH: value = registers.h
+            case .regL: value = registers.l
             }
         case .memory:
             value = memory.readByte(at: registers.hl)
@@ -209,7 +209,7 @@ enum RegisterSource {
 
 /// 8ビットレジスタ
 enum Register8 {
-    case a, b, c, d, e, h, l
+    case regA, regB, regC, regD, regE, regH, regL
 }
 
 /// INC r命令（レジスタインクリメント）
@@ -221,13 +221,13 @@ struct INCRegInstruction: Z80Instruction {
         
         // レジスタから値を取得
         switch register {
-        case .a: value = registers.a
-        case .b: value = registers.b
-        case .c: value = registers.c
-        case .d: value = registers.d
-        case .e: value = registers.e
-        case .h: value = registers.h
-        case .l: value = registers.l
+        case .regA: value = registers.a
+        case .regB: value = registers.b
+        case .regC: value = registers.c
+        case .regD: value = registers.d
+        case .regE: value = registers.e
+        case .regH: value = registers.h
+        case .regL: value = registers.l
         }
         
         // ハーフキャリーの計算
@@ -238,13 +238,13 @@ struct INCRegInstruction: Z80Instruction {
         
         // 結果をレジスタに設定
         switch register {
-        case .a: registers.a = result
-        case .b: registers.b = result
-        case .c: registers.c = result
-        case .d: registers.d = result
-        case .e: registers.e = result
-        case .h: registers.h = result
-        case .l: registers.l = result
+        case .regA: registers.a = result
+        case .regB: registers.b = result
+        case .regC: registers.c = result
+        case .regD: registers.d = result
+        case .regE: registers.e = result
+        case .regH: registers.h = result
+        case .regL: registers.l = result
         }
         
         // フラグの設定
@@ -272,13 +272,13 @@ struct DECRegInstruction: Z80Instruction {
         
         // レジスタから値を取得
         switch register {
-        case .a: value = registers.a
-        case .b: value = registers.b
-        case .c: value = registers.c
-        case .d: value = registers.d
-        case .e: value = registers.e
-        case .h: value = registers.h
-        case .l: value = registers.l
+        case .regA: value = registers.a
+        case .regB: value = registers.b
+        case .regC: value = registers.c
+        case .regD: value = registers.d
+        case .regE: value = registers.e
+        case .regH: value = registers.h
+        case .regL: value = registers.l
         }
         
         // ハーフキャリーの計算
@@ -289,13 +289,13 @@ struct DECRegInstruction: Z80Instruction {
         
         // 結果をレジスタに設定
         switch register {
-        case .a: registers.a = result
-        case .b: registers.b = result
-        case .c: registers.c = result
-        case .d: registers.d = result
-        case .e: registers.e = result
-        case .h: registers.h = result
-        case .l: registers.l = result
+        case .regA: registers.a = result
+        case .regB: registers.b = result
+        case .regC: registers.c = result
+        case .regD: registers.d = result
+        case .regE: registers.e = result
+        case .regH: registers.h = result
+        case .regL: registers.l = result
         }
         
         // フラグの設定
