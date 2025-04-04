@@ -1126,9 +1126,9 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         let result = loadDiskImage(url: diskImageURL, drive: 0)
         
         if result {
-            print("ALPHA-MINI-DOSディスクイメージを正常に読み込みました")
+            PC88Logger.disk.debug("ALPHA-MINI-DOSディスクイメージを正常に読み込みました")
         } else {
-            print("ALPHA-MINI-DOSディスクイメージの読み込みに失敗しました")
+            PC88Logger.disk.error("ALPHA-MINI-DOSディスクイメージの読み込みに失敗しました")
         }
     }
     
@@ -1139,7 +1139,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         // 成功した場合、ドライブ0にロードされた場合はブートセクタを再ロード
         if result && reloadBootSector && drive == 0 {
-            print("ディスクイメージがロードされたため、ブートセクタを再ロードします")
+            PC88Logger.disk.debug("ディスクイメージがロードされたため、ブートセクタを再ロードします")
             loadBootSector()
         }
         
@@ -1151,7 +1151,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// FDDブートの有効/無効を設定
     func setFDDBootEnabled(_ enabled: Bool) {
         fddBootEnabled = enabled
-        print("FDDブートを\(enabled ? "有効" : "無効")にしました")
+        PC88Logger.disk.debug("FDDブートを\(enabled ? "有効" : "無効")にしました")
         
         // 設定が変更された場合、ブートセクタを再ロード
         if enabled {
