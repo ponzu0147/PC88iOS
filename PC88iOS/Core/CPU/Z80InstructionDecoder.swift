@@ -243,7 +243,8 @@ class Z80InstructionDecoder {
         if (opcode & 0xC0) == 0x40 && opcode != 0x76 { // 0x76はHALT
             let dst = decodeRegister8((opcode >> 3) & 0x07)
             let src = decodeRegister8(opcode & 0x07)
-            return LDRegRegInstruction(
+
+          return LDRegRegInstruction(
                 destination: convertToRegisterOperand(dst),
                 source: convertToRegisterOperand(src)
             )
