@@ -111,3 +111,8 @@ PC88iOS.xcodeproj/project.pbxproj.backup
 *.d88
 *.ROM
 *.rom
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
