@@ -90,16 +90,45 @@ enum RegisterPairOperand {
     
     func read(from registers: Z80Registers) -> UInt16 {
         switch self {
+        case .af, .bc, .de:
+            return readRegisterPair(registers)
+        case .hl, .sp, .afAlt:
+            return readSpecialRegister(registers)
+        }
+    }
+    
+    private func readRegisterPair(_ registers: Z80Registers) -> UInt16 {
+        switch self {
         case .af: return UInt16(registers.regA) << 8 | UInt16(registers.regF)
         case .bc: return UInt16(registers.regB) << 8 | UInt16(registers.regC)
         case .de: return UInt16(registers.regD) << 8 | UInt16(registers.regE)
+        default:
+            PC88Logger.cpu.error("不正なレジスタペアタイプです")
+            return 0
+        }
+    }
+    
+    private func readSpecialRegister(_ registers: Z80Registers) -> UInt16 {
+        switch self {
         case .hl: return registers.regHL
         case .sp: return registers.regSP
         case .afAlt: return UInt16(registers.regAAlt) << 8 | UInt16(registers.regFAlt)
+        default:
+            PC88Logger.cpu.error("不正なレジスタペアタイプです")
+            return 0
         }
     }
     
     func write(to registers: inout Z80Registers, value: UInt16) {
+        switch self {
+        case .af, .bc, .de:
+            writeToRegisterPair(&registers, value)
+        case .hl, .sp, .afAlt:
+            writeToSpecialRegister(&registers, value)
+        }
+    }
+    
+    private func writeToRegisterPair(_ registers: inout Z80Registers, _ value: UInt16) {
         switch self {
         case .af:
             registers.regA = UInt8(value >> 8)
@@ -110,6 +139,13 @@ enum RegisterPairOperand {
         case .de:
             registers.regD = UInt8(value >> 8)
             registers.regE = UInt8(value & 0xFF)
+        default:
+            PC88Logger.cpu.error("不正なレジスタペアタイプです")
+        }
+    }
+    
+    private func writeToSpecialRegister(_ registers: inout Z80Registers, _ value: UInt16) {
+        switch self {
         case .hl:
             registers.regHL = value
         case .sp:
@@ -117,6 +153,8 @@ enum RegisterPairOperand {
         case .afAlt:
             registers.regAAlt = UInt8(value >> 8)
             registers.regFAlt = UInt8(value & 0xFF)
+        default:
+            PC88Logger.cpu.error("不正なレジスタペアタイプです")
         }
     }
 }
@@ -127,10 +165,22 @@ enum AddressOperand {
     
     func getAddress(from registers: Z80Registers) -> UInt16 {
         switch self {
+        case .bc, .de:
+            return getRegisterPairAddress(registers)
+        case .hl:
+            return registers.regHL
+        case .direct(let address):
+            return address
+        }
+    }
+    
+    private func getRegisterPairAddress(_ registers: Z80Registers) -> UInt16 {
+        switch self {
         case .bc: return UInt16(registers.regB) << 8 | UInt16(registers.regC)
         case .de: return UInt16(registers.regD) << 8 | UInt16(registers.regE)
-        case .hl: return registers.regHL
-        case .direct(let address): return address
+        default:
+            PC88Logger.cpu.error("不正なアドレスオペランドタイプです")
+            return 0
         }
     }
 }
@@ -141,12 +191,33 @@ enum MemoryAddressOperand {
     
     func getAddress(from registers: Z80Registers) -> UInt16 {
         switch self {
+        case .hl, .bc, .de:
+            return getBasicAddress(registers)
+        case .ix, .iy:
+            return getIndexedAddress(registers)
+        case .direct(let address):
+            return address
+        }
+    }
+    
+    private func getBasicAddress(_ registers: Z80Registers) -> UInt16 {
+        switch self {
         case .hl: return registers.regHL
         case .bc: return registers.regBC
         case .de: return registers.regDE
+        default:
+            PC88Logger.cpu.error("不正な拡張アドレスオペランドタイプです")
+            return 0
+        }
+    }
+    
+    private func getIndexedAddress(_ registers: Z80Registers) -> UInt16 {
+        switch self {
         case .ix(let offset): return UInt16(Int(registers.regIX) + Int(offset))
         case .iy(let offset): return UInt16(Int(registers.regIY) + Int(offset))
-        case .direct(let address): return address
+        default:
+            PC88Logger.cpu.error("不正なインデックスアドレスオペランドタイプです")
+            return 0
         }
     }
 }
