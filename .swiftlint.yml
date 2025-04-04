@@ -1,0 +1,86 @@
+# PC88iOS プロジェクト用 SwiftLint 設定ファイル
+
+# デフォルトで有効にするルール
+included:
+  - PC88iOS
+  - PC88iOSTests
+  - PC88iOSUITests
+
+# 無視するファイル・ディレクトリ
+excluded:
+  - Pods
+  - PC88iOS/Resources
+  - PC88iOS/Preview Content
+  - "**/*.generated.swift"
+
+# デフォルトルールの調整
+line_length:
+  warning: 120
+  error: 150
+  ignores_comments: true
+  ignores_urls: true
+
+# 関数の長さ
+function_body_length:
+  warning: 60
+  error: 100
+
+# 型の長さ
+type_body_length:
+  warning: 300
+  error: 500
+
+# ファイルの長さ
+file_length:
+  warning: 500
+  error: 1000
+
+# 引数の数
+function_parameter_count:
+  warning: 6
+  error: 8
+
+# 循環的複雑度
+cyclomatic_complexity:
+  warning: 10
+  error: 15
+
+# 無効にするルール
+disabled_rules:
+  - trailing_whitespace # 行末の空白を許可
+  - todo # TODOコメントを許可
+
+# オプトインルール（デフォルトでは無効だが有効にするルール）
+opt_in_rules:
+  - empty_count # count == 0 の代わりに isEmpty を使用
+  - force_unwrapping # 強制アンラップを警告
+  - private_outlet # IBOutletをprivateに
+  - implicitly_unwrapped_optional # 暗黙的にアンラップされるOptionalを警告
+  - missing_docs # ドキュメントコメントの欠落を警告
+  - closure_spacing # クロージャの前後にスペースを要求
+  - explicit_init # 不要なinitの呼び出しを警告
+  - first_where # filter().first の代わりに first(where:) を使用
+  - modifier_order # モディファイアの順序を統一
+  - sorted_imports # importを整列
+
+# カスタムルール
+custom_rules:
+  no_direct_print:
+    name: "No Direct Print"
+    regex: "\\bprint\\("
+    message: "直接のprint()の使用は避け、ロガーを使用してください"
+    severity: warning
+
+# ドキュメントコメントのフォーマット
+missing_docs:
+  warning:
+    - public
+    - open
+
+# 警告として扱うエラー
+analyzer_rules:
+  - unused_import
+  - unused_declaration
+
+# SwiftLintのバージョン
+swiftlint_version: 0.58.2
