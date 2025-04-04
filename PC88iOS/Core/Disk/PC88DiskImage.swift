@@ -94,10 +94,8 @@ class PC88DiskImage: DiskImageAccessing {
         // データ範囲が有効かチェック
         if offset >= 0 && endOffset <= diskData.count {
             // データを書き込み
-            for i in 0..<dataSize {
-                if offset + i < diskData.count {
-                    diskData[offset + i] = data[i]
-                }
+            for i in 0..<dataSize where offset + i < diskData.count {
+                diskData[offset + i] = data[i]
             }
             self.diskData = diskData
             return true
