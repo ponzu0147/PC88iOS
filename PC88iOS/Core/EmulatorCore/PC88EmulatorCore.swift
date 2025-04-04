@@ -54,9 +54,6 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     private var beepTest: PC88BeepTest?
     
 
-    
-
-    
     /// ビープ音生成機能へのアクセサ
     func getBeepSound() -> Any? {
         return beepSound
@@ -86,9 +83,6 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     }
     
 
-    
-
-    
     /// エミュレーション速度（1.0 = 通常速度）
     private var emulationSpeed: Float = 1.0
     
@@ -98,8 +92,6 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// 現在のCPUクロックモード
     private var currentClockMode: PC88CPUClock.ClockMode = .mode4MHz // デフォルトは4MHz
     
-
-    
     /// ログ表示用タイマー
     private var logTimer: Timer?
     
@@ -108,8 +100,6 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     /// エミュレーションタイマー
     private var emulationTimer: Timer?
-    
-
     
     /// 画面イメージ
     private var screenImage: CGImage?
