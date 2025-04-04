@@ -677,7 +677,6 @@ struct POPInstruction: Z80Instruction {
 }
 
 
-
 /// RLCA命令
 struct RLCAInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
@@ -823,7 +822,6 @@ struct PUSHInstruction: Z80Instruction {
 }
 
 
-
 /// INCレジスタペア命令
 struct INCRegPairInstruction: Z80Instruction {
     let register: RegisterPairOperand
@@ -839,7 +837,6 @@ struct INCRegPairInstruction: Z80Instruction {
     var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) }
     var description: String { return "INC \(register)" }
 }
-
 
 
 /// LD A,(nn)命令（直接アドレスからAレジスタへのロード）
