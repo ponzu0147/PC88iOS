@@ -110,6 +110,27 @@ class TestMemory: MemoryAccessing {
     func readByte(at address: UInt16) -> UInt8 {
         return memory[address] ?? 0
     }
+    
+    func readWord(at address: UInt16) -> UInt16 {
+        let lowByte = readByte(at: address)
+        let highByte = readByte(at: address + 1)
+        return UInt16(highByte) << 8 | UInt16(lowByte)
+    }
+    
+    func writeWord(_ value: UInt16, at address: UInt16) {
+        let lowByte = UInt8(value & 0xFF)
+        let highByte = UInt8(value >> 8)
+        writeByte(lowByte, at: address)
+        writeByte(highByte, at: address + 1)
+    }
+    
+    func switchBank(_ bank: Int, for area: MemoryArea) {
+        // テスト用の簡易実装のため何もしない
+    }
+    
+    func setROMEnabled(_ enabled: Bool, for area: MemoryArea) {
+        // テスト用の簡易実装のため何もしない
+    }
 }
 
 /// テスト用CPU
@@ -123,6 +144,18 @@ class TestCPU: CpuControlling {
     
     func setStartAddress(_ address: UInt16) {
         programCounter = address
+    }
+    
+    func setProgramCounter(address: Int) {
+        programCounter = UInt16(address)
+    }
+    
+    func startExecution() {
+        // テスト用の簡易実装のため何もしない
+    }
+    
+    func stopExecution() {
+        // テスト用の簡易実装のため何もしない
     }
 }
 
@@ -143,12 +176,6 @@ class MockD88DiskImage: D88DiskImage {
         self.hasValidOs = validOs
         super.init()
         
-        // テスト用のディスク名を設定
-        self.diskName = hasValidIpl ? "ALPHA-MINI TEST" : "NORMAL DISK"
-        
-        // テスト用のディスクタイプを設定
-        self.diskType = diskType2D
-        
         // テスト用のセクタデータを作成
         createMockSectorData()
     }
@@ -157,49 +184,26 @@ class MockD88DiskImage: D88DiskImage {
     
     /// テスト用のセクタデータを作成
     private func createMockSectorData() {
-        // トラック0のセクタデータを作成
-        let track0 = TrackData(track: 0, side: 0)
-        
-        // IPLセクタ（セクタ1）
-        let iplData = hasValidIpl ? [0xF3, 0xC3] + Array(repeating: 0, count: 254) : Array(repeating: 0xFF, count: 256)
-        let iplSector = SectorData(
-            id: SectorID(cylinder: 0, head: 0, record: 1, size: 1), // N=1 は256バイト
-            data: Data(iplData),
-            status: 0
-        )
-        track0.sectors.append(iplSector)
-        
-        // OSセクタ（セクタ2〜）
-        if hasValidOs {
-            let sector2Data = [0x01, 0x02] + Array(repeating: 0, count: 254)
-            let sector2 = SectorData(
-                id: SectorID(cylinder: 0, head: 0, record: 2, size: 1),
-                data: Data(sector2Data),
-                status: 0
-            )
-            track0.sectors.append(sector2)
-            
-            let sector3Data = [0x03, 0x04] + Array(repeating: 0, count: 254)
-            let sector3 = SectorData(
-                id: SectorID(cylinder: 0, head: 0, record: 3, size: 1),
-                data: Data(sector3Data),
-                status: 0
-            )
-            track0.sectors.append(sector3)
-        }
-        
-        // セクタデータを追加
-        sectorData.append(track0)
+        // セクタデータを作成（実際のデータはオーバーライドメソッドで提供）
+        // 注：D88DiskImageの内部実装にアクセスできないため、
+        // extractAlphaMiniDosIpl()とextractAlphaMiniDosOs()をオーバーライドして
+        // テストデータを提供します
     }
     
     // MARK: - オーバーライド
     
     override func readSector(track: Int, sector: Int) -> [UInt8]? {
-        if !hasValidIpl && track == 0 && sector == 1 {
-            return nil
+        // IPLセクタ（トラック0、セクタ1）の場合
+        if track == 0 && sector == 1 {
+            if !hasValidIpl {
+                return nil
+            }
+            
+            // テスト用のIPLデータを返す
+            return [UInt8(0xF3), UInt8(0xC3)] + Array(repeating: UInt8(0), count: 254)
         }
         
-        // スーパークラスの実装を使用
+        // その他のセクタは親クラスの実装を使用
         return super.readSector(track: track, sector: sector)
     }
     
@@ -209,8 +213,8 @@ class MockD88DiskImage: D88DiskImage {
         }
         
         // テスト用のOSデータを返す
-        let sector1 = [0x01, 0x02] + Array(repeating: 0, count: 254)
-        let sector2 = [0x03, 0x04] + Array(repeating: 0, count: 254)
+        let sector1: [UInt8] = [0x01, 0x02] + Array(repeating: 0, count: 254)
+        let sector2: [UInt8] = [0x03, 0x04] + Array(repeating: 0, count: 254)
         
         return [sector1, sector2]
     }
@@ -223,4 +227,15 @@ class MockD88DiskImage: D88DiskImage {
         // スーパークラスの実装を使用
         return super.readSector(track: track, side: side, sectorID: sectorID)
     }
+    
+    /// ALPHA-MINI-DOSのOS部分を抽出（オーバーライド）
+    override func extractAlphaMiniDosOs() -> [UInt8]? {
+        if hasValidOs {
+            return [UInt8(0x01), UInt8(0x02)] + Array(repeating: UInt8(0), count: 254)
+        } else {
+            return nil
+        }
+    }
+    
+
 }
