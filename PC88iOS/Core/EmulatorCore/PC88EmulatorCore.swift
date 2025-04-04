@@ -876,7 +876,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         // CPUを取得
         guard let z80CPU = cpu as? Z80CPU else {
-            print("CPUが初期化されていません")
+            PC88Logger.cpu.error("CPUが初期化されていません")
             return
         }
         
@@ -1311,7 +1311,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         cyclesRemainder = 0
         shouldResetMetrics = false
         
-        print("クロックモード変更検出: \(currentMode), 周波数: \(baseCyclesPerSecond) Hz, サイクル数/フレーム: \(cyclesPerFrame)")
+        PC88Logger.core.debug("クロックモード変更検出: \(currentMode), 周波数: \(baseCyclesPerSecond) Hz, サイクル数/フレーム: \(cyclesPerFrame)")
     }
     
     /// パフォーマンスメトリクスをログに出力
@@ -1334,9 +1334,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         let perfLog = "[クロックモード: \(clockMode)] FPS: \(String(format: "%.2f", targetFPS)), 平均フレーム時間: \(String(format: "%.2f", (1.0/targetFPS) * 1000)) ms, サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(baseCyclesPerSecond) Hz"
         
         // コンソールにログを出力
-        print("\n")
-        print(perfLog)
-        print("\n")
+        PC88Logger.core.debug("\n\n\(perfLog)\n\n")
         
         // ログ出力を確実に行うために強制的にフラッシュ
         fflush(stdout)
@@ -1363,7 +1361,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         var baseCyclesPerSecond: Int = currentMode == .mode4MHz ? 4_000_000 : 8_000_000
         var cyclesPerFrame: Int = Int(Double(baseCyclesPerSecond) / targetFPS)
         
-        print("クロックモード: \(currentMode), サイクル数/フレーム: \(cyclesPerFrame)")
+        PC88Logger.core.debug("クロックモード: \(currentMode), サイクル数/フレーム: \(cyclesPerFrame)")
         
         while !Thread.current.isCancelled {
             // 一時停止中は処理をスキップ
@@ -1435,19 +1433,19 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     func playBeepScale() {
         // ビープ音テストが初期化されているか確認
         guard let beepTest = beepTest else {
-            print("ビープ音テストが初期化されていません")
+            PC88Logger.sound.error("ビープ音テストが初期化されていません")
             return
         }
         
         // ビープ音が初期化されているか確認
         guard beepSound != nil else {
-            print("ビープ音生成機能が初期化されていません")
+            PC88Logger.sound.error("ビープ音生成機能が初期化されていません")
             return
         }
         
         // すでに再生中なら何もしない
         if beepTest.isPlaying {
-            print("すでにビープ音が再生中です")
+            PC88Logger.sound.debug("すでにビープ音が再生中です")
             return
         }
         
@@ -1461,13 +1459,13 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         // CPUクロックモードを確認して表示
         let clockModeText = cpuClock.currentMode == .mode4MHz ? "4MHz" : "8MHz"
-        print("現在のクロックモード: \(clockModeText)")
+        PC88Logger.cpu.debug("現在のクロックモード: \(clockModeText)")
         
         // クロックモードが正しく設定されているか確認
         if let z80 = cpu as? Z80CPU {
             let cpuMode = z80.getClockMode()
             if cpuMode != cpuClock.currentMode {
-                print("警告: CPUクロックモードが不一致しています。修正します。")
+                PC88Logger.cpu.warning("警告: CPUクロックモードが不一致しています。修正します。")
                 cpuClock.setClockMode(cpuMode)
             }
         }
@@ -1491,16 +1489,16 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             }
         }
         
-        print("ビープ音の演奏を開始しました")
+        PC88Logger.sound.debug("ビープ音の演奏を開始しました")
     }
     
     /// フォントを設定
     private func setupFonts(for screen: PC88ScreenBase) {
-        print("フォントデータの読み込みを開始します...")
+        PC88Logger.core.debug("フォントデータの読み込みを開始します...")
         
         // フォントローダーを初期化
         let fontLoaded = PC88FontLoader.shared.loadFonts()
-        print("フォントデータの読み込み結果: \(fontLoaded ? "成功" : "失敗")")
+        PC88Logger.core.debug("フォントデータの読み込み結果: \(fontLoaded ? "成功" : "失敗")")
         
         // フォントデータを画面に設定
         var successCount = 0
@@ -1511,9 +1509,9 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         for testChar in testChars {
             if let fontData = PC88FontLoader.shared.getFontBitmap8x16(charCode: testChar) {
-                print("文字コード \(testChar) (\(String(format: "%c", testChar))) のフォントデータ: \(fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))...")
+                PC88Logger.core.debug("文字コード \(testChar) (\(String(format: "%c", testChar))) のフォントデータ: \(fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))...")
             } else {
-                print("文字コード \(testChar) のフォントデータが取得できません")
+                PC88Logger.core.error("文字コード \(testChar) のフォントデータが取得できません")
             }
         }
         
@@ -1527,24 +1525,24 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             }
         }
         
-        print("フォントデータを画面に設定しました (成功: \(successCount), 失敗: \(failureCount))")
+        PC88Logger.core.debug("フォントデータを画面に設定しました (成功: \(successCount), 失敗: \(failureCount))")
         
         // 画面のフォントデータを確認
         for testChar in testChars {
             // フォントデータを直接PC88FontLoaderから取得して表示
             if let fontData = PC88FontLoader.shared.getFontBitmap8x16(charCode: testChar) {
-                print("画面の文字コード \(testChar) (\(String(format: "%c", testChar))) のフォントデータ: \(fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))...")
+                PC88Logger.core.debug("画面の文字コード \(testChar) (\(String(format: "%c", testChar))) のフォントデータ: \(fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))...")
             }
         }
     }
     
     /// IPLを実行してOSを起動
     private func executeIPL() {
-        print("IPLを実行します...")
+        PC88Logger.core.debug("IPLを実行します...")
         
         // CPUが初期化されているか確認
         if cpu == nil {
-            print("CPUが初期化されていません")
+            PC88Logger.cpu.error("CPUが初期化されていません")
             return
         }
         
@@ -1559,7 +1557,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             // 割り込みを有効化
             z80.setInterruptEnabled(true)
             
-            print("Z80 CPUレジスタを初期化しました: PC=0x0000, SP=0xF380")
+            PC88Logger.cpu.debug("Z80 CPUレジスタを初期化しました: PC=0x0000, SP=0xF380")
         }
         
         // I/Oポートの初期化
@@ -1569,20 +1567,20 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             pc88IO.writePort(0xE6, value: 0x00) // 割り込みマスクレジスタ
             
             // CRTCの初期化（必要に応じて実装）
-            print("I/Oポートを初期化しました")
+            PC88Logger.io.debug("I/Oポートを初期化しました")
         }
         
         // 画面モードの初期化
         if let pc88Screen = screen as? PC88ScreenBase {
             // テキストモードを設定
             pc88Screen.writeIO(port: 0x30, value: 0x00) // テキストモード有効、グラフィックモード無効
-            print("画面モードを初期化しました: テキストモード有効")
+            PC88Logger.screen.debug("画面モードを初期化しました: テキストモード有効")
         }
         
         // ディスクがセットされているか確認
         if let pc88FDC = fdc as? PC88FDC, pc88FDC.hasDiskImage(drive: 0) {
             // ディスクがセットされていればIPLを実行
-            print("ディスクからのIPLを実行します")
+            PC88Logger.disk.debug("ディスクからのIPLを実行します")
             
             // ブートセクタをメモリにロード (通常0x8000にロード)
             loadBootSector()
@@ -1594,7 +1592,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             if let z80 = cpu as? Z80CPU {
                 if isAlphaMiniDos {
                     // ALPHA-MINI-DOSの場合は特別処理
-                    print("ALPHA-MINI-DOSの実行を開始します")
+                    PC88Logger.disk.debug("ALPHA-MINI-DOSの実行を開始します")
                     
                     // PC88AlphaMiniDosIntegrationを使用して初期化
                     if let pc88Memory = memory as? PC88Memory,
@@ -1604,9 +1602,9 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                         let integration = PC88AlphaMiniDosIntegration(memory: pc88Memory, cpu: z80)
                         
                         if integration.loadAlphaMiniDos(from: d88DiskImage) {
-                            print("ALPHA-MINI-DOSの初期化に成功しました")
+                            PC88Logger.disk.debug("ALPHA-MINI-DOSの初期化に成功しました")
                         } else {
-                            print("ALPHA-MINI-DOSの初期化に失敗しました。従来の方法で続行します")
+                            PC88Logger.disk.warning("ALPHA-MINI-DOSの初期化に失敗しました。従来の方法で続行します")
                             
                             // 従来の方法で初期化
                             // Z80 CPUの初期状態を設定
@@ -1623,7 +1621,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                             z80.disableInterrupts()  // 割り込み無効化
                         }
                     } else {
-                        print("ALPHA-MINI-DOSの初期化に必要なコンポーネントが取得できませんでした")
+                        PC88Logger.disk.error("ALPHA-MINI-DOSの初期化に必要なコンポーネントが取得できませんでした")
                         
                         // 従来の方法で初期化
                         z80.setPC(0xC000)  // プログラムカウンタをIPLの先頭に設定
@@ -1631,21 +1629,21 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                         z80.disableInterrupts()  // 割り込み無効化
                     }
                     
-                    print("Z80 CPUの初期状態を設定しました: PC=0xC000, SP=0xF000")
+                    PC88Logger.cpu.debug("Z80 CPUの初期状態を設定しました: PC=0xC000, SP=0xF000")
                     
                     // メモリの内容を確認
                     if let pc88Memory = memory as? PC88Memory {
-                        print("IPLメモリ内容確認 (0xC000-0xC00F):")
+                        PC88Logger.memory.debug("IPLメモリ内容確認 (0xC000-0xC00F):")
                         for i in 0..<16 {
                             let byte = pc88Memory.readByte(at: 0xC000 + UInt16(i))
-                            print(String(format: "%02X ", byte), terminator: "")
+                            PC88Logger.memory.debug(String(format: "%02X ", byte), terminator: "")
                         }
-                        print("")
+                        PC88Logger.memory.debug("")
                     }
                     
                     // 命令トレースを有効化
                     z80.enableInstructionTrace()
-                    print("ALPHA-MINI-DOSの実行をトレースします")
+                    PC88Logger.cpu.debug("ALPHA-MINI-DOSの実行をトレースします")
                     
                     // 画面を強制的に更新
                     if let pc88Screen = screen as? PC88ScreenBase {
@@ -1676,16 +1674,16 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                         
                         // 画面を更新
                         updateScreen()
-                        print("ALPHA-MINI-DOS用に画面を更新しました")
+                        PC88Logger.screen.debug("ALPHA-MINI-DOS用に画面を更新しました")
                     }
                 } else {
                     // 通常のディスクイメージは0x8000に設定
                     z80.setPC(0x8000)
-                    print("ブートセクタから実行を開始します: PC=0x8000")
+                    PC88Logger.cpu.debug("ブートセクタから実行を開始します: PC=0x8000")
                 }
             }
         } else {
-            print("ディスクがセットされていないか、読み込みに失敗しました")
+            PC88Logger.disk.warning("ディスクがセットされていないか、読み込みに失敗しました")
         }
     }
     
