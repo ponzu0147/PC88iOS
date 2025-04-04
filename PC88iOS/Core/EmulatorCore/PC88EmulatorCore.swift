@@ -827,7 +827,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     private func loadBootSector() {
         guard let pc88FDC = fdc as? PC88FDC,
               let pc88Memory = memory as? PC88Memory else {
-            print("FDCまたはメモリが初期化されていません")
+            PC88Logger.core.error("FDCまたはメモリが初期化されていません")
             return
         }
         
@@ -851,13 +851,13 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     private func isBootSectorLoadable(pc88FDC: PC88FDC) -> Bool {
         // FDDブートが有効でない場合は何もしない
         if !fddBootEnabled {
-            print("FDDブートが無効です")
+            PC88Logger.disk.warning("FDDブートが無効です")
             return false
         }
         
         // ドライブ1にディスクイメージがセットされているか確認
         if !pc88FDC.hasDiskImage(drive: 0) {
-            print("ドライブ1にディスクイメージがセットされていません")
+            PC88Logger.disk.warning("ドライブ1にディスクイメージがセットされていません")
             return false
         }
         
@@ -866,11 +866,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     /// ALPHA-MINI-DOSのブートセクタをロードする
     private func loadAlphaMiniDosBootSector(pc88FDC: PC88FDC, pc88Memory: PC88Memory) {
-        print("ALPHA-MINI-DOSを検出しました。特別処理を実行します。")
+        PC88Logger.disk.debug("ALPHA-MINI-DOSを検出しました。特別処理を実行します。")
         
         // D88DiskImageを取得
         guard let d88DiskImage = pc88FDC.getDiskImage(drive: 0) as? D88DiskImage else {
-            print("ALPHA-MINI-DOSのディスクイメージの取得に失敗しました")
+            PC88Logger.disk.error("ALPHA-MINI-DOSのディスクイメージの取得に失敗しました")
             return
         }
         
@@ -884,35 +884,35 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         let integration = PC88AlphaMiniDosIntegration(memory: pc88Memory, cpu: z80CPU)
         
         if integration.loadAlphaMiniDos(from: d88DiskImage) {
-            print("ALPHA-MINI-DOSのロードに成功しました")
+            PC88Logger.disk.debug("ALPHA-MINI-DOSのロードに成功しました")
         } else {
-            print("ALPHA-MINI-DOSのロードに失敗しました")
+            PC88Logger.disk.error("ALPHA-MINI-DOSのロードに失敗しました")
             
             // 失敗した場合は従来の方法で再試行
             if let iplData = d88DiskImage.readSector(track: 0, sector: 1) {
                 // メモリの0xC000にIPLをロード (256バイト)
                 loadDataToMemory(data: iplData, startAddress: 0xC000, pc88Memory: pc88Memory)
-                print("ALPHA-MINI-DOSのIPLをメモリにロードしました: 0xC000-0xC0FF")
+                PC88Logger.disk.debug("ALPHA-MINI-DOSのIPLをメモリにロードしました: 0xC000-0xC0FF")
                 
                 // OS部分もロード
                 loadAlphaMiniDosOs()
             } else {
-                print("ALPHA-MINI-DOSのIPLの読み込みに失敗しました")
+                PC88Logger.disk.error("ALPHA-MINI-DOSのIPLの読み込みに失敗しました")
             }
         }
     }
     
     /// 標準的なブートセクタをロードする
     private func loadStandardBootSector(pc88FDC: PC88FDC, pc88Memory: PC88Memory) {
-        print("IPLをロード中: ドライブ1、トラック0、セクタ1")
+        PC88Logger.disk.debug("IPLをロード中: ドライブ1、トラック0、セクタ1")
         
         // ブートセクタを読み込む (トラック0、セクタ1)
         if let sectorData = pc88FDC.readSector(drive: 0, track: 0, sector: 1) {
             // メモリの0x8000にIPLをロード (256バイト)
             loadDataToMemory(data: sectorData, startAddress: 0x8000, pc88Memory: pc88Memory)
-            print("IPLをメモリにロードしました: 0x8000-0x80FF")
+            PC88Logger.disk.debug("IPLをメモリにロードしました: 0x8000-0x80FF")
         } else {
-            print("IPLの読み込みに失敗しました")
+            PC88Logger.disk.error("IPLの読み込みに失敗しました")
         }
     }
     
@@ -927,11 +927,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     private func loadAlphaMiniDosOs() {
         guard let pc88FDC = fdc as? PC88FDC,
               let pc88Memory = memory as? PC88Memory else {
-            print("FDCまたはメモリが初期化されていません")
+            PC88Logger.core.error("FDCまたはメモリが初期化されていません")
             return
         }
         
-        print("ALPHA-MINI-DOSのOS部分をロードします")
+        PC88Logger.disk.debug("ALPHA-MINI-DOSのOS部分をロードします")
         
         // OS領域をクリア
         clearOsMemoryRegion(pc88Memory: pc88Memory)
@@ -945,7 +945,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         let osStartAddress: UInt16 = 0xD000
         let osClearSize: Int = 0x3000 // 12KBクリア
         
-        print("OS領域をクリアします: 0xD000-0xFFFF")
+        PC88Logger.disk.debug("OS領域をクリアします: 0xD000-0xFFFF")
         
         // UInt16の範囲を超えないように注意
         for i in 0..<min(osClearSize, 0x3000) {
@@ -965,7 +965,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         if let d88DiskImage = pc88FDC.getDiskImage(drive: 0) as? D88DiskImage,
            let osSectors = d88DiskImage.loadOsSectors() {
             
-            print("ALPHA-MINI-DOSのOS部分をロードします: \(osSectors.count)セクタ")
+            PC88Logger.disk.debug("ALPHA-MINI-DOSのOS部分をロードします: \(osSectors.count)セクタ")
             
             // OS部分を0xD000からロード
             _ = loadOsSectorsToMemory(osSectors: osSectors, pc88Memory: pc88Memory)
@@ -973,7 +973,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             // メモリ内容を確認してログに出力
             verifyOsMemoryContents(pc88Memory: pc88Memory)
         } else {
-            print("ALPHA-MINI-DOSのOSセクタの読み込みに失敗しました")
+            PC88Logger.disk.error("ALPHA-MINI-DOSのOSセクタの読み込みに失敗しました")
         }
     }
     
@@ -1001,22 +1001,22 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             }
         }
         
-        print("ALPHA-MINI-DOSのOS部分のロードが完了しました: 0xD000-0x\(String(format: "%04X", memoryOffset - 1)) (合計: \(totalBytesLoaded) バイト)")
+        PC88Logger.disk.debug("ALPHA-MINI-DOSのOS部分のロードが完了しました: 0xD000-0x\(String(format: "%04X", memoryOffset - 1)) (合計: \(totalBytesLoaded) バイト)")
         
         return memoryOffset
     }
     
     /// セクタロードの情報をログに出力
     private func logSectorLoad(index: Int, sectorData: [UInt8], startAddress: UInt16, endAddress: UInt16, validData: Bool) {
-        print("  OSセクタ\(index+1)をメモリにロードしました: 0x\(String(format: "%04X", startAddress))-0x\(String(format: "%04X", endAddress)) (有効データ: \(validData ? "あり" : "なし"))")
+        PC88Logger.disk.debug("  OSセクタ\(index+1)をメモリにロードしました: 0x\(String(format: "%04X", startAddress))-0x\(String(format: "%04X", endAddress)) (有効データ: \(validData ? "あり" : "なし"))")
         
         // 最初のセクタの内容を表示
         if index == 0 {
-            print("  最初のセクタの内容 (16バイト):")
+            PC88Logger.disk.debug("  最初のセクタの内容 (16バイト):")
             for i in 0..<min(16, sectorData.count) {
-                print(String(format: "%02X ", sectorData[i]), terminator: "")
+                PC88Logger.disk.debug(String(format: "%02X ", sectorData[i]), terminator: "")
             }
-            print("")
+            PC88Logger.disk.debug("")
         }
     }
     

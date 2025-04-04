@@ -397,6 +397,6 @@ class PC88FontLoader {
         font8x16![minusIndex + 14] = 0b00000000
         font8x16![minusIndex + 15] = 0b00000000
         
-        print("デフォルトフォントを作成しました")
+        PC88Logger.core.debug("デフォルトフォントを作成しました")
     }
 }
