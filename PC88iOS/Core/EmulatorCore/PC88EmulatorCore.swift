@@ -315,7 +315,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         let clockModeStr = currentClockMode == .mode4MHz ? "4MHz" : "8MHz"
         
         // 起動直後からパフォーマンス情報を表示
-        let startupLog = "[クロックモード: \(clockModeStr)] FPS: \(String(format: "%.2f", targetFPS)), 平均フレーム時間: \(String(format: "%.2f", (1.0/targetFPS) * 1000)) ms, サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(frequency) Hz"
+        let fpsStr = String(format: "%.2f", targetFPS)
+        let frameTimeStr = String(format: "%.2f", (1.0/targetFPS) * 1000)
+        let startupLog = "[クロックモード: \(clockModeStr)] FPS: \(fpsStr), " +
+            "平均フレーム時間: \(frameTimeStr) ms, " +
+            "サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(frequency) Hz"
         
         // コンソールにログを出力
         PC88Logger.core.debug("\n\n\(startupLog)\n")
@@ -987,18 +991,34 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             
             // 最初の数セクタのみログ表示
             if index < 5 {
-                logSectorLoad(index: index, sectorData: sectorData, startAddress: previousOffset, endAddress: memoryOffset - 1, validData: validData)
+                logSectorLoad(
+                    index: index,
+                    sectorData: sectorData,
+                    startAddress: previousOffset,
+                    endAddress: memoryOffset - 1,
+                    validData: validData
+                )
             }
         }
         
-        PC88Logger.disk.debug("ALPHA-MINI-DOSのOS部分のロードが完了しました: 0xD000-0x\(String(format: "%04X", memoryOffset - 1)) (合計: \(totalBytesLoaded) バイト)")
+        let endAddressHex = String(format: "%04X", memoryOffset - 1)
+        PC88Logger.disk.debug(
+            "ALPHA-MINI-DOSのOS部分のロードが完了しました: 0xD000-0x\(endAddressHex) " +
+            "(合計: \(totalBytesLoaded) バイト)"
+        )
         
         return memoryOffset
     }
     
     /// セクタロードの情報をログに出力
     private func logSectorLoad(index: Int, sectorData: [UInt8], startAddress: UInt16, endAddress: UInt16, validData: Bool) {
-        PC88Logger.disk.debug("  OSセクタ\(index+1)をメモリにロードしました: 0x\(String(format: "%04X", startAddress))-0x\(String(format: "%04X", endAddress)) (有効データ: \(validData ? "あり" : "なし"))")
+        let startAddressHex = String(format: "%04X", startAddress)
+        let endAddressHex = String(format: "%04X", endAddress)
+        let validDataStr = validData ? "あり" : "なし"
+        PC88Logger.disk.debug(
+            "  OSセクタ\(index+1)をメモリにロードしました: 0x\(startAddressHex)-0x\(endAddressHex) " +
+            "(有効データ: \(validDataStr))"
+        )
         
         // 最初のセクタの内容を表示
         if index == 0 {
@@ -1303,7 +1323,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         cyclesRemainder = 0
         shouldResetMetrics = false
         
-        PC88Logger.core.debug("クロックモード変更検出: \(currentMode), 周波数: \(baseCyclesPerSecond) Hz, サイクル数/フレーム: \(cyclesPerFrame)")
+        PC88Logger.core.debug(
+            "クロックモード変更検出: \(currentMode), " +
+            "周波数: \(baseCyclesPerSecond) Hz, " +
+            "サイクル数/フレーム: \(cyclesPerFrame)"
+        )
     }
     
     /// パフォーマンスメトリクスをログに出力
@@ -1323,7 +1347,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         let cyclesPerFrame = Int(Double(baseCyclesPerSecond) / targetFPS)
         
         // パフォーマンス情報を生成
-        let perfLog = "[クロックモード: \(clockMode)] FPS: \(String(format: "%.2f", targetFPS)), 平均フレーム時間: \(String(format: "%.2f", (1.0/targetFPS) * 1000)) ms, サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(baseCyclesPerSecond) Hz"
+        let fpsStr = String(format: "%.2f", targetFPS)
+        let frameTimeStr = String(format: "%.2f", (1.0/targetFPS) * 1000)
+        let perfLog = "[クロックモード: \(clockMode)] FPS: \(fpsStr), " +
+            "平均フレーム時間: \(frameTimeStr) ms, " +
+            "サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(baseCyclesPerSecond) Hz"
         
         // コンソールにログを出力
         PC88Logger.core.debug("\n\n\(perfLog)\n\n")
@@ -1378,7 +1406,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             // 1フレーム分のCPUサイクルを実行
             // フレームレートに応じて処理量を調整
             let frameRateAdjustment = 60.0 / targetFPS
-            let adjustedCycles = Int(Double(cyclesPerFrame) * Double(emulationSpeed) / frameRateAdjustment) + cyclesRemainder
+            let speedAdjustedCycles = Double(cyclesPerFrame) * Double(emulationSpeed)
+            let adjustedCycles = Int(speedAdjustedCycles / frameRateAdjustment) + cyclesRemainder
             let executedCycles = executeCPUCycles(adjustedCycles: adjustedCycles)
             
             // 実行されたサイクル数と目標サイクル数の差を次のフレームに持ち越す
@@ -1501,7 +1530,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         for testChar in testChars {
             if let fontData = PC88FontLoader.shared.getFontBitmap8x16(charCode: testChar) {
-                PC88Logger.core.debug("文字コード \(testChar) (\(String(format: "%c", testChar))) のフォントデータ: \(fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))...")
+                let charStr = String(format: "%c", testChar)
+                let fontDataHex = fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " ")
+                PC88Logger.core.debug(
+                    "文字コード \(testChar) (\(charStr)) のフォントデータ: \(fontDataHex)..."
+                )
             } else {
                 PC88Logger.core.error("文字コード \(testChar) のフォントデータが取得できません")
             }
@@ -1523,7 +1556,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         for testChar in testChars {
             // フォントデータを直接PC88FontLoaderから取得して表示
             if let fontData = PC88FontLoader.shared.getFontBitmap8x16(charCode: testChar) {
-                PC88Logger.core.debug("画面の文字コード \(testChar) (\(String(format: "%c", testChar))) のフォントデータ: \(fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))...")
+                let charStr = String(format: "%c", testChar)
+                let fontDataHex = fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " ")
+                PC88Logger.core.debug(
+                    "画面の文字コード \(testChar) (\(charStr)) のフォントデータ: \(fontDataHex)..."
+                )
             }
         }
     }
