@@ -562,7 +562,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// ディスクイメージのロード
     func loadDiskImage(url: URL, drive: Int) -> Bool {
         guard drive >= 0 && drive < 2 else { return false }
-        guard let fdc = fdc else { return false }
+        guard fdc != nil else { return false }
         return loadDiskImage(from: url, drive: drive, tempFileName: "user_disk.d88", reloadBootSector: fddBootEnabled)
     }
 
@@ -970,7 +970,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             print("ALPHA-MINI-DOSのOS部分をロードします: \(osSectors.count)セクタ")
             
             // OS部分を0xD000からロード
-            let memoryOffset = loadOsSectorsToMemory(osSectors: osSectors, pc88Memory: pc88Memory)
+            _ = loadOsSectorsToMemory(osSectors: osSectors, pc88Memory: pc88Memory)
             
             // メモリ内容を確認してログに出力
             verifyOsMemoryContents(pc88Memory: pc88Memory)
