@@ -1660,18 +1660,14 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                         
                         // デバッグ用に文字を表示
                         let testMessage = "ALPHA-MINI-DOS 1.3 (デバッグモード)"
-                        for (i, char) in testMessage.utf8.enumerated() {
-                            if i < 80 { // 1行目のみ
-                                pc88Screen.writeTextVRAM(address: UInt16(i), value: char)
-                            }
+                        for (i, char) in testMessage.utf8.enumerated() where i < 80 { // 1行目のみ
+                            pc88Screen.writeTextVRAM(address: UInt16(i), value: char)
                         }
                         
                         // 2行目に追加情報
                         let infoMessage = "PC=C000h SP=F000h"
-                        for (i, char) in infoMessage.utf8.enumerated() {
-                            if i < 80 { // 2行目
-                                pc88Screen.writeTextVRAM(address: UInt16(80 + i), value: char)
-                            }
+                        for (i, char) in infoMessage.utf8.enumerated() where i < 80 { // 2行目
+                            pc88Screen.writeTextVRAM(address: UInt16(80 + i), value: char)
                         }
                         
                         // 画面を更新
