@@ -12,7 +12,7 @@ struct LDRegRegInstruction: Z80Instruction {
     let destination: RegisterOperand
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers)
         destination.write(to: &registers, value: value)
         return cycles
@@ -29,7 +29,7 @@ struct LDRegImmInstruction: Z80Instruction {
     let destination: RegisterOperand
     let value: UInt8
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         destination.write(to: &registers, value: value)
         return cycles
     }
@@ -45,7 +45,7 @@ struct LDRegMemInstruction: Z80Instruction {
     let destination: RegisterOperand
     let address: MemoryAddressOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let addr = address.getAddress(from: registers)
         let value = memory.readByte(at: addr)
         destination.write(to: &registers, value: value)
@@ -63,7 +63,7 @@ struct LDMemRegInstruction: Z80Instruction {
     let address: MemoryAddressOperand
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let addr = address.getAddress(from: registers)
         let value = source.read(from: registers)
         memory.writeByte(value, at: addr)
@@ -81,7 +81,7 @@ struct LDMemImmInstruction: Z80Instruction {
     let address: MemoryAddressOperand
     let value: UInt8
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let addr = address.getAddress(from: registers)
         memory.writeByte(value, at: addr)
         return cycles
@@ -95,7 +95,7 @@ struct LDMemImmInstruction: Z80Instruction {
 
 /// LD A,(BC)命令
 struct LDABCInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         registers.regA = memory.readByte(at: registers.regBC)
         return cycles
     }
@@ -108,7 +108,7 @@ struct LDABCInstruction: Z80Instruction {
 
 /// LD A,(DE)命令
 struct LDADEInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         registers.regA = memory.readByte(at: registers.regDE)
         return cycles
     }
@@ -123,7 +123,7 @@ struct LDADEInstruction: Z80Instruction {
 struct LDAnnInstruction: Z80Instruction {
     let address: UInt16
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         registers.regA = memory.readByte(at: address)
         return cycles
     }
@@ -136,7 +136,7 @@ struct LDAnnInstruction: Z80Instruction {
 
 /// LD (BC),A命令
 struct LDBCAInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         memory.writeByte(registers.regA, at: registers.regBC)
         return cycles
     }
@@ -149,7 +149,7 @@ struct LDBCAInstruction: Z80Instruction {
 
 /// LD (DE),A命令
 struct LDDEAInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         memory.writeByte(registers.regA, at: registers.regDE)
         return cycles
     }
@@ -165,7 +165,7 @@ struct LDRegPairImmInstruction: Z80Instruction {
     let register: RegisterPairOperand
     let value: UInt16
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // レジスタペアに値を書き込む
         register.write(to: &registers, value: value)
         return cycles
@@ -181,7 +181,7 @@ struct LDRegPairImmInstruction: Z80Instruction {
 struct LDnnAInstruction: Z80Instruction {
     let address: UInt16
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         memory.writeByte(registers.regA, at: address)
         return cycles
     }
@@ -197,7 +197,7 @@ struct LDMemAddrRegPairInstruction: Z80Instruction {
     let address: UInt16
     let source: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers)
         memory.writeWord(value, at: address)
         return cycles
@@ -214,7 +214,7 @@ struct LDRegPairMemAddrInstruction: Z80Instruction {
     let destination: RegisterPairOperand
     let address: UInt16
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = memory.readWord(at: address)
         destination.write(to: &registers, value: value)
         return cycles

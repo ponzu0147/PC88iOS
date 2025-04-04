@@ -24,7 +24,7 @@ struct ANDInstruction: Z80Instruction {
         }
     }
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value: UInt8
         var cycles = 4
         
@@ -81,7 +81,7 @@ struct ORInstruction: Z80Instruction {
         }
     }
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value: UInt8
         var cycles = 4
         
@@ -138,7 +138,7 @@ struct XORInstruction: Z80Instruction {
         }
     }
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value: UInt8
         var cycles = 4
         
@@ -195,7 +195,7 @@ struct CPInstruction: Z80Instruction {
         }
     }
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value: UInt8
         var cycles = 4
         
