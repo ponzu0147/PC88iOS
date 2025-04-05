@@ -7,8 +7,8 @@ import Foundation
 struct INInstruction: Z80Instruction {
     let port: UInt8
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
-        let value = io.readPort(port)
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
+        let value = inputOutput.readPort(port)
         
         registers.a = value
         
@@ -24,8 +24,8 @@ struct INInstruction: Z80Instruction {
 struct OUTInstruction: Z80Instruction {
     let port: UInt8
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
-        io.writePort(port, value: registers.a)
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
+        inputOutput.writePort(port, value: registers.a)
         
         return cycles
     }
@@ -39,10 +39,10 @@ struct OUTInstruction: Z80Instruction {
 struct INRegCInstruction: Z80Instruction {
     let register: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let port = registers.c
         
-        let value = io.readPort(port)
+        let value = inputOutput.readPort(port)
         
         register.write(to: &registers, value: value)
         
@@ -64,12 +64,12 @@ struct INRegCInstruction: Z80Instruction {
 struct OUTCRegInstruction: Z80Instruction {
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let port = registers.c
         
         let value = source.read(from: registers)
         
-        io.writePort(port, value: value)
+        inputOutput.writePort(port, value: value)
         
         return cycles
     }

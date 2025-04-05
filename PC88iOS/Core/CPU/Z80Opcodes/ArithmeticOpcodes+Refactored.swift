@@ -7,7 +7,7 @@ import Foundation
 struct ADDInstruction: Z80Instruction {
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
         let a = registers.a
         
@@ -40,7 +40,7 @@ struct ADDInstruction: Z80Instruction {
 struct SUBInstruction: Z80Instruction {
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
         let a = registers.a
         
@@ -73,7 +73,7 @@ struct SUBInstruction: Z80Instruction {
 struct INCRegInstruction: Z80Instruction {
     let register: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = register.read(from: registers, memory: memory)
         
         let halfCarry = (value & 0x0F) == 0x0F
@@ -102,7 +102,7 @@ struct INCRegInstruction: Z80Instruction {
 struct DECRegInstruction: Z80Instruction {
     let register: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = register.read(from: registers, memory: memory)
         
         let halfCarry = (value & 0x0F) == 0
@@ -131,7 +131,7 @@ struct DECRegInstruction: Z80Instruction {
 struct CPInstruction: Z80Instruction {
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
         let a = registers.a
         
@@ -160,7 +160,7 @@ struct CPInstruction: Z80Instruction {
 }
 
 struct CPLInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         registers.a = ~registers.a
         
         registers.setFlag(Z80Registers.Flags.halfCarry, value: true)
