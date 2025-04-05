@@ -11,9 +11,9 @@ import Foundation
 struct OUTInstruction: Z80Instruction {
     let port: UInt8
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // PC-88の実装ではポート番号は8ビットであるため、ポート番号のみを使用
-        io.writePort(port, value: registers.regA)
+        inputOutput.writePort(port, value: registers.regA)
         return cycles
     }
     
@@ -27,9 +27,9 @@ struct OUTInstruction: Z80Instruction {
 struct INInstruction: Z80Instruction {
     let port: UInt8
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // PC-88の実装ではポート番号は8ビットであるため、ポート番号のみを使用
-        registers.regA = io.readPort(port)
+        registers.regA = inputOutput.readPort(port)
         return cycles
     }
     

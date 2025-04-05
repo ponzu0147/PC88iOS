@@ -6,12 +6,232 @@ import Foundation
 
 class Z80InstructionDecoder {
     
-    func decode(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction {
+    // オペランドソースとターゲットは別ファイルで定義されているので使用
+    /// 命令をデコード
+    func decode(_ opcode: UInt8, memory: MemoryAccessing, programCounter: UInt16) -> Z80Instruction {
+        // 基本的な命令デコード
         switch opcode {
         case 0x00: // NOP
             return NOPInstruction()
+        case 0x03: // INC BC
+            return INCRegPairInstruction(register: .bc)
+        case 0x07: // RLCA
+            return RLCAInstruction()
+        case 0x08: // EX AF,AF'
+            return EXAFInstruction()
+        case 0x0F: // RRCA
+            return RRCAInstruction()
+        case 0x10: // DJNZ
+            let offset = memory.readByte(at: programCounter)
+            return DJNZInstruction(offset: Int8(bitPattern: offset))
+        case 0x11: // LD DE,nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let value = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDRegPairImmInstruction(register: .de, value: value)
+        case 0x12: // LD (DE),A
+            return LDMemRegInstruction(address: .de, source: .a)
+        case 0x13: // INC DE
+            return INCRegPairInstruction(register: .de)
+        case 0x21: // LD HL,nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let value = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDRegPairImmInstruction(register: .hl, value: value)
+        case 0x23: // INC HL
+            return INCRegPairInstruction(register: .hl)
+        case 0x02: // LD (BC),A
+            return LDMemRegInstruction(address: .bc, source: .a)
+            
+        case 0x1A: // LD A,(DE)
+            return LDRegMemInstruction(destination: .a, address: .de)
+            
+        case 0x32: // LD (nn),A
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDDirectMemRegInstruction(address: address, source: .a)
+            
+        case 0x3A: // LD A,(nn)
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDRegMemAddrInstruction(destination: .a, address: address)
+            
+        case 0x3B: // DEC SP
+            return DECRegPairInstruction(register: .sp)
+        case 0x01: // LD BC,nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let value = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDRegPairImmInstruction(register: .bc, value: value)
+        case 0x04: // INC B
+            return INCRegInstruction(register: .b)
+        case 0x05: // DEC B
+            return DECRegInstruction(register: .b)
+        case 0x06: // LD B,n
+            let value = memory.readByte(at: programCounter)
+            return LDRegImmInstruction(destination: .b, value: value)
+        case 0x0A: // LD A,(BC)
+            return LDRegMemInstruction(destination: .a, address: .bc)
+        case 0x0C: // INC C
+            return INCRegInstruction(register: .c)
+        case 0x0D: // DEC C
+            return DECRegInstruction(register: .c)
+        case 0x0E: // LD C,n
+            let value = memory.readByte(at: programCounter)
+            return LDRegImmInstruction(destination: .c, value: value)
+        case 0x14: // INC D
+            return INCRegInstruction(register: .d)
+        case 0x15: // DEC D
+            return DECRegInstruction(register: .d)
+        case 0x16: // LD D,n
+            let value = memory.readByte(at: programCounter)
+            return LDRegImmInstruction(destination: .d, value: value)
+        case 0x1C: // INC E
+            return INCRegInstruction(register: .e)
+        case 0x1D: // DEC E
+            return DECRegInstruction(register: .e)
+        case 0x1E: // LD E,n
+            let value = memory.readByte(at: programCounter)
+            return LDRegImmInstruction(destination: .e, value: value)
+        case 0x22: // LD (nn),HL
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDMemAddrRegPairInstruction(address: address, source: .hl)
+        case 0x24: // INC H
+            return INCRegInstruction(register: .h)
+        case 0x25: // DEC H
+            return DECRegInstruction(register: .h)
+        case 0x26: // LD H,n
+            let value = memory.readByte(at: programCounter)
+            return LDRegImmInstruction(destination: .h, value: value)
+        case 0x2A: // LD HL,(nn)
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDRegPairMemAddrInstruction(destination: .hl, address: address)
+        case 0x2C: // INC L
+            return INCRegInstruction(register: .l)
+        case 0x2D: // DEC L
+            return DECRegInstruction(register: .l)
+        case 0x2E: // LD L,n
+            let value = memory.readByte(at: programCounter)
+            return LDRegImmInstruction(destination: .l, value: value)
+        case 0x31: // LD SP,nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let value = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDRegPairImmInstruction(register: .sp, value: value)
+        case 0x33: // INC SP
+            return INCRegPairInstruction(register: .sp)
+        case 0x36: // LD (HL),n
+            let value = memory.readByte(at: programCounter)
+            return LDMemImmInstruction(address: .hl, value: value)
+        case 0x18: // JR n
+            let offset = memory.readByte(at: programCounter)
+            return JRInstruction(condition: .none, offset: Int8(bitPattern: offset))
+        case 0x20: // JR NZ,n
+            let offset = memory.readByte(at: programCounter)
+            return JRInstruction(condition: .notZero, offset: Int8(bitPattern: offset))
+        case 0x28: // JR Z,n
+            let offset = memory.readByte(at: programCounter)
+            return JRInstruction(condition: .zero, offset: Int8(bitPattern: offset))
+        case 0x30: // JR NC,n
+            let offset = memory.readByte(at: programCounter)
+            return JRInstruction(condition: .notCarry, offset: Int8(bitPattern: offset))
+        case 0x38: // JR C,n
+            let offset = memory.readByte(at: programCounter)
+            return JRInstruction(condition: .carry, offset: Int8(bitPattern: offset))
+        case 0x39: // ADD HL,SP
+            return ADDHLInstruction(source: .sp)
         case 0x76: // HALT
             return HALTInstruction()
+        case 0xC0: // RET NZ
+            return RETInstruction(condition: .notZero)
+        case 0xC2: // JP NZ,nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return JPInstruction(condition: .notZero, address: address)
+        case 0xC3: // JP nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return JPInstruction(condition: .none, address: address)
+        case 0xC4: // CALL NZ,nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return CALLInstruction(condition: .notZero, address: address)
+        case 0xC8: // RET Z
+            return RETInstruction(condition: .zero)
+        case 0xC9: // RET
+            return RETInstruction(condition: .none)
+        case 0xCA: // JP Z,nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return JPInstruction(condition: .zero, address: address)
+        case 0xCC: // CALL Z,nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return CALLInstruction(condition: .zero, address: address)
+        case 0xCD: // CALL nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return CALLInstruction(condition: .none, address: address)
+        case 0xD0: // RET NC
+            return RETInstruction(condition: .notCarry)
+        case 0xD2: // JP NC,nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return JPInstruction(condition: .notCarry, address: address)
+        case 0xD4: // CALL NC,nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return CALLInstruction(condition: .notCarry, address: address)
+        case 0xD8: // RET C
+            return RETInstruction(condition: .carry)
+        case 0xDA: // JP C,nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return JPInstruction(condition: .carry, address: address)
+        case 0xDC: // CALL C,nn
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return CALLInstruction(condition: .carry, address: address)
+        case 0x98: // SBC A,B
+            return SBCInstruction(source: .b)
+        case 0xC5: // PUSH BC
+            return PUSHInstruction(register: .bc)
+        case 0xD3: // OUT (n), A
+            let port = memory.readByte(at: pc)
+            return OUTInstruction(port: port)
+        case 0xD5: // PUSH DE
+            return PUSHInstruction(register: .de)
+        case 0xDB: // IN A,(n)
+            let port = memory.readByte(at: pc)
+            return INInstruction(port: port)
+        case 0xE1: // POP HL
+            return POPInstruction(register: .hl)
+        case 0xE5: // PUSH HL
+            return PUSHInstruction(register: .hl)
+        case 0x2F: // CPL
+            return CPLInstruction()
+        case 0xC1: // POP BC
+            return POPInstruction(register: .bc)
+        case 0xD1: // POP DE
+            return POPInstruction(register: .de)
+        case 0xF1: // POP AF
+            return POPInstruction(register: .af)
         case 0xF3: // DI
             return DISInstruction()
         case 0xFB: // EI
@@ -176,18 +396,23 @@ class Z80InstructionDecoder {
         return nil
     }
     
-    private func decodeControlInstruction(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+    // 制御命令のデコード
+    private func decodeControlInstruction(_ opcode: UInt8, memory: MemoryAccessing, programCounter: UInt16) -> Z80Instruction? {
+        // JP nn
         if opcode == 0xC3 {
-            let lowByte = memory.readByte(at: pc)
-            let highByte = memory.readByte(at: pc &+ 1)
+            // 安全なメモリアクセス
+            let lowByte = memory.readByte(at: programCounter)
+            // 安全なアドレス計算
+            let nextPC = programCounter < UInt16.max ? programCounter + 1 : programCounter
+            let highByte = memory.readByte(at: nextPC)
             let address = UInt16(highByte) << 8 | UInt16(lowByte)
             return JPInstruction(condition: .none, address: address)
         }
         
         if (opcode & 0xC7) == 0xC2 {
             let condition = decodeCondition((opcode >> 3) & 0x03)
-            let lowByte = memory.readByte(at: pc)
-            let highByte = memory.readByte(at: pc &+ 1)
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
             let address = UInt16(highByte) << 8 | UInt16(lowByte)
             return JPInstruction(condition: condition, address: address)
         }
@@ -204,16 +429,16 @@ class Z80InstructionDecoder {
         }
         
         if opcode == 0xCD {
-            let lowByte = memory.readByte(at: pc)
-            let highByte = memory.readByte(at: pc &+ 1)
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
             let address = UInt16(highByte) << 8 | UInt16(lowByte)
             return CALLInstruction(condition: .none, address: address)
         }
         
         if (opcode & 0xC7) == 0xC4 {
             let condition = decodeCondition((opcode >> 3) & 0x03)
-            let lowByte = memory.readByte(at: pc)
-            let highByte = memory.readByte(at: pc &+ 1)
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
             let address = UInt16(highByte) << 8 | UInt16(lowByte)
             return CALLInstruction(condition: condition, address: address)
         }
@@ -250,7 +475,8 @@ class Z80InstructionDecoder {
         
         if (opcode & 0xC7) == 0x06 {
             let reg = decodeRegister8((opcode >> 3) & 0x07)
-            let value = memory.readByte(at: pc)
+            // 安全なメモリアクセス
+            let value = memory.readByte(at: programCounter)
             return LDRegImmInstruction(destination: convertToRegisterOperand(reg), value: value)
         }
         
@@ -264,10 +490,10 @@ class Z80InstructionDecoder {
             return LDMemRegInstruction(address: .hl, source: convertToRegisterOperand(reg))
         }
         
-        if (opcode & 0xCF) == 0x01 {
-            let rp = decodeRegisterPair((opcode >> 4) & 0x03)
-            let lowByte = memory.readByte(at: pc)
-            let highByte = memory.readByte(at: pc &+ 1)
+        // LD SP, nn (0x31)
+        if opcode == 0x31 {
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
             let value = UInt16(highByte) << 8 | UInt16(lowByte)
             return LDRegPairImmInstruction(register: rp, value: value)
         }
@@ -288,87 +514,12 @@ class Z80InstructionDecoder {
             return LDMemRegInstruction(address: .de, source: .a)
         }
         
-        if opcode == 0x3A {
-            let lowByte = memory.readByte(at: pc)
-            let highByte = memory.readByte(at: pc &+ 1)
-            let address = UInt16(highByte) << 8 | UInt16(lowByte)
-            return LDRegMemAddrInstruction(destination: .a, address: address)
-        }
-        
-        if opcode == 0x32 {
-            let lowByte = memory.readByte(at: pc)
-            let highByte = memory.readByte(at: pc &+ 1)
-            let address = UInt16(highByte) << 8 | UInt16(lowByte)
-            return LDDirectMemRegInstruction(address: address, source: .a)
-        }
-        
-        if opcode == 0x2A {
-            let lowByte = memory.readByte(at: pc)
-            let highByte = memory.readByte(at: pc &+ 1)
-            let address = UInt16(highByte) << 8 | UInt16(lowByte)
-            return LDRegPairMemAddrInstruction(destination: .hl, address: address)
-        }
-        
-        if opcode == 0x22 {
-            let lowByte = memory.readByte(at: pc)
-            let highByte = memory.readByte(at: pc &+ 1)
-            let address = UInt16(highByte) << 8 | UInt16(lowByte)
-            return LDMemAddrRegPairInstruction(address: address, source: .hl)
-        }
-        
-        if opcode == 0x36 {
-            let value = memory.readByte(at: pc)
-            return LDMemImmInstruction(address: .hl, value: value)
-        }
-        
-        return nil
-    }
-    
-    private func decodeStackInstruction(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
-        if opcode == 0xC5 {
-            return PUSHInstruction(register: .bc)
-        }
-        
-        if opcode == 0xD5 {
-            return PUSHInstruction(register: .de)
-        }
-        
-        if opcode == 0xE5 {
-            return PUSHInstruction(register: .hl)
-        }
-        
-        if opcode == 0xF5 {
-            return PUSHInstruction(register: .af)
-        }
-        
-        if opcode == 0xC1 {
-            return POPInstruction(register: .bc)
-        }
-        
-        if opcode == 0xD1 {
-            return POPInstruction(register: .de)
-        }
-        
-        if opcode == 0xE1 {
-            return POPInstruction(register: .hl)
-        }
-        
-        if opcode == 0xF1 {
-            return POPInstruction(register: .af)
-        }
-        
-        return nil
-    }
-    
-    private func decodeIOInstruction(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
-        if opcode == 0xDB {
-            let port = memory.readByte(at: pc)
-            return INInstruction(port: port)
-        }
-        
-        if opcode == 0xD3 {
-            let port = memory.readByte(at: pc)
-            return OUTInstruction(port: port)
+        // LD BC, nn (0x01)
+        if opcode == 0x01 {
+            let lowByte = memory.readByte(at: programCounter)
+            let highByte = memory.readByte(at: programCounter &+ 1)
+            let value = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDRegPairImmInstruction(register: .bc, value: value)
         }
         
         return nil
@@ -439,7 +590,7 @@ class Z80InstructionDecoder {
 /// Z80命令の基本プロトコル
 protocol Z80Instruction {
     /// 命令を実行
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int
     
     /// 命令のサイズ（バイト数）
     var size: UInt16 { get }
@@ -456,7 +607,7 @@ protocol Z80Instruction {
 
 /// NOP命令
 struct NOPInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         return cycles
     }
     
@@ -468,7 +619,7 @@ struct NOPInstruction: Z80Instruction {
 
 /// HALT命令
 struct HALTInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // CPUをホルト状態にする
         cpu.halt()
         return cycles
@@ -482,7 +633,7 @@ struct HALTInstruction: Z80Instruction {
 
 /// DI命令（割り込み禁止）
 struct DISInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // 割り込み禁止（CPUExecutingプロトコルのメソッドを使用）
         (cpu as CPUExecuting).setInterruptEnabled(false)
         return cycles
@@ -496,7 +647,7 @@ struct DISInstruction: Z80Instruction {
 
 /// EI命令（割り込み許可）
 struct EIInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // 割り込み許可（CPUExecutingプロトコルのメソッドを使用）
         (cpu as CPUExecuting).setInterruptEnabled(true)
         return cycles
@@ -512,7 +663,7 @@ struct EIInstruction: Z80Instruction {
 struct UnimplementedInstruction: Z80Instruction {
     let opcode: UInt8
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // PCの計算で整数オーバーフローを防止
         let pc = registers.pc > 0 ? registers.pc - 1 : 0
         let opcodeHex = String(opcode, radix: 16, uppercase: true)
@@ -531,7 +682,7 @@ struct UnimplementedInstruction: Z80Instruction {
 struct POPInstruction: Z80Instruction {
     let register: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // スタックから値を取得
         let value = memory.readWord(at: registers.sp)
         
@@ -559,7 +710,7 @@ struct POPInstruction: Z80Instruction {
 
 /// RLCA命令
 struct RLCAInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // Aレジスタを左に回転し、最上位ビットをキャリーフラグと最下位ビットに設定
         let carry = (registers.a & 0x80) != 0
         registers.a = (registers.a << 1) | (carry ? 1 : 0)
@@ -587,7 +738,7 @@ struct RLCAInstruction: Z80Instruction {
 struct SBCInstruction: Z80Instruction {
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // ソースの値を取得
         let value = source.read(from: registers, memory: memory)
         
@@ -633,7 +784,7 @@ struct SBCInstruction: Z80Instruction {
 
 /// RRCA命令
 struct RRCAInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // Aレジスタを右に回転
         let carry = registers.a & 0x01
         registers.a = (registers.a >> 1) | (carry << 7)
@@ -659,7 +810,7 @@ struct RRCAInstruction: Z80Instruction {
 
 /// EX AF,AF'命令
 struct EXAFInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // AFとAF'を交換
         let tempA = registers.a
         let tempF = registers.f
@@ -681,7 +832,7 @@ struct EXAFInstruction: Z80Instruction {
 struct PUSHInstruction: Z80Instruction {
     let register: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = register.read(from: registers)
         // SPを減算
         if registers.sp >= 2 {
@@ -706,7 +857,7 @@ struct PUSHInstruction: Z80Instruction {
 struct INCRegPairInstruction: Z80Instruction {
     let register: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = register.read(from: registers)
         register.write(to: &registers, value: value &+ 1)
         return cycles
@@ -724,7 +875,7 @@ struct LDRegMemAddrInstruction: Z80Instruction {
     let destination: RegisterOperand
     let address: UInt16
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = memory.readByte(at: address)
         destination.write(to: &registers, value: value)
         return cycles
@@ -743,7 +894,7 @@ struct LDRegMemAddrInstruction: Z80Instruction {
 struct DECRegPairInstruction: Z80Instruction {
     let register: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = register.read(from: registers)
         register.write(to: &registers, value: value &- 1)
         return cycles
@@ -760,7 +911,7 @@ struct LDDirectMemRegInstruction: Z80Instruction {
     let address: UInt16
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
         memory.writeByte(value, at: address)
         return cycles
@@ -776,7 +927,7 @@ struct LDDirectMemRegInstruction: Z80Instruction {
 struct ADDHLInstruction: Z80Instruction {
     let source: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let hl = registers.hl
         let value = source.read(from: registers)
         let result = hl &+ value
@@ -805,7 +956,7 @@ struct ADDHLInstruction: Z80Instruction {
 struct DJNZInstruction: Z80Instruction {
     let offset: Int8
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // Bレジスタをデクリメント
         registers.b = registers.b &- 1
         
@@ -831,7 +982,7 @@ struct DJNZInstruction: Z80Instruction {
 /// IYプレフィックス命令
 /// CPL命令 - Aレジスタの全ビットを反転する
 struct CPLInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // Aレジスタの全ビットを反転
         registers.a = ~registers.a
         
@@ -851,7 +1002,7 @@ struct CPLInstruction: Z80Instruction {
 struct IYPrefixedInstruction: Z80Instruction {
     let instruction: Z80Instruction
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // IYプレフィックス命令は通常の命令と同じように実行されるが、
         // HLレジスタの代わりにIYレジスタを使用する
         let savedHL = registers.hl
@@ -875,7 +1026,7 @@ struct IYPrefixedInstruction: Z80Instruction {
 struct LDIYInstruction: Z80Instruction {
     let value: UInt16
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         registers.iy = value
         return cycles
     }
