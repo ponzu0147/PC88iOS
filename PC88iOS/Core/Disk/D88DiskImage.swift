@@ -84,15 +84,11 @@ class D88DiskImage: DiskImageAccessing {
         // トラックインデックスは実際には使用しない
         _ = track * 2 + side
         
-        for trackData in sectorData {
-            if trackData.track == track && trackData.side == side {
-                for sector in trackData.sectors {
-                    if sector.id.cylinder == sectorID.cylinder &&
-                       sector.id.head == sectorID.head &&
-                       sector.id.record == sectorID.record {
-                        return sector.data
-                    }
-                }
+        for trackData in sectorData where trackData.track == track && trackData.side == side {
+            for sector in trackData.sectors where sector.id.cylinder == sectorID.cylinder &&
+                                                  sector.id.head == sectorID.head &&
+                                                  sector.id.record == sectorID.record {
+                return sector.data
             }
         }
         
@@ -112,17 +108,14 @@ class D88DiskImage: DiskImageAccessing {
         for trackIndex in 0..<sectorData.count {
             let trackData = sectorData[trackIndex]
             if trackData.track == track && trackData.side == side {
-                for sectorIndex in 0..<trackData.sectors.count {
-                    let sector = trackData.sectors[sectorIndex]
-                    if sector.id.cylinder == sectorID.cylinder &&
-                       sector.id.head == sectorID.head &&
-                       sector.id.record == sectorID.record {
-                        // セクタデータを更新
-                        var newSector = sector
-                        newSector.data = data
-                        sectorData[trackIndex].sectors[sectorIndex] = newSector
-                        return true
-                    }
+                for sectorIndex in 0..<trackData.sectors.count where trackData.sectors[sectorIndex].id.cylinder == sectorID.cylinder &&
+                                                                     trackData.sectors[sectorIndex].id.head == sectorID.head &&
+                                                                     trackData.sectors[sectorIndex].id.record == sectorID.record {
+                    // セクタデータを更新
+                    var newSector = trackData.sectors[sectorIndex]
+                    newSector.data = data
+                    sectorData[trackIndex].sectors[sectorIndex] = newSector
+                    return true
                 }
             }
         }
@@ -173,13 +166,11 @@ class D88DiskImage: DiskImageAccessing {
     func getSectorIDs(track: Int, side: Int) -> [SectorID] {
         var result: [SectorID] = []
         
-        for trackData in sectorData {
-            if trackData.track == track && trackData.side == side {
-                for sector in trackData.sectors {
-                    result.append(sector.id)
-                }
-                break
+        for trackData in sectorData where trackData.track == track && trackData.side == side {
+            for sector in trackData.sectors {
+                result.append(sector.id)
             }
+            break
         }
         
         return result
