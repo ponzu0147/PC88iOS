@@ -162,7 +162,11 @@ struct Z80InstructionCycles {
     // 16ビット転送命令のサイクル
     static let loadRegPairToVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
     static let loadHLToAddr16 = InstructionCycles.standard(opcodeFetch: true, memoryReads: 5) // 6M, 16T
-    static let loadAddr16ToHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 2) // 5M, 16T
+    static let loadAddr16ToHL = InstructionCycles.standard(
+        opcodeFetch: true, 
+        memoryReads: 2, 
+        memoryWrites: 2
+    )
     static let loadSPToHL = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
     
     // 算術演算命令のサイクル
@@ -209,9 +213,21 @@ struct Z80InstructionCycles {
     // ジャンプ命令のサイクル
     static let jumpToAddr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
     static let jumpCondToAddr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
-    static let jumpRelative = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 5) // 3M, 12T
-    static let jumpRelativeCond = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 5) // 3M, 12T
-    static let decrJumpNotZero = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 5) // 3M, 13T
+    static let jumpRelative = InstructionCycles.standard(
+        opcodeFetch: true, 
+        memoryReads: 1, 
+        internalCycles: 5
+    )
+    static let jumpRelativeCond = InstructionCycles.standard(
+        opcodeFetch: true, 
+        memoryReads: 1, 
+        internalCycles: 5
+    )
+    static let decrJumpNotZero = InstructionCycles.standard(
+        opcodeFetch: true, 
+        memoryReads: 1, 
+        internalCycles: 5
+    )
     
     // その他の命令のサイクル
     static let noOperation = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
