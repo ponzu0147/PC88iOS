@@ -923,7 +923,7 @@ struct IYPrefixedInstruction: Z80Instruction {
         let savedHL = registers.hl
         registers.hl = registers.iy
         
-        let cycles = instruction.execute(cpu: cpu, registers: &registers, memory: memory, io: io)
+        let cycles = instruction.execute(cpu: cpu, registers: &registers, memory: memory, inputOutput: inputOutput)
         
         registers.iy = registers.hl
         registers.hl = savedHL
