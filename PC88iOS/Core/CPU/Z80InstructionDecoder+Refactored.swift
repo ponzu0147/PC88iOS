@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import PC88iOS
 
 class Z80InstructionDecoderRefactored {
     
