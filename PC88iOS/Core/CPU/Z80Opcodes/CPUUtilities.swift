@@ -166,7 +166,7 @@ struct Z80InstructionCycles {
         opcodeFetch: true, 
         memoryReads: 2, 
         memoryWrites: 2
-    )
+    ) // 5M, 16T
     static let loadSPToHL = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
     
     // 算術演算命令のサイクル
@@ -217,17 +217,17 @@ struct Z80InstructionCycles {
         opcodeFetch: true, 
         memoryReads: 1, 
         internalCycles: 5
-    )
+    ) // 3M, 12T
     static let jumpRelativeCond = InstructionCycles.standard(
         opcodeFetch: true, 
         memoryReads: 1, 
         internalCycles: 5
-    )
+    ) // 3M, 12T
     static let decrJumpNotZero = InstructionCycles.standard(
         opcodeFetch: true, 
         memoryReads: 1, 
         internalCycles: 5
-    )
+    ) // 3M, 13T
     
     // その他の命令のサイクル
     static let noOperation = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
