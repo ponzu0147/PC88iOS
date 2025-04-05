@@ -12,11 +12,11 @@ import Foundation
 
 /// ジャンプ条件
 public enum JumpCondition {
-    case none      // 無条件
-    case zero      // ゼロフラグがセットされている
-    case notZero   // ゼロフラグがセットされていない
-    case carry     // キャリーフラグがセットされている
-    case notCarry  // キャリーフラグがセットされていない
+    case none
+    case zero
+    case notZero
+    case carry
+    case notCarry
     
     /// 条件が満たされているか評価
     func evaluate(registers: Z80Registers) -> Bool {
