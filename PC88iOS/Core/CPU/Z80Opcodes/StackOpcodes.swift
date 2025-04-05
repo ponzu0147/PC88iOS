@@ -3,19 +3,20 @@
 //
 
 import Foundation
+import PC88iOS
 
 struct POPInstruction: Z80Instruction {
     let register: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
-        let value = memory.readWord(at: registers.sp)
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
+        let value = memory.readWord(at: registers.stackPointer)
         
         register.write(to: &registers, value: value)
         
-        if registers.sp <= UInt16.max - 2 {
-            registers.sp = registers.sp &+ 2
+        if registers.stackPointer <= UInt16.max - 2 {
+            registers.stackPointer = registers.stackPointer &+ 2
         } else {
-            registers.sp = 0
+            registers.stackPointer = 0
             PC88Logger.cpu.warning("スタックポインタがオーバーフローしました")
         }
         
@@ -31,16 +32,16 @@ struct POPInstruction: Z80Instruction {
 struct PUSHInstruction: Z80Instruction {
     let register: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = register.read(from: registers)
         
-        if registers.sp >= 2 {
-            registers.sp = registers.sp &- 2
+        if registers.stackPointer >= 2 {
+            registers.stackPointer = registers.stackPointer &- 2
         } else {
-            registers.sp = 0xFFFF
+            registers.stackPointer = 0xFFFF
             PC88Logger.cpu.warning("スタックポインタがオーバーフローしました")
         }
-        memory.writeWord(value, at: registers.sp)
+        memory.writeWord(value, at: registers.stackPointer)
         
         return cycles
     }

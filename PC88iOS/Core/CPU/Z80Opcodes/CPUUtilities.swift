@@ -166,7 +166,7 @@ struct Z80InstructionCycles {
         opcodeFetch: true, 
         memoryReads: 2, 
         memoryWrites: 2
-    ) // 5M, 16T
+    )
     static let loadSPToHL = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
     
     // 算術演算命令のサイクル
@@ -208,11 +208,11 @@ struct Z80InstructionCycles {
     // レジスタペア操作命令のサイクル
     static let incrementRegPair = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
     static let decrementRegPair = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
-    static let addHLToRegPair = InstructionCycles.standard(opcodeFetch: true, internalCycles: 7) // 3M, 11T
+    static let addHLToRegPair = InstructionCycles.standard(opcodeFetch: true, internalCycles: 7)
     
     // ジャンプ命令のサイクル
-    static let jumpToAddr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
-    static let jumpCondToAddr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    static let jumpToAddr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2)
+    static let jumpCondToAddr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2)
     static let jumpRelative = InstructionCycles.standard(
         opcodeFetch: true, 
         memoryReads: 1, 
@@ -282,8 +282,8 @@ struct Z80InstructionCycles {
     static let outputAToPort = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, ioWrites: 1) // 3M, 11T
     
     // 旧定数名（互換性のため）
-    static let NOP = noOperation
-    static let HALT = haltCPU
-    static let DI = disableInterrupt
-    static let EI = enableInterrupt
+    static let nopOld = noOperation
+    static let haltOld = haltCPU
+    static let disableInterruptOld = disableInterrupt
+    static let enableInterruptOld = enableInterrupt
 }
