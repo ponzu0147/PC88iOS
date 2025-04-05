@@ -61,7 +61,6 @@ struct ANDInstruction: Z80Instruction {
         return cycles
     }
     
-
 }
 
 /// OR命令（A |= r）
@@ -118,7 +117,6 @@ struct ORInstruction: Z80Instruction {
         return cycles
     }
     
-
 }
 
 /// XOR命令（A ^= r）
@@ -175,7 +173,6 @@ struct XORInstruction: Z80Instruction {
         return cycles
     }
     
-
 }
 
 /// CP命令（A - r、結果は破棄）
@@ -238,5 +235,4 @@ struct CPInstruction: Z80Instruction {
         return cycles
     }
     
-
 }
