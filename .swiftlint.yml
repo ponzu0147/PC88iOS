@@ -20,6 +20,29 @@ line_length:
   ignores_comments: true
   ignores_urls: true
 
+# 識別子の長さ
+identifier_name:
+  min_length: 3
+  max_length: 40
+  excluded:
+    - a  # Z80 レジスタ名
+    - b  # Z80 レジスタ名
+    - c  # Z80 レジスタ名
+    - d  # Z80 レジスタ名
+    - e  # Z80 レジスタ名
+    - f  # Z80 レジスタ名
+    - h  # Z80 レジスタ名
+    - l  # Z80 レジスタ名
+    - af # Z80 レジスタペア名
+    - bc # Z80 レジスタペア名
+    - de # Z80 レジスタペア名
+    - hl # Z80 レジスタペア名
+    - ix # Z80 レジスタペア名
+    - iy # Z80 レジスタペア名
+    - sp # Z80 スタックポインタ
+    - pc # Z80 プログラムカウンタ
+    - io # 入出力アクセス
+
 # 関数の長さ
 function_body_length:
   warning: 60

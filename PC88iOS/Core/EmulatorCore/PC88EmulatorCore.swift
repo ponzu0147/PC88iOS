@@ -5,11 +5,11 @@
 //  Created by 越川将人 on 2025/03/30.
 //
 
-import Foundation
 import CoreGraphics
-import UIKit
-import SwiftUI
+import Foundation
 import os.log
+import SwiftUI
+import UIKit
 
 // 必要なプロトコルを明示的にインポート
 // これにより型の曖昧さを解消
@@ -54,9 +54,6 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     private var beepTest: PC88BeepTest?
     
 
-    
-
-    
     /// ビープ音生成機能へのアクセサ
     func getBeepSound() -> Any? {
         return beepSound
@@ -86,9 +83,6 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     }
     
 
-    
-
-    
     /// エミュレーション速度（1.0 = 通常速度）
     private var emulationSpeed: Float = 1.0
     
@@ -98,8 +92,6 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// 現在のCPUクロックモード
     private var currentClockMode: PC88CPUClock.ClockMode = .mode4MHz // デフォルトは4MHz
     
-
-    
     /// ログ表示用タイマー
     private var logTimer: Timer?
     
@@ -108,8 +100,6 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     /// エミュレーションタイマー
     private var emulationTimer: Timer?
-    
-
     
     /// 画面イメージ
     private var screenImage: CGImage?
@@ -325,7 +315,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         let clockModeStr = currentClockMode == .mode4MHz ? "4MHz" : "8MHz"
         
         // 起動直後からパフォーマンス情報を表示
-        let startupLog = "[クロックモード: \(clockModeStr)] FPS: \(String(format: "%.2f", targetFPS)), 平均フレーム時間: \(String(format: "%.2f", (1.0/targetFPS) * 1000)) ms, サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(frequency) Hz"
+        let fpsStr = String(format: "%.2f", targetFPS)
+        let frameTimeStr = String(format: "%.2f", (1.0/targetFPS) * 1000)
+        let startupLog = "[クロックモード: \(clockModeStr)] FPS: \(fpsStr), " +
+            "平均フレーム時間: \(frameTimeStr) ms, " +
+            "サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(frequency) Hz"
         
         // コンソールにログを出力
         PC88Logger.core.debug("\n\n\(startupLog)\n")
@@ -997,18 +991,34 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             
             // 最初の数セクタのみログ表示
             if index < 5 {
-                logSectorLoad(index: index, sectorData: sectorData, startAddress: previousOffset, endAddress: memoryOffset - 1, validData: validData)
+                logSectorLoad(
+                    index: index,
+                    sectorData: sectorData,
+                    startAddress: previousOffset,
+                    endAddress: memoryOffset - 1,
+                    validData: validData
+                )
             }
         }
         
-        PC88Logger.disk.debug("ALPHA-MINI-DOSのOS部分のロードが完了しました: 0xD000-0x\(String(format: "%04X", memoryOffset - 1)) (合計: \(totalBytesLoaded) バイト)")
+        let endAddressHex = String(format: "%04X", memoryOffset - 1)
+        PC88Logger.disk.debug(
+            "ALPHA-MINI-DOSのOS部分のロードが完了しました: 0xD000-0x\(endAddressHex) " +
+            "(合計: \(totalBytesLoaded) バイト)"
+        )
         
         return memoryOffset
     }
     
     /// セクタロードの情報をログに出力
     private func logSectorLoad(index: Int, sectorData: [UInt8], startAddress: UInt16, endAddress: UInt16, validData: Bool) {
-        PC88Logger.disk.debug("  OSセクタ\(index+1)をメモリにロードしました: 0x\(String(format: "%04X", startAddress))-0x\(String(format: "%04X", endAddress)) (有効データ: \(validData ? "あり" : "なし"))")
+        let startAddressHex = String(format: "%04X", startAddress)
+        let endAddressHex = String(format: "%04X", endAddress)
+        let validDataStr = validData ? "あり" : "なし"
+        PC88Logger.disk.debug(
+            "  OSセクタ\(index+1)をメモリにロードしました: 0x\(startAddressHex)-0x\(endAddressHex) " +
+            "(有効データ: \(validDataStr))"
+        )
         
         // 最初のセクタの内容を表示
         if index == 0 {
@@ -1126,9 +1136,9 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         let result = loadDiskImage(url: diskImageURL, drive: 0)
         
         if result {
-            print("ALPHA-MINI-DOSディスクイメージを正常に読み込みました")
+            PC88Logger.disk.debug("ALPHA-MINI-DOSディスクイメージを正常に読み込みました")
         } else {
-            print("ALPHA-MINI-DOSディスクイメージの読み込みに失敗しました")
+            PC88Logger.disk.error("ALPHA-MINI-DOSディスクイメージの読み込みに失敗しました")
         }
     }
     
@@ -1139,7 +1149,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         // 成功した場合、ドライブ0にロードされた場合はブートセクタを再ロード
         if result && reloadBootSector && drive == 0 {
-            print("ディスクイメージがロードされたため、ブートセクタを再ロードします")
+            PC88Logger.disk.debug("ディスクイメージがロードされたため、ブートセクタを再ロードします")
             loadBootSector()
         }
         
@@ -1151,7 +1161,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// FDDブートの有効/無効を設定
     func setFDDBootEnabled(_ enabled: Bool) {
         fddBootEnabled = enabled
-        print("FDDブートを\(enabled ? "有効" : "無効")にしました")
+        PC88Logger.disk.debug("FDDブートを\(enabled ? "有効" : "無効")にしました")
         
         // 設定が変更された場合、ブートセクタを再ロード
         if enabled {
@@ -1313,7 +1323,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         cyclesRemainder = 0
         shouldResetMetrics = false
         
-        PC88Logger.core.debug("クロックモード変更検出: \(currentMode), 周波数: \(baseCyclesPerSecond) Hz, サイクル数/フレーム: \(cyclesPerFrame)")
+        PC88Logger.core.debug(
+            "クロックモード変更検出: \(currentMode), " +
+            "周波数: \(baseCyclesPerSecond) Hz, " +
+            "サイクル数/フレーム: \(cyclesPerFrame)"
+        )
     }
     
     /// パフォーマンスメトリクスをログに出力
@@ -1333,7 +1347,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         let cyclesPerFrame = Int(Double(baseCyclesPerSecond) / targetFPS)
         
         // パフォーマンス情報を生成
-        let perfLog = "[クロックモード: \(clockMode)] FPS: \(String(format: "%.2f", targetFPS)), 平均フレーム時間: \(String(format: "%.2f", (1.0/targetFPS) * 1000)) ms, サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(baseCyclesPerSecond) Hz"
+        let fpsStr = String(format: "%.2f", targetFPS)
+        let frameTimeStr = String(format: "%.2f", (1.0/targetFPS) * 1000)
+        let perfLog = "[クロックモード: \(clockMode)] FPS: \(fpsStr), " +
+            "平均フレーム時間: \(frameTimeStr) ms, " +
+            "サイクル数/フレーム: \(cyclesPerFrame), 周波数: \(baseCyclesPerSecond) Hz"
         
         // コンソールにログを出力
         PC88Logger.core.debug("\n\n\(perfLog)\n\n")
@@ -1388,7 +1406,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             // 1フレーム分のCPUサイクルを実行
             // フレームレートに応じて処理量を調整
             let frameRateAdjustment = 60.0 / targetFPS
-            let adjustedCycles = Int(Double(cyclesPerFrame) * Double(emulationSpeed) / frameRateAdjustment) + cyclesRemainder
+            let speedAdjustedCycles = Double(cyclesPerFrame) * Double(emulationSpeed)
+            let adjustedCycles = Int(speedAdjustedCycles / frameRateAdjustment) + cyclesRemainder
             let executedCycles = executeCPUCycles(adjustedCycles: adjustedCycles)
             
             // 実行されたサイクル数と目標サイクル数の差を次のフレームに持ち越す
@@ -1511,7 +1530,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         for testChar in testChars {
             if let fontData = PC88FontLoader.shared.getFontBitmap8x16(charCode: testChar) {
-                PC88Logger.core.debug("文字コード \(testChar) (\(String(format: "%c", testChar))) のフォントデータ: \(fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))...")
+                let charStr = String(format: "%c", testChar)
+                let fontDataHex = fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " ")
+                PC88Logger.core.debug(
+                    "文字コード \(testChar) (\(charStr)) のフォントデータ: \(fontDataHex)..."
+                )
             } else {
                 PC88Logger.core.error("文字コード \(testChar) のフォントデータが取得できません")
             }
@@ -1533,7 +1556,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         for testChar in testChars {
             // フォントデータを直接PC88FontLoaderから取得して表示
             if let fontData = PC88FontLoader.shared.getFontBitmap8x16(charCode: testChar) {
-                PC88Logger.core.debug("画面の文字コード \(testChar) (\(String(format: "%c", testChar))) のフォントデータ: \(fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))...")
+                let charStr = String(format: "%c", testChar)
+                let fontDataHex = fontData.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " ")
+                PC88Logger.core.debug(
+                    "画面の文字コード \(testChar) (\(charStr)) のフォントデータ: \(fontDataHex)..."
+                )
             }
         }
     }
@@ -1660,18 +1687,14 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                         
                         // デバッグ用に文字を表示
                         let testMessage = "ALPHA-MINI-DOS 1.3 (デバッグモード)"
-                        for (i, char) in testMessage.utf8.enumerated() {
-                            if i < 80 { // 1行目のみ
-                                pc88Screen.writeTextVRAM(address: UInt16(i), value: char)
-                            }
+                        for (i, char) in testMessage.utf8.enumerated() where i < 80 { // 1行目のみ
+                            pc88Screen.writeTextVRAM(address: UInt16(i), value: char)
                         }
                         
                         // 2行目に追加情報
                         let infoMessage = "PC=C000h SP=F000h"
-                        for (i, char) in infoMessage.utf8.enumerated() {
-                            if i < 80 { // 2行目
-                                pc88Screen.writeTextVRAM(address: UInt16(80 + i), value: char)
-                            }
+                        for (i, char) in infoMessage.utf8.enumerated() where i < 80 { // 2行目
+                            pc88Screen.writeTextVRAM(address: UInt16(80 + i), value: char)
                         }
                         
                         // 画面を更新

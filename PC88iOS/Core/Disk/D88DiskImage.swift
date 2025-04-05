@@ -427,7 +427,165 @@ class D88DiskImage: DiskImageAccessing {
     ///   - track: トラック番号（0から始まる）
     ///   - sector: セクタ番号（1から始まる）
     /// - Returns: セクタデータ（バイト配列）
+    
+    private func isValidSectorID(_ sectorID: SectorID) -> Bool {
+        return sectorID.cylinder < 80 && sectorID.head < 2 && sectorID.record < 30
+    }
+    
+    private func isValidSectorSize(_ dataSize: Int) -> Bool {
+        return dataSize > 0 && dataSize <= 8192 // 8KBを上限とする
+    }
+    
+    private func hasValidContent(_ data: Data) -> Bool {
+        guard data.count >= 10 else { return false }
+        
+        // 先頭バイトが0xC3（JP命令）または0x18（JR命令）で始まるかチェック
+        let firstByte = data[0]
+        return (firstByte == 0xC3 || firstByte == 0x18)
+    }
+    
+    private func isAllFF(_ data: Data) -> Bool {
+        return data.allSatisfy { $0 == 0xFF }
+    }
+    
+    private func createDefaultIPLSector() -> Data {
+        let defaultIPLSectorSize = 256 // 標準的なIPLセクタサイズ
+        var defaultIPLSector = Data(count: defaultIPLSectorSize)
+        
+        // デフォルトIPLセクタを0xC9 (RET命令) で埋める - 最低限のブート処理
+        defaultIPLSector.withUnsafeMutableBytes { ptr in
+            if let baseAddress = ptr.baseAddress {
+                memset(baseAddress, 0xC9, defaultIPLSectorSize)
+            }
+        }
+        
+        return defaultIPLSector
+    }
+    
+    private func findTrack0Sector(sector: Int) -> (data: Data?, size: Int, sizeN: UInt8) {
+        PC88Logger.disk.debug("トラック0を検索: ディスクタイプ=\(getDiskTypeString()), 期待セクタ数=\(getExpectedSectorsPerTrack())")
+        
+        // 有効なセクタデータを保持する変数
+        var validSectorData: Data? = nil
+        var validSectorSize: Int = 0
+        var validSectorN: UInt8 = 0
+        
+        // 2Dフォーマットの場合の期待されるセクタサイズ
+        let expectedSectorSize = diskType == diskType2D ? 256 : 0
+        
+        // トラック0のデータを検索
+        let track0Data = sectorData.filter { $0.track == 0 }
+        PC88Logger.disk.debug("  トラック0のデータブロック数: \(track0Data.count)")
+        
+        // トラック0のデータブロックをスキャン
+        for trackData in track0Data {
+            // すべてのセクタをチェック
+            for (index, sectorInfo) in trackData.sectors.enumerated() {
+                let sectorSize = calculateSectorSizeFromN(sectorInfo.id.size)
+                PC88Logger.disk.debug("    セクタ\(index): C=\(sectorInfo.id.cylinder), H=\(sectorInfo.id.head), R=\(sectorInfo.id.record), N=\(sectorInfo.id.size) (\(sectorSize)バイト), データサイズ=\(sectorInfo.data.count)")
+                
+                // セクタIDの検証
+                if !isValidSectorID(sectorInfo.id) {
+                    PC88Logger.disk.warning("    無効なセクタID - C=\(sectorInfo.id.cylinder), H=\(sectorInfo.id.head), R=\(sectorInfo.id.record)")
+                    continue // 無効なIDのセクタはスキップ
+                }
+                
+                // データサイズの検証
+                let dataSize = sectorInfo.data.count
+                if !isValidSectorSize(dataSize) {
+                    PC88Logger.disk.warning("    無効なデータサイズ - \(dataSize)バイト")
+                    continue // 無効なサイズのセクタはスキップ
+                }
+                
+                // シリンダ番号(C)=0、レコード番号(R)=セクタ番号のセクタを探す
+                // PC-88では、セクタ番号は1から始まり、D88フォーマットのレコード番号も1から始まる
+                // 柔軟な検索: 正確なマッチに加えて、レコード番号だけが一致するケースも考慮
+                let exactMatch = sectorInfo.id.cylinder == 0 && sectorInfo.id.record == UInt8(sector)
+                let recordOnlyMatch = sectorInfo.id.record == UInt8(sector)
+                
+                if exactMatch || recordOnlyMatch {
+                    let matchType = exactMatch ? "完全一致" : "レコード番号のみ一致"
+                    PC88Logger.disk.debug("  トラック0のセクタ\(sector)が見つかりました (\(matchType)): データサイズ=\(dataSize)")
+                    
+                    // データが全てFFで埋められているかチェック
+                    let allFF = isAllFF(sectorInfo.data)
+                    
+                    // データの内容を検証
+                    let hasValidContentFlag = hasValidContent(sectorInfo.data)
+                    
+                    // 2Dフォーマットの場合、期待されるセクタサイズと一致するかチェック
+                    let matchesExpectedSize = expectedSectorSize == 0 || dataSize == expectedSectorSize
+                    
+                    // 優先順位に基づいてセクタを選択
+                    if exactMatch && hasValidContentFlag && matchesExpectedSize {
+                        // 最高優先度: 完全一致、有効なコンテンツ、期待サイズ
+                        PC88Logger.disk.debug("  最適なセクタを発見しました: 完全一致、有効なコンテンツ、期待サイズ (N=\(sectorInfo.id.size), \(dataSize)バイト)")
+                        return (sectorInfo.data, dataSize, sectorInfo.id.size)
+                    } else if exactMatch && !allFF && matchesExpectedSize {
+                        // 高優先度: 完全一致、FFでない、期待サイズ
+                        PC88Logger.disk.debug("  有効なデータを含むセクタを発見しました (N=\(sectorInfo.id.size), \(dataSize)バイト)")
+                        validSectorData = sectorInfo.data
+                        validSectorSize = dataSize
+                        validSectorN = sectorInfo.id.size
+                    } else if exactMatch && !allFF {
+                        // 中優先度: 完全一致、FFでない
+                        PC88Logger.disk.debug("  有効なデータを含むセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
+                        validSectorData = sectorInfo.data
+                        validSectorSize = dataSize
+                        validSectorN = sectorInfo.id.size
+                    } else if recordOnlyMatch && !allFF && validSectorData == nil {
+                        // 低優先度: レコード番号のみ一致、FFでない
+                        PC88Logger.disk.debug("  レコード番号のみ一致するセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
+                        validSectorData = sectorInfo.data
+                        validSectorSize = dataSize
+                        validSectorN = sectorInfo.id.size
+                    } else if exactMatch && allFF && matchesExpectedSize && validSectorData == nil {
+                        // 最低優先度: 完全一致、FF、期待サイズ
+                        PC88Logger.disk.debug("  FFで埋められたセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
+                        validSectorData = sectorInfo.data
+                        validSectorSize = dataSize
+                        validSectorN = sectorInfo.id.size
+                    }
+                }
+            }
+        }
+        
+        return (validSectorData, validSectorSize, validSectorN)
+    }
+    
+    private func findTrack1Sector(sector: Int) -> (data: Data?, size: Int, sizeN: UInt8) {
+        PC88Logger.disk.debug("  トラック0のセクタが見つからなかったため、物理トラック1を検索します")
+        
+        // 有効なセクタデータを保持する変数
+        var validSectorData: Data? = nil
+        var validSectorSize: Int = 0
+        var validSectorN: UInt8 = 0
+        
+        let track1Data = sectorData.filter { $0.track == 1 && $0.side == 0 }
+        
+        for trackData in track1Data {
+            for sectorInfo in trackData.sectors where sectorInfo.id.record == UInt8(sector) {
+                let dataSize = sectorInfo.data.count
+                if isValidSectorSize(dataSize) && !isAllFF(sectorInfo.data) {
+                    PC88Logger.disk.debug("  物理トラック1でセクタ\(sector)が見つかりました: データサイズ=\(dataSize)")
+                    validSectorData = sectorInfo.data
+                    validSectorSize = dataSize
+                    validSectorN = sectorInfo.id.size
+                    break
+                }
+            }
+        }
+        
+        return (validSectorData, validSectorSize, validSectorN)
+    }
+    
+    /// - Parameters:
+    /// - Returns: セクタデータ、失敗した場合はnil
     func readSector(track: Int, sector: Int) -> [UInt8]? {
+        var validSectorData: Data? = nil
+        var validSectorSize: Int = 0
+        var validSectorN: UInt8 = 0
+        
         // トラックとセクタの範囲チェック
         guard track >= 0 && track < maxTracks && sector >= 1 && sector <= maxSectorsPerTrack else {
             PC88Logger.disk.error("トラックまたはセクタが範囲外: track=\(track), sector=\(sector)")
@@ -442,236 +600,101 @@ class D88DiskImage: DiskImageAccessing {
         
         // トラック0の場合は特別な処理を行う
         if track == 0 {
-            PC88Logger.disk.debug("トラック0を検索: ディスクタイプ=\(getDiskTypeString()), 期待セクタ数=\(getExpectedSectorsPerTrack())")
-            
-            // 有効なセクタデータを保持する変数
-            var validSectorData: Data? = nil
-            var validSectorSize: Int = 0
-            var validSectorN: UInt8 = 0
-            
-            // 2Dフォーマットの場合の期待されるセクタサイズ
-            let expectedSectorSize = diskType == diskType2D ? 256 : 0
-            
-            // デフォルトのIPLセクタを用意（ディスクイメージが破損している場合用）
-            let defaultIPLSectorSize = 256 // 標準的なIPLセクタサイズ
-            var defaultIPLSector = Data(count: defaultIPLSectorSize)
-            // デフォルトIPLセクタを0xC9 (RET命令) で埋める - 最低限のブート処理
-            defaultIPLSector.withUnsafeMutableBytes { ptr in
-                if let baseAddress = ptr.baseAddress {
-                    memset(baseAddress, 0xC9, defaultIPLSectorSize)
-                }
-            }
-            
-            // トラック0のデータを検索
-            let track0Data = sectorData.filter { $0.track == 0 }
-            PC88Logger.disk.debug("  トラック0のデータブロック数: \(track0Data.count)")
-            
-            // トラック0のデータブロックをスキャン
-            for trackData in track0Data {
-                
-                // すべてのセクタをチェック
-                for (index, sectorInfo) in trackData.sectors.enumerated() {
-                    let sectorSize = calculateSectorSizeFromN(sectorInfo.id.size)
-                    PC88Logger.disk.debug("    セクタ\(index): C=\(sectorInfo.id.cylinder), H=\(sectorInfo.id.head), R=\(sectorInfo.id.record), N=\(sectorInfo.id.size) (\(sectorSize)バイト), データサイズ=\(sectorInfo.data.count)")
-                    
-                    // セクタIDの検証
-                    let isValidID = sectorInfo.id.cylinder < 80 && sectorInfo.id.head < 2 && sectorInfo.id.record < 30
-                    if !isValidID {
-                        PC88Logger.disk.warning("    無効なセクタID - C=\(sectorInfo.id.cylinder), H=\(sectorInfo.id.head), R=\(sectorInfo.id.record)")
-                        continue // 無効なIDのセクタはスキップ
-                    }
-                    
-                    // データサイズの検証
-                    let dataSize = sectorInfo.data.count
-                    let isValidSize = dataSize > 0 && dataSize <= 8192 // 8KBを上限とする
-                    if !isValidSize {
-                        PC88Logger.disk.warning("    無効なデータサイズ - \(dataSize)バイト")
-                        continue // 無効なサイズのセクタはスキップ
-                    }
-                    
-                    // シリンダ番号(C)=0、レコード番号(R)=セクタ番号のセクタを探す
-                    // PC-88では、セクタ番号は1から始まり、D88フォーマットのレコード番号も1から始まる
-                    // 柔軟な検索: 正確なマッチに加えて、レコード番号だけが一致するケースも考慮
-                    let exactMatch = sectorInfo.id.cylinder == 0 && sectorInfo.id.record == UInt8(sector)
-                    let recordOnlyMatch = sectorInfo.id.record == UInt8(sector)
-                    
-                    if exactMatch || recordOnlyMatch {
-                        let matchType = exactMatch ? "完全一致" : "レコード番号のみ一致"
-                        PC88Logger.disk.debug("  トラック0のセクタ\(sector)が見つかりました (\(matchType)): データサイズ=\(dataSize)")
-                        
-                        // データが全てFFで埋められているかチェック
-                        let allFF = sectorInfo.data.allSatisfy { $0 == 0xFF }
-                        
-                        // データの内容を検証（先頭バイトをチェック）
-                        var hasValidContent = false
-                        if dataSize >= 10 {
-                            // 先頭バイトが0xC3（JP命令）または0x18（JR命令）で始まるかチェック
-                            let firstByte = sectorInfo.data[0]
-                            hasValidContent = (firstByte == 0xC3 || firstByte == 0x18)
-                        }
-                        
-                        // 2Dフォーマットの場合、期待されるセクタサイズと一致するかチェック
-                        let matchesExpectedSize = expectedSectorSize == 0 || dataSize == expectedSectorSize
-                        
-                        // 優先順位に基づいてセクタを選択
-                        if exactMatch && hasValidContent && matchesExpectedSize {
-                            // 最高優先度: 完全一致、有効なコンテンツ、期待サイズ
-                            PC88Logger.disk.debug("  最適なセクタを発見しました: 完全一致、有効なコンテンツ、期待サイズ (N=\(sectorInfo.id.size), \(dataSize)バイト)")
-                            // validSectorFound変数は不要なので削除
-                            return [UInt8](sectorInfo.data)
-                        } else if exactMatch && !allFF && matchesExpectedSize {
-                            // 高優先度: 完全一致、FFでない、期待サイズ
-                            PC88Logger.disk.debug("  有効なデータを含むセクタを発見しました (N=\(sectorInfo.id.size), \(dataSize)バイト)")
-                            validSectorData = sectorInfo.data
-                            validSectorSize = dataSize
-                            validSectorN = sectorInfo.id.size
-                            // validSectorFound変数は不要なので削除
-                        } else if exactMatch && !allFF {
-                            // 中優先度: 完全一致、FFでない
-                            PC88Logger.disk.debug("  有効なデータを含むセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
-                            validSectorData = sectorInfo.data
-                            validSectorSize = dataSize
-                            validSectorN = sectorInfo.id.size
-                        } else if recordOnlyMatch && !allFF && validSectorData == nil {
-                            // 低優先度: レコード番号のみ一致、FFでない
-                            PC88Logger.disk.debug("  レコード番号のみ一致するセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
-                            validSectorData = sectorInfo.data
-                            validSectorSize = dataSize
-                            validSectorN = sectorInfo.id.size
-                        } else if exactMatch && allFF && matchesExpectedSize && validSectorData == nil {
-                            // 最低優先度: 完全一致、FF、期待サイズ
-                            PC88Logger.disk.debug("  FFで埋められたセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
-                            validSectorData = sectorInfo.data
-                            validSectorSize = dataSize
-                            validSectorN = sectorInfo.id.size
-                        }
-                    }
-                }
-            }
-            
-            // 物理トラック1のセクタも確認（代替手段）
-            if validSectorData == nil {
-                for trackData in sectorData where trackData.track == 1 {
-                    for sectorInfo in trackData.sectors {
-                        // セクタIDの検証
-                        let isValidID = sectorInfo.id.cylinder < 80 && sectorInfo.id.head < 2 && sectorInfo.id.record < 30
-                        if !isValidID {
-                            continue // 無効なIDのセクタはスキップ
-                        }
-                        
-                        // レコード番号が一致するセクタを探す (PC-88のセクタ番号は1から始まる)
-                        if sectorInfo.id.record == UInt8(sector) {
-                            let dataSize = sectorInfo.data.count
-                            let sectorSize = calculateSectorSizeFromN(sectorInfo.id.size)
-                            
-                            if dataSize > 0 && dataSize <= 8192 {
-                                // データが全てFFで埋められているかチェック
-                                let allFF = sectorInfo.data.allSatisfy { $0 == 0xFF }
-                                
-                                // データの内容を検証
-                                var hasValidContent = false
-                                if dataSize >= 10 {
-                                    // 先頭バイトが0xC3（JP命令）または0x18（JR命令）で始まるかチェック
-                                    let firstByte = sectorInfo.data[0]
-                                    hasValidContent = (firstByte == 0xC3 || firstByte == 0x18)
-                                }
-                                
-                                // 2Dフォーマットの場合、期待されるセクタサイズと一致するかチェック
-                                let matchesExpectedSize = expectedSectorSize == 0 || dataSize == expectedSectorSize
-                                
-                                if hasValidContent && matchesExpectedSize {
-                                    PC88Logger.disk.debug("  物理トラック1の最適なセクタ\(sector)を発見しました: N=\(sectorInfo.id.size) (\(sectorSize)バイト), データサイズ=\(dataSize)")
-                                    return [UInt8](sectorInfo.data)
-                                } else if !allFF && matchesExpectedSize {
-                                    PC88Logger.disk.debug("  物理トラック1の有効なセクタ\(sector)を発見しました: N=\(sectorInfo.id.size) (\(sectorSize)バイト), データサイズ=\(dataSize)")
-                                    validSectorData = sectorInfo.data
-                                    validSectorSize = dataSize
-                                    validSectorN = sectorInfo.id.size
-                                    // validSectorFoundは不要になりました
-                                } else if !allFF && validSectorData == nil {
-                                    validSectorData = sectorInfo.data
-                                    validSectorSize = dataSize
-                                    validSectorN = sectorInfo.id.size
-                                    PC88Logger.disk.debug("  物理トラック1の有効なデータを含むセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
-                                } else if allFF && matchesExpectedSize && validSectorData == nil {
-                                    validSectorData = sectorInfo.data
-                                    validSectorSize = dataSize
-                                    validSectorN = sectorInfo.id.size
-                                    PC88Logger.disk.debug("  物理トラック1のFFで埋められたセクタを候補として保存します (N=\(sectorInfo.id.size), \(dataSize)バイト)")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // ここまでで有効なセクタが見つからなかった場合
-            if validSectorData == nil {
-                // ALPHA-MINI-DOSの特別処理を試みる
-                if isAlphaMiniDos() {
-                    PC88Logger.disk.debug("  ALPHA-MINI-DOSを検出しました。IPLを直接抽出します。")
-                    return extractAlphaMiniDosIpl()
-                }
-                
-                // レコード番号が一致するセクタを探す（最後の手段）
-                PC88Logger.disk.debug("  レコード番号のみで検索します")
-                
-                // すべてのトラックから、レコード番号が一致するセクタを収集
-                var matchingSectors: [(trackIndex: Int, sectorInfo: SectorData)] = []
-                
-                for (trackIndex, trackData) in sectorData.enumerated() {
-                    // トラック0とトラック1はすでにチェック済みなのでスキップ
-                    if trackData.track <= 1 {
-                        continue
-                    }
-                    
-                    for sectorInfo in trackData.sectors {
-                        if sectorInfo.id.record == UInt8(sector) {
-                            let dataSize = sectorInfo.data.count
-                            if dataSize > 0 && dataSize <= 8192 {
-                                matchingSectors.append((trackIndex, sectorInfo))
-                            }
-                        }
-                    }
-                }
-                
-                PC88Logger.disk.debug("  レコード番号\(sector)に一致するセクタ数: \(matchingSectors.count)")
-                
-                // 有効なセクタを選択
-                if !matchingSectors.isEmpty {
-                    // 有効なデータを含むセクタを探す
-                    let nonEmptySectors = matchingSectors.filter { !$0.sectorInfo.data.allSatisfy { $0 == 0xFF } }
-                    
-                    if !nonEmptySectors.isEmpty {
-                        // 有効なデータを含むセクタが見つかった場合
-                        let (trackIndex, sectorInfo) = nonEmptySectors.first!
-                        let dataSize = sectorInfo.data.count
-                        PC88Logger.disk.debug("  トラック\(sectorData[trackIndex].track)で有効なセクタ\(sector)を発見しました: データサイズ=\(dataSize)")
-                        validSectorData = sectorInfo.data
-                        validSectorSize = dataSize
-                        validSectorN = sectorInfo.id.size
-                    } else if !matchingSectors.isEmpty {
-                        // すべてFFで埋められている場合、最初のセクタを使用
-                        let (trackIndex, sectorInfo) = matchingSectors.first!
-                        let dataSize = sectorInfo.data.count
-                        PC88Logger.disk.debug("  トラック\(sectorData[trackIndex].track)でFFで埋められたセクタ\(sector)を発見しました: データサイズ=\(dataSize)")
-                        validSectorData = sectorInfo.data
-                        validSectorSize = dataSize
-                        validSectorN = sectorInfo.id.size
-                    }
-                }
-            }
-            
-            // 有効なセクタが見つかった場合は返す
-            if let data = validSectorData {
-                PC88Logger.disk.debug("  トラック0のセクタ\(sector)の候補を使用します: N=\(validSectorN) (\(calculateSectorSizeFromN(validSectorN))バイト), データサイズ=\(validSectorSize)")
-                return [UInt8](data)
-            }
-            
-            // 最後の手段: デフォルトのIPLセクタを返す
-            PC88Logger.disk.warning("  警告: 有効なセクタが見つかりませんでした。デフォルトのIPLセクタを使用します。")
-            return [UInt8](defaultIPLSector)
+            return readTrack0Sector(sector: sector)
         }
+        
+        return readNormalTrackSector(track: track, sector: sector)
+    }
+    
+    /// - Returns: セクタデータ、失敗した場合はnil
+    private func readTrack0Sector(sector: Int) -> [UInt8]? {
+        // デフォルトのIPLセクタを用意（ディスクイメージが破損している場合用）
+        let defaultIPLSector = createDefaultIPLSector()
+        
+        let (sectorData, sectorSize, sectorN) = findTrack0Sector(sector: sector)
+        
+        if let validData = sectorData {
+            PC88Logger.disk.debug("  有効なセクタが見つかりました: サイズ=\(sectorSize), N=\(sectorN)")
+            return [UInt8](validData)
+        }
+        
+        let (track1Data, track1Size, track1N) = findTrack1Sector(sector: sector)
+        
+        if let validTrack1Data = track1Data {
+            PC88Logger.disk.debug("  物理トラック1で有効なセクタが見つかりました: サイズ=\(track1Size), N=\(track1N)")
+            return [UInt8](validTrack1Data)
+        }
+        
+        // ここまでで有効なセクタが見つからなかった場合
+        // ALPHA-MINI-DOSの特別処理を試みる
+        if isAlphaMiniDos() {
+            PC88Logger.disk.debug("  ALPHA-MINI-DOSを検出しました。IPLを直接抽出します。")
+            return extractAlphaMiniDosIpl()
+        }
+        
+        // レコード番号が一致するセクタを探す（最後の手段）
+        let (validSectorData, validSectorSize, validSectorN) = findMatchingSectorsByRecord(sector: sector)
+        
+        // 有効なセクタが見つかった場合は返す
+        if let data = validSectorData {
+            PC88Logger.disk.debug("  トラック0のセクタ\(sector)の候補を使用します: N=\(validSectorN) (\(calculateSectorSizeFromN(validSectorN))バイト), データサイズ=\(validSectorSize)")
+            return [UInt8](data)
+        }
+        
+        // 最後の手段: デフォルトのIPLセクタを返す
+        PC88Logger.disk.warning("  警告: 有効なセクタが見つかりませんでした。デフォルトのIPLセクタを使用します。")
+        return [UInt8](defaultIPLSector)
+    }
+    
+    private func findMatchingSectorsByRecord(sector: Int) -> (Data?, Int, UInt8) {
+        var validSectorData: Data? = nil
+        var validSectorSize: Int = 0
+        var validSectorN: UInt8 = 0
+        
+        PC88Logger.disk.debug("  レコード番号のみで検索します")
+        
+        var matchingSectors: [(trackIndex: Int, sectorInfo: SectorData)] = []
+        
+        for (trackIndex, trackData) in sectorData.enumerated() {
+            if trackData.track <= 1 {
+                continue
+            }
+            for sectorInfo in trackData.sectors where sectorInfo.id.record == UInt8(sector) {
+                let dataSize = sectorInfo.data.count
+                if dataSize > 0 && dataSize <= 8192 {
+                    matchingSectors.append((trackIndex, sectorInfo))
+                }
+            }
+        }
+        
+        PC88Logger.disk.debug("  レコード番号\(sector)に一致するセクタ数: \(matchingSectors.count)")
+        
+        if !matchingSectors.isEmpty {
+            let nonEmptySectors = matchingSectors.filter { !$0.sectorInfo.data.allSatisfy { $0 == 0xFF } }
+            
+            if !nonEmptySectors.isEmpty {
+                let (trackIndex, sectorInfo) = nonEmptySectors.first!
+                let dataSize = sectorInfo.data.count
+                PC88Logger.disk.debug("  トラック\(sectorData[trackIndex].track)で有効なセクタ\(sector)を発見しました: データサイズ=\(dataSize)")
+                validSectorData = sectorInfo.data
+                validSectorSize = dataSize
+                validSectorN = sectorInfo.id.size
+            } else if !matchingSectors.isEmpty {
+                let (trackIndex, sectorInfo) = matchingSectors.first!
+                let dataSize = sectorInfo.data.count
+                PC88Logger.disk.debug("  トラック\(sectorData[trackIndex].track)でFFで埋められたセクタ\(sector)を発見しました: データサイズ=\(dataSize)")
+                validSectorData = sectorInfo.data
+                validSectorSize = dataSize
+                validSectorN = sectorInfo.id.size
+            }
+        }
+        
+        return (validSectorData, validSectorSize, validSectorN)
+    }
+    
+    /// - Parameters:
+    /// - Returns: セクタデータ、失敗した場合はnil
+    private func readNormalTrackSector(track: Int, sector: Int) -> [UInt8]? {
         
         // トラック0以外の場合は通常の検索を行う
         PC88Logger.disk.debug("  トラック\(track)を検索します")
