@@ -40,10 +40,10 @@ public struct JPInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         if condition.evaluate(registers: registers) {
-            registers.pc = address
+            registers.programCounter = address
             return 10 // 条件が真の場合
         } else {
-            registers.pc &+= size
+            registers.programCounter &+= size
             return 10 // 条件が偽の場合
         }
     }
@@ -69,11 +69,11 @@ public struct JRInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         if condition.evaluate(registers: registers) {
-            let newPC = Int(registers.pc) + Int(offset) + 2
-            registers.pc = UInt16(newPC)
+            let newPC = Int(registers.programCounter) + Int(offset) + 2
+            registers.programCounter = UInt16(newPC)
             return 12 // 条件が真の場合
         } else {
-            registers.pc &+= size
+            registers.programCounter &+= size
             return 7 // 条件が偽の場合
         }
     }
@@ -100,15 +100,15 @@ public struct CALLInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         if condition.evaluate(registers: registers) {
             // スタックにリターンアドレスをプッシュ
-            registers.sp &-= 2
-            let returnAddress = registers.pc &+ size
-            memory.writeWord(returnAddress, at: registers.sp)
+            registers.stackPointer &-= 2
+            let returnAddress = registers.programCounter &+ size
+            memory.writeWord(returnAddress, at: registers.stackPointer)
             
             // ジャンプ先に移動
-            registers.pc = address
+            registers.programCounter = address
             return 17 // 条件が真の場合
         } else {
-            registers.pc &+= size
+            registers.programCounter &+= size
             return 10 // 条件が偽の場合
         }
     }
@@ -136,14 +136,14 @@ public struct RETInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         if condition.evaluate(registers: registers) {
             // スタックからリターンアドレスをポップ
-            let returnAddress = memory.readWord(at: registers.sp)
-            registers.sp &+= 2
+            let returnAddress = memory.readWord(at: registers.stackPointer)
+            registers.stackPointer &+= 2
             
             // リターンアドレスにジャンプ
-            registers.pc = returnAddress
+            registers.programCounter = returnAddress
             return 11 // 条件が真の場合
         } else {
-            registers.pc &+= size
+            registers.programCounter &+= size
             return 5 // 条件が偽の場合
         }
     }
@@ -167,12 +167,12 @@ struct RSTInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         // スタックにリターンアドレスをプッシュ
-        registers.sp &-= 2
-        let returnAddress = registers.pc &+ size
-        memory.writeWord(returnAddress, at: registers.sp)
+        registers.stackPointer &-= 2
+        let returnAddress = registers.programCounter &+ size
+        memory.writeWord(returnAddress, at: registers.stackPointer)
         
         // リスタートアドレスにジャンプ
-        registers.pc = UInt16(address)
+        registers.programCounter = UInt16(address)
         return cycles
     }
     
