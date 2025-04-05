@@ -715,16 +715,14 @@ class D88DiskImage: DiskImageAccessing {
                 }
                 
                 // セクタを検索 - レコード番号(R)で検索
-                for sectorInfo in trackData.sectors {
-                    if sectorInfo.id.record == UInt8(sector) {
-                        let dataSize = sectorInfo.data.count
-                        if dataSize > 0 && dataSize <= 8192 { // セクタサイズの妥当性チェック
-                            PC88Logger.disk.debug("  セクタ\(sector)が見つかりました: データサイズ=\(dataSize)")
-                            // DataをUInt8配列に変換して返す
-                            return [UInt8](sectorInfo.data)
-                        } else {
-                            PC88Logger.disk.warning("  セクタ\(sector)のサイズが異常です: \(dataSize)バイト")
-                        }
+                for sectorInfo in trackData.sectors where sectorInfo.id.record == UInt8(sector) {
+                    let dataSize = sectorInfo.data.count
+                    if dataSize > 0 && dataSize <= 8192 { // セクタサイズの妥当性チェック
+                        PC88Logger.disk.debug("  セクタ\(sector)が見つかりました: データサイズ=\(dataSize)")
+                        // DataをUInt8配列に変換して返す
+                        return [UInt8](sectorInfo.data)
+                    } else {
+                        PC88Logger.disk.warning("  セクタ\(sector)のサイズが異常です: \(dataSize)バイト")
                     }
                 }
             }
