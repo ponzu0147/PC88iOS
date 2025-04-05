@@ -144,6 +144,23 @@ struct InstructionCycles {
 
 /// Z80 CPUの命令サイクル定義
 struct Z80InstructionCycles {
+    // 基本命令のサイクル
+    static let NOP = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let HALT = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let DI = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let EI = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let JP = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    static let JR = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 1) // 3M, 12T
+    static let CALL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 2) // 5M, 17T
+    static let RET = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    static let RST = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 2) // 3M, 11T
+    static let UNIMPLEMENTED = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    
+    // I/O命令のサイクル
+    static let IN = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, ioReads: 1) // 3M, 11T
+    static let OUT = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, ioWrites: 1) // 3M, 11T
+    static let INRC = InstructionCycles.standard(opcodeFetch: true, ioReads: 1) // 2M, 8T
+    static let OUTCR = InstructionCycles.standard(opcodeFetch: true, ioWrites: 1) // 2M, 8T
     // 8ビット転送命令のサイクル
     static let loadRegToReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
     static let loadRegToVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
@@ -158,6 +175,15 @@ struct Z80InstructionCycles {
     static let loadAddrToA = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 1) // 4M, 13T
     static let loadAddrToHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 2) // 5M, 16T
     static let loadHLToAddr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 2) // 5M, 16T
+    static let LDRI = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let LDRM = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let LDMR = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 1) // 2M, 7T
+    static let LDMI = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1) // 3M, 10T
+    static let LDRPI = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    static let LDRMA = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    static let LDMAR = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 1) // 2M, 7T
+    static let LDRPMA = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 1) // 4M, 13T
+    static let LDMARP = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 1) // 4M, 13T
     
     // 16ビット転送命令のサイクル
     static let loadRegPairToVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
@@ -186,6 +212,8 @@ struct Z80InstructionCycles {
     static let incrementHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1) // 3M, 11T
     static let decrementReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
     static let decrementHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1) // 3M, 11T
+    static let CP = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let CPL = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
     
     // 論理演算命令のサイクル
     static let logicalAndReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
@@ -204,11 +232,18 @@ struct Z80InstructionCycles {
     // スタック操作命令のサイクル
     static let pushRegPair = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 2) // 3M, 11T
     static let popRegPair = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    static let PUSH = InstructionCycles.standard(opcodeFetch: true, memoryWrites: 2) // 3M, 11T
+    static let POP = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
     
     // レジスタペア操作命令のサイクル
     static let incrementRegPair = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
     static let decrementRegPair = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
     static let addHLToRegPair = InstructionCycles.standard(opcodeFetch: true, internalCycles: 7)
+    static let INCRP = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
+    static let DECRP = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 6T
+    static let ADDHL = InstructionCycles.standard(opcodeFetch: true, internalCycles: 7)
+    static let SBC = InstructionCycles.standard(opcodeFetch: true, internalCycles: 2) // 2M, 8T
+    static let LDMEM = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
     
     // ジャンプ命令のサイクル
     static let jumpToAddr = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2)
@@ -228,9 +263,14 @@ struct Z80InstructionCycles {
         memoryReads: 1, 
         internalCycles: 5
     ) // 3M, 13T
+    static let DJNZ = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 1) // 3M, 13T
     
     // その他の命令のサイクル
     static let noOperation = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let RLCA = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let RRCA = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let EXAF = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let LDIY = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
     static let complementA = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
     static let returnFromSub = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
     

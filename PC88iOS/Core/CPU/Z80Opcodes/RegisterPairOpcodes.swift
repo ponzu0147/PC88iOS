@@ -15,7 +15,7 @@ struct INCRegPairInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 6 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.INCRP }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.INCRP }
     var description: String { return "INC \(register)" }
 }
 
@@ -30,7 +30,7 @@ struct DECRegPairInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 6 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.DECRP }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.DECRP }
     var description: String { return "DEC \(register)" }
 }
 
@@ -58,7 +58,7 @@ struct ADDHLInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 11 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.ADDHL }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.ADDHL }
     var description: String { return "ADD HL,\(source)" }
 }
 
@@ -88,7 +88,7 @@ struct SBCInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.SBC }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.SBC }
     var description: String { return "SBC A,\(source)" }
 }
 
@@ -104,6 +104,6 @@ struct LDDirectMemRegInstruction: Z80Instruction {
     
     var size: UInt16 { return 3 }
     var cycles: Int { return 13 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LDMEM }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.LDMEM }
     var description: String { return "LD (\(String(format: "0x%04X", address))),\(source)" }
 }

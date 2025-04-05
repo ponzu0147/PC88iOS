@@ -17,7 +17,7 @@ struct INInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 11 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.IN }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.IN }
     var description: String { return "IN A,(\(String(format: "0x%02X", port)))" }
 }
 
@@ -32,7 +32,7 @@ struct OUTInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 11 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.OUT }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.OUT }
     var description: String { return "OUT (\(String(format: "0x%02X", port))),A" }
 }
 
@@ -57,7 +57,7 @@ struct INRegCInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 12 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.INRC }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.INRC }
     var description: String { return "IN \(register),(C)" }
 }
 
@@ -76,6 +76,6 @@ struct OUTCRegInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 12 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.OUTCR }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.OUTCR }
     var description: String { return "OUT (C),\(source)" }
 }

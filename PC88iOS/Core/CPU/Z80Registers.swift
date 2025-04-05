@@ -32,12 +32,16 @@ struct Z80Registers {
     // 特殊レジスタ
     var regIX: UInt16 = 0
     var regIY: UInt16 = 0
-    var regSP: UInt16 = 0
-    var regPC: UInt16 = 0
+    var sp: UInt16 = 0
+    var programCounter: UInt16 = 0
     
     // 割り込み関連レジスタ
     var regI: UInt8 = 0
     var regR: UInt8 = 0
+    
+    // 割り込みフラグ
+    var iff1: Bool = false
+    var iff2: Bool = false
     
     /// レジスタペア AF の取得・設定
     var regAF: UInt16 {

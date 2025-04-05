@@ -3,6 +3,8 @@
 //
 
 import Foundation
+// CPUUtilitiesからInstructionCyclesを使用するためにインポート
+@_exported import PC88iOS.CPUUtilities
 
 struct ADDInstruction: Z80Instruction {
     let source: RegisterOperand
@@ -33,7 +35,7 @@ struct ADDInstruction: Z80Instruction {
     
     var size: UInt16 { return source.isImmediate ? 2 : 1 }
     var cycles: Int { return source.isImmediate ? 7 : (source.isMemory ? 7 : 4) }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.addAToReg }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.addAToReg }
     var description: String { return "ADD A,\(source)" }
 }
 
@@ -66,7 +68,7 @@ struct SUBInstruction: Z80Instruction {
     
     var size: UInt16 { return source.isImmediate ? 2 : 1 }
     var cycles: Int { return source.isImmediate ? 7 : (source.isMemory ? 7 : 4) }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.subtractReg }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.subtractReg }
     var description: String { return "SUB A,\(source)" }
 }
 
@@ -95,7 +97,7 @@ struct INCRegInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return register.isMemory ? 11 : 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.incrementReg }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.incrementReg }
     var description: String { return "INC \(register)" }
 }
 
@@ -124,7 +126,7 @@ struct DECRegInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return register.isMemory ? 11 : 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.decrementReg }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.decrementReg }
     var description: String { return "DEC \(register)" }
 }
 
@@ -155,7 +157,7 @@ struct CPInstruction: Z80Instruction {
     
     var size: UInt16 { return source.isImmediate ? 2 : 1 }
     var cycles: Int { return source.isImmediate ? 7 : (source.isMemory ? 7 : 4) }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.CP }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.CP }
     var description: String { return "CP \(source)" }
 }
 
@@ -171,6 +173,6 @@ struct CPLInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.CPL }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.CPL }
     var description: String { return "CPL" }
 }

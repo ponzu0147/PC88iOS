@@ -23,7 +23,19 @@ struct PC88TextEmulatorView: View {
     @State private var displayInterval: Double = 0.01
     
     /// 表示するテキスト
-    @State private var textToDisplay: String = "PC-88 テキスト表示テスト\n\nこれはPC-88のテキスト表示をエミュレートするテストです。\n左上から1文字ずつ表示していきます。\n\n表示間隔: 0.01秒/文字\n\nABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789\n!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+    @State private var textToDisplay: String = """
+PC-88 テキスト表示テスト
+
+これはPC-88のテキスト表示をエミュレートするテストです。
+左上から1文字ずつ表示していきます。
+
+表示間隔: 0.01秒/文字
+
+ABCDEFGHIJKLMNOPQRSTUVWXYZ
+abcdefghijklmnopqrstuvwxyz
+0123456789
+!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~
+"""
     
     /// 表示中かどうか
     @State private var isDisplaying: Bool = false

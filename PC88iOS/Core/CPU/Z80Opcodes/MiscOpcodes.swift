@@ -18,7 +18,7 @@ struct RLCAInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.RLCA }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.RLCA }
     var description: String { return "RLCA" }
 }
 
@@ -36,7 +36,7 @@ struct RRCAInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.RRCA }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.RRCA }
     var description: String { return "RRCA" }
 }
 
@@ -56,7 +56,7 @@ struct EXAFInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.EXAF }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.EXAF }
     var description: String { return "EX AF,AF'" }
 }
 
@@ -77,7 +77,7 @@ struct DJNZInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 8 } // 最小サイクル数
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.DJNZ }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.DJNZ }
     var description: String { return "DJNZ \(offset)" }
 }
 
@@ -91,7 +91,7 @@ struct IYPrefixedInstruction: Z80Instruction {
     
     var size: UInt16 { return instruction.size + 1 } // プレフィックスバイト分を追加
     var cycles: Int { return instruction.cycles + 4 } // プレフィックスの追加サイクル
-    var cycleInfo: InstructionCycles { return instruction.cycleInfo } // 基本的には元の命令のサイクル情報
+    var cycleInfo: PC88iOS.InstructionCycles { return instruction.cycleInfo } // 基本的には元の命令のサイクル情報
     var description: String { return "IY: \(instruction.description)" }
 }
 
@@ -105,6 +105,6 @@ struct LDIYInstruction: Z80Instruction {
     
     var size: UInt16 { return 4 } // FD + 21 + nn + nn
     var cycles: Int { return 14 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LDIY }
+    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.LDIY }
     var description: String { return "LD IY,\(String(format: "0x%04X", value))" }
 }
