@@ -404,8 +404,8 @@ class Z80InstructionDecoder {
             // 安全なメモリアクセス
             let lowByte = memory.readByte(at: programCounter)
             // 安全なアドレス計算
-            let nextPC = programCounter < UInt16.max ? programCounter + 1 : programCounter
-            let highByte = memory.readByte(at: nextPC)
+            let nextProgramCounter = programCounter < UInt16.max ? programCounter + 1 : programCounter
+            let highByte = memory.readByte(at: nextProgramCounter)
             let address = UInt16(highByte) << 8 | UInt16(lowByte)
             return JPInstruction(condition: .none, address: address)
         }
