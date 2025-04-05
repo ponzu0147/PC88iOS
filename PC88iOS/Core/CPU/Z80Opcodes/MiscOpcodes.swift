@@ -71,7 +71,7 @@ struct DJNZInstruction: Z80Instruction {
             registers.pc = UInt16(Int(registers.pc) + Int(offset) + 2)
             return 13 // ジャンプする場合
         } else {
-            registers.pc = registers.pc &+ size
+            registers.programCounter = registers.programCounter &+ size
             return 8 // ジャンプしない場合
         }
     }
