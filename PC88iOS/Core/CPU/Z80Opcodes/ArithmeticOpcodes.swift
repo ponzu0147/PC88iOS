@@ -59,7 +59,6 @@ struct ADDInstruction: Z80Instruction {
         
         return cycles
     }
-    
 }
 
 struct ADCInstruction: Z80Instruction {
@@ -119,7 +118,6 @@ struct ADCInstruction: Z80Instruction {
         
         return cycles
     }
-    
 }
 
 struct SUBInstruction: Z80Instruction {
@@ -176,7 +174,6 @@ struct SUBInstruction: Z80Instruction {
         
         return cycles
     }
-    
 }
 
 enum RegisterSource {
