@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import PC88iOS
 
 struct INInstruction: Z80Instruction {
     let port: UInt8
