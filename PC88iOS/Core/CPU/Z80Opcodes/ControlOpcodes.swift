@@ -6,9 +6,7 @@
 //
 
 import Foundation
-
-// 必要なファイルをインポート
-// プロジェクト内の他のファイルは直接参照できるはず
+import PC88iOS
 
 /// ジャンプ条件
 public enum JumpCondition {
@@ -59,7 +57,8 @@ public struct JPInstruction: Z80Instruction {
         ) 
     }
     var description: String { 
-        return "JP \(condition), \(String(format: "0x%04X", address))" 
+        let addressStr = String(format: "0x%04X", address)
+        return "JP \(condition), \(addressStr)" 
     }
 }
 
@@ -70,7 +69,8 @@ public struct JRInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         if condition.evaluate(registers: registers) {
-            registers.pc = UInt16(Int(registers.pc) + Int(offset) + 2)
+            let newPC = Int(registers.pc) + Int(offset) + 2
+            registers.pc = UInt16(newPC)
             return 12 // 条件が真の場合
         } else {
             registers.pc &+= size
@@ -124,7 +124,8 @@ public struct CALLInstruction: Z80Instruction {
         ) 
     }
     var description: String { 
-        return "CALL \(condition), \(String(format: "0x%04X", address))" 
+        let addressStr = String(format: "0x%04X", address)
+        return "CALL \(condition), \(addressStr)" 
     }
 }
 
