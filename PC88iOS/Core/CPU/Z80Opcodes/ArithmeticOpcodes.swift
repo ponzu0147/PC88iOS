@@ -119,6 +119,7 @@ struct ADCInstruction: Z80Instruction {
         return cycles
     }
 }
+
 struct SUBInstruction: Z80Instruction {
     let source: RegisterSource
     
@@ -174,6 +175,7 @@ struct SUBInstruction: Z80Instruction {
         return cycles
     }
 }
+
 enum RegisterSource {
     case register(Register8)
     case memory
