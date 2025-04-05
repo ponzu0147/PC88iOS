@@ -10,15 +10,15 @@ struct ADDInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
-        let a = registers.regA
+        let regA = registers.regA
         
-        let halfCarry = ((a & 0x0F) + (value & 0x0F)) > 0x0F
+        let halfCarry = ((regA & 0x0F) + (value & 0x0F)) > 0x0F
         
-        let result = a &+ value
+        let result = regA &+ value
         
-        let carry = Int(a) + Int(value) > 0xFF
+        let carry = Int(regA) + Int(value) > 0xFF
         
-        let overflow = (a & 0x80) == (value & 0x80) && (result & 0x80) != (a & 0x80)
+        let overflow = (regA & 0x80) == (value & 0x80) && (result & 0x80) != (regA & 0x80)
         
         registers.regA = result
         
@@ -43,15 +43,15 @@ struct SUBInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
-        let a = registers.regA
+        let regA = registers.regA
         
-        let halfCarry = (a & 0x0F) < (value & 0x0F)
+        let halfCarry = (regA & 0x0F) < (value & 0x0F)
         
-        let result = a &- value
+        let result = regA &- value
         
-        let carry = Int(a) < Int(value)
+        let carry = Int(regA) < Int(value)
         
-        let overflow = (a & 0x80) != (value & 0x80) && (result & 0x80) != (a & 0x80)
+        let overflow = (regA & 0x80) != (value & 0x80) && (result & 0x80) != (regA & 0x80)
         
         registers.regA = result
         
@@ -134,15 +134,15 @@ struct CPInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
-        let a = registers.regA
+        let regA = registers.regA
         
-        let halfCarry = (a & 0x0F) < (value & 0x0F)
+        let halfCarry = (regA & 0x0F) < (value & 0x0F)
         
-        let result = a &- value
+        let result = regA &- value
         
-        let carry = Int(a) < Int(value)
+        let carry = Int(regA) < Int(value)
         
-        let overflow = (a & 0x80) != (value & 0x80) && (result & 0x80) != (a & 0x80)
+        let overflow = (regA & 0x80) != (value & 0x80) && (result & 0x80) != (regA & 0x80)
         
         registers.setFlag(Z80Registers.Flags.zero, value: result == 0)
         registers.setFlag(Z80Registers.Flags.sign, value: (result & 0x80) != 0)
