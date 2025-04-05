@@ -3,11 +3,12 @@
 //
 
 import Foundation
+import PC88iOS
 
 struct INCRegPairInstruction: Z80Instruction {
     let register: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = register.read(from: registers)
         register.write(to: &registers, value: value &+ 1)
         return cycles
@@ -22,7 +23,7 @@ struct INCRegPairInstruction: Z80Instruction {
 struct DECRegPairInstruction: Z80Instruction {
     let register: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = register.read(from: registers)
         register.write(to: &registers, value: value &- 1)
         return cycles
@@ -37,9 +38,9 @@ struct DECRegPairInstruction: Z80Instruction {
 struct ADDHLInstruction: Z80Instruction {
     let source: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
-        let hl = registers.hl
-        let value = source.read(from: registers)
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
+　      let hl = registers.regHL
+=lue = source.read(from: registers)
         
         let halfCarry = ((hl & 0x0FFF) + (value & 0x0FFF)) > 0x0FFF
         
@@ -47,7 +48,7 @@ struct ADDHLInstruction: Z80Instruction {
         
         let carry = result > 0xFFFF
         
-        registers.hl = UInt16(result & 0xFFFF)
+        registers.regHL = UInt16(result & 0xFFFF)
         
         registers.setFlag(Z80Registers.Flags.halfCarry, value: halfCarry)
         registers.setFlag(Z80Registers.Flags.subtract, value: false)
@@ -65,21 +66,21 @@ struct ADDHLInstruction: Z80Instruction {
 struct SBCInstruction: Z80Instruction {
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers)
         let carryValue: UInt8 = registers.getFlag(Z80Registers.Flags.carry) ? 1 : 0
         
-        let halfCarry = (registers.a & 0x0F) < ((value & 0x0F) + carryValue)
+        let halfCarry = (registers.regA & 0x0F) < ((value & 0x0F) + carryValue)
         
-        let result = Int(registers.a) - Int(value) - Int(carryValue)
+        let result = Int(registers.regA) - Int(value) - Int(carryValue)
         let carry = result < 0
         
-        registers.a = UInt8(result & 0xFF)
+        registers.regA = UInt8(result & 0xFF)
         
-        registers.setFlag(Z80Registers.Flags.zero, value: registers.a == 0)
-        registers.setFlag(Z80Registers.Flags.sign, value: (registers.a & 0x80) != 0)
+        registers.setFlag(Z80Registers.Flags.zero, value: registers.regA == 0)
+        registers.setFlag(Z80Registers.Flags.sign, value: (registers.regA & 0x80) != 0)
         registers.setFlag(Z80Registers.Flags.halfCarry, value: halfCarry)
-        registers.setFlag(Z80Registers.Flags.parity, value: parityEven(registers.a))
+        registers.setFlag(Z80Registers.Flags.parity, value: parityEven(registers.regA))
         registers.setFlag(Z80Registers.Flags.subtract, value: true)
         registers.setFlag(Z80Registers.Flags.carry, value: carry)
         
@@ -96,7 +97,7 @@ struct LDDirectMemRegInstruction: Z80Instruction {
     let address: UInt16
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers)
         memory.writeByte(value, at: address)
         return cycles
