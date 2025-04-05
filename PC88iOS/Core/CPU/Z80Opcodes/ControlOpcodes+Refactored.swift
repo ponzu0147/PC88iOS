@@ -8,7 +8,7 @@ struct JPInstruction: Z80Instruction {
     let condition: JumpCondition
     let address: UInt16
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         if checkCondition(condition, registers: registers) {
             registers.pc = address
             return cycles
@@ -34,7 +34,7 @@ struct JRInstruction: Z80Instruction {
     let condition: JumpCondition
     let offset: Int8
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         if checkCondition(condition, registers: registers) {
             registers.pc = UInt16(Int(registers.pc) + Int(offset) + 2)
             return condition == .none ? 12 : 12 // 条件付きジャンプも同じサイクル数
@@ -60,7 +60,7 @@ struct CALLInstruction: Z80Instruction {
     let condition: JumpCondition
     let address: UInt16
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         if checkCondition(condition, registers: registers) {
             let returnAddress = registers.pc &+ size
             
@@ -92,7 +92,7 @@ struct CALLInstruction: Z80Instruction {
 struct RETInstruction: Z80Instruction {
     let condition: JumpCondition
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         if checkCondition(condition, registers: registers) {
             let returnAddress = memory.readWord(at: registers.sp)
             
@@ -122,7 +122,7 @@ struct RETInstruction: Z80Instruction {
 struct RSTInstruction: Z80Instruction {
     let address: UInt8
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let returnAddress = registers.pc &+ size
         
         registers.sp = registers.sp &- 2
