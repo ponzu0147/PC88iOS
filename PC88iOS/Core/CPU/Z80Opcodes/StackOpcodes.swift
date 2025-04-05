@@ -9,7 +9,7 @@ struct POPInstruction: Z80Instruction {
     let register: RegisterPairOperand
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        let value = memory.readWord(at: registers.stackPointer)
+        let value = memory.readWord(at: registers.sp)
         
         register.write(to: &registers, value: value)
         
