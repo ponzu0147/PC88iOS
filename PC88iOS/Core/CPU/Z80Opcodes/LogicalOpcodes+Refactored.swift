@@ -7,7 +7,7 @@ import Foundation
 struct ANDInstruction: Z80Instruction {
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
         
         registers.a &= value
@@ -31,7 +31,7 @@ struct ANDInstruction: Z80Instruction {
 struct ORInstruction: Z80Instruction {
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
         
         registers.a |= value
@@ -55,7 +55,7 @@ struct ORInstruction: Z80Instruction {
 struct XORInstruction: Z80Instruction {
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
         
         registers.a ^= value
