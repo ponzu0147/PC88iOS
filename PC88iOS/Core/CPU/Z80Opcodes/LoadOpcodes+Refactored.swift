@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import PC88iOS
 
 struct LDRegRegInstruction: Z80Instruction {
     let destination: RegisterOperand
