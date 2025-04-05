@@ -13,6 +13,11 @@ excluded:
   - PC88iOS/Preview Content
   - "**/*.generated.swift"
 
+# 特定のファイルに対する特定のルールの無効化
+excluded_rules_for_files:
+  "PC88iOS/UI/EmulatorViewModel.swift":
+    - no_fallthrough_only # PC88Key参照の問題を無視
+
 # デフォルトルールの調整
 line_length:
   warning: 120
@@ -79,6 +84,7 @@ cyclomatic_complexity:
 disabled_rules:
   - trailing_whitespace # 行末の空白を許可
   - todo # TODOコメントを許可
+  - unneeded_break_in_switch # 不要なbreakを許可（デフォルトケースなど）
 
 # オプトインルール（デフォルトでは無効だが有効にするルール）
 opt_in_rules:

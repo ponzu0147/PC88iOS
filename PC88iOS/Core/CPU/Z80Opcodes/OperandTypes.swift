@@ -26,14 +26,14 @@ enum RegisterOperand {
     
     private func readFromRegister(_ registers: Z80Registers) -> UInt8 {
         switch self {
-        case .regA: return registers.a
-        case .regB: return registers.b
-        case .regC: return registers.c
-        case .regD: return registers.d
-        case .regE: return registers.e
-        case .regH: return registers.h
-        case .regL: return registers.l
-        case .regF: return registers.f
+        case .regA: return registers.regA
+        case .regB: return registers.regB
+        case .regC: return registers.regC
+        case .regD: return registers.regD
+        case .regE: return registers.regE
+        case .regH: return registers.regH
+        case .regL: return registers.regL
+        case .regF: return registers.regF
         default:
             PC88Logger.cpu.error("不正なレジスタタイプです")
             return 0
@@ -42,7 +42,7 @@ enum RegisterOperand {
     
     private func readFromMemory(_ registers: Z80Registers, _ memory: MemoryAccessing?) -> UInt8 {
         if let memory = memory {
-            return memory.readByte(at: registers.hl)
+            return memory.readByte(at: registers.regHL)
         } else {
             PC88Logger.cpu.debug("警告: memoryが指定されていません")
             return 0
@@ -62,14 +62,14 @@ enum RegisterOperand {
     
     private func writeToRegister(_ registers: inout Z80Registers, _ value: UInt8) {
         switch self {
-        case .regA: registers.a = value
-        case .regB: registers.b = value
-        case .regC: registers.c = value
-        case .regD: registers.d = value
-        case .regE: registers.e = value
-        case .regH: registers.h = value
-        case .regL: registers.l = value
-        case .regF: registers.f = value
+        case .regA: registers.regA = value
+        case .regB: registers.regB = value
+        case .regC: registers.regC = value
+        case .regD: registers.regD = value
+        case .regE: registers.regE = value
+        case .regH: registers.regH = value
+        case .regL: registers.regL = value
+        case .regF: registers.regF = value
         default:
             PC88Logger.cpu.error("不正なレジスタタイプです")
         }
@@ -77,7 +77,7 @@ enum RegisterOperand {
     
     private func writeToMemory(_ registers: Z80Registers, _ value: UInt8, _ memory: MemoryAccessing?) {
         if let memory = memory {
-            memory.writeByte(value, at: registers.hl)
+            memory.writeByte(value, at: registers.regHL)
         } else {
             PC88Logger.cpu.debug("警告: memoryが指定されていません")
         }

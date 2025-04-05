@@ -7,7 +7,6 @@
 
 import Foundation
 import os.log
-import PC88iOS
 
 /// アイドルループ検出用のフィルタプロトコル
 protocol InstructionTraceFilterProtocol {
@@ -458,7 +457,7 @@ class Z80CPU: CPUExecuting {
     /// 命令実行
     private func executeInstruction(_ opcode: UInt8) -> Int {
         // デコード
-        let instruction = decoder.decode(opcode, memory: memory, programCounter: registers.regPC)
+        let instruction = decoder.decode(opcode, memory: memory, pc: registers.regPC)
         
         // トレース処理
         handleInstructionTrace(opcode, instruction)
@@ -791,7 +790,7 @@ extension Z80CPU {
         
         for opcode in idleLoopInstructions {
             // 命令を実行せずにサイクル数だけ取得
-            let instruction = decoder.decode(opcode, memory: memory, programCounter: 0)
+            let instruction = decoder.decode(opcode, memory: memory, pc: 0)
             idleLoopCycles += instruction.cycles
         }
     }
@@ -821,7 +820,7 @@ extension Z80CPU {
             PC88Logger.cpu.info("Instructions:")
             for (index, opcode) in idleLoopInstructions.enumerated() {
                 let programCounter = (idleLoopPC + UInt16(index)) & 0xFFFF
-                let instruction = decoder.decode(opcode, memory: memory, programCounter: programCounter)
+                let instruction = decoder.decode(opcode, memory: memory, pc: programCounter)
                 PC88Logger.cpu.info("  \(String(format: "0x%04X", programCounter)): \(String(format: "%02X", opcode)) - \(instruction.description)")
             }
             

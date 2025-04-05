@@ -3,7 +3,6 @@
 //
 
 import Foundation
-import PC88iOS
 
 struct POPInstruction: Z80Instruction {
     let register: RegisterPairOperand

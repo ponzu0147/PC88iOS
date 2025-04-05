@@ -1,50 +1,43 @@
 //
-//  LoadOpcodes.swift
-//  PC88iOS
 //
-//  Created by 越川将人 on 2025/03/30.
 //
 
 import Foundation
-import PC88iOS
 
-/// LD r,r'命令（レジスタ間コピー）
 struct LDRegRegInstruction: Z80Instruction {
     let destination: RegisterOperand
     let source: RegisterOperand
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        let value = source.read(from: registers)
-        destination.write(to: &registers, value: value)
+        let value = source.read(from: registers, memory: memory)
+        destination.write(to: &registers, value: value, memory: memory)
         return cycles
     }
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadRegToReg }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LDRR }
     var description: String { return "LD \(destination),\(source)" }
 }
 
-/// LD r,n命令（即値ロード）
 struct LDRegImmInstruction: Z80Instruction {
     let destination: RegisterOperand
     let value: UInt8
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        destination.write(to: &registers, value: value)
+        destination.write(to: &registers, value: value, memory: memory)
         return cycles
     }
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 7 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadRegToVal }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LDRI }
     var description: String { return "LD \(destination),\(String(format: "0x%02X", value))" }
 }
 
-/// LD r,(HL)命令（メモリからレジスタへのロード）
 struct LDRegMemInstruction: Z80Instruction {
     let destination: RegisterOperand
-    let address: MemoryAddressOperand
+    let address: AddressOperand
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let addr = address.getAddress(from: registers)
@@ -55,13 +48,12 @@ struct LDRegMemInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 7 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadRegToHL }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LDRM }
     var description: String { return "LD \(destination),(\(address))" }
 }
 
-/// LD (HL),r命令（レジスタからメモリへのストア）
 struct LDMemRegInstruction: Z80Instruction {
-    let address: MemoryAddressOperand
+    let address: AddressOperand
     let source: RegisterOperand
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
@@ -73,13 +65,12 @@ struct LDMemRegInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 7 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadHLToReg }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LDMR }
     var description: String { return "LD (\(address)),\(source)" }
 }
 
-/// LD (HL),n命令（即値をメモリにストア）
 struct LDMemImmInstruction: Z80Instruction {
-    let address: MemoryAddressOperand
+    let address: AddressOperand
     let value: UInt8
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
@@ -90,127 +81,57 @@ struct LDMemImmInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 }
     var cycles: Int { return 10 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadHLToVal }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LDMI }
     var description: String { return "LD (\(address)),\(String(format: "0x%02X", value))" }
 }
 
-/// LD A,(BC)命令
-struct LDABCInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        registers.regA = memory.readByte(at: registers.regBC)
-        return cycles
-    }
-    
-    var size: UInt16 { return 1 }
-    var cycles: Int { return 7 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadAToBC }
-    var description: String { return "LD A,(BC)" }
-}
-
-/// LD A,(DE)命令
-struct LDADEInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        registers.regA = memory.readByte(at: registers.regDE)
-        return cycles
-    }
-    
-    var size: UInt16 { return 1 }
-    var cycles: Int { return 7 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadAToDE }
-    var description: String { return "LD A,(DE)" }
-}
-
-/// LD A,(nn)命令
-struct LDAnnInstruction: Z80Instruction {
-    let address: UInt16
-    
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        registers.regA = memory.readByte(at: address)
-        return cycles
-    }
-    
-    var size: UInt16 { return 3 }
-    var cycles: Int { return 13 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadAToAddr }
-    var description: String { return "LD A,(\(String(format: "0x%04X", address)))" }
-}
-
-/// LD (BC),A命令
-struct LDBCAInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        memory.writeByte(registers.regA, at: registers.regBC)
-        return cycles
-    }
-    
-    var size: UInt16 { return 1 }
-    var cycles: Int { return 7 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadBCToA }
-    var description: String { return "LD (BC),A" }
-}
-
-/// LD (DE),A命令
-struct LDDEAInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        memory.writeByte(registers.regA, at: registers.regDE)
-        return cycles
-    }
-    
-    var size: UInt16 { return 1 }
-    var cycles: Int { return 7 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadDEToA }
-    var description: String { return "LD (DE),A" }
-}
-
-/// LD rp,nn命令（レジスタペアに16ビット即値をロード）
 struct LDRegPairImmInstruction: Z80Instruction {
     let register: RegisterPairOperand
     let value: UInt16
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        // レジスタペアに値を書き込む
         register.write(to: &registers, value: value)
         return cycles
     }
     
     var size: UInt16 { return 3 }
     var cycles: Int { return 10 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadRegPairToVal }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LDRPI }
     var description: String { return "LD \(register),\(String(format: "0x%04X", value))" }
 }
 
-/// LD (nn),A命令
-struct LDnnAInstruction: Z80Instruction {
+struct LDRegMemAddrInstruction: Z80Instruction {
+    let destination: RegisterOperand
     let address: UInt16
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        memory.writeByte(registers.regA, at: address)
+        let value = memory.readByte(at: address)
+        destination.write(to: &registers, value: value)
         return cycles
     }
     
     var size: UInt16 { return 3 }
     var cycles: Int { return 13 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadAddrToA }
-    var description: String { return "LD (\(String(format: "0x%04X", address))),A" }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LDRMA }
+    var description: String { return "LD \(destination),(\(String(format: "0x%04X", address)))" }
 }
 
-/// LD (nn),HL命令（HLレジスタペアの内容をメモリに格納）
-struct LDMemAddrRegPairInstruction: Z80Instruction {
+struct LDMemAddrRegInstruction: Z80Instruction {
     let address: UInt16
-    let source: RegisterPairOperand
+    let source: RegisterOperand
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers)
-        memory.writeWord(value, at: address)
+        memory.writeByte(value, at: address)
         return cycles
     }
     
     var size: UInt16 { return 3 }
-    var cycles: Int { return 16 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadAddrToHL }
+    var cycles: Int { return 13 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LDMAR }
     var description: String { return "LD (\(String(format: "0x%04X", address))),\(source)" }
 }
 
-/// LD HL,(nn)命令（メモリからHLレジスタペアにロード）
 struct LDRegPairMemAddrInstruction: Z80Instruction {
     let destination: RegisterPairOperand
     let address: UInt16
@@ -223,6 +144,22 @@ struct LDRegPairMemAddrInstruction: Z80Instruction {
     
     var size: UInt16 { return 3 }
     var cycles: Int { return 16 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.loadHLToAddr }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LDRPMA }
     var description: String { return "LD \(destination),(\(String(format: "0x%04X", address)))" }
+}
+
+struct LDMemAddrRegPairInstruction: Z80Instruction {
+    let address: UInt16
+    let source: RegisterPairOperand
+    
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
+        let value = source.read(from: registers)
+        memory.writeWord(value, at: address)
+        return cycles
+    }
+    
+    var size: UInt16 { return 3 }
+    var cycles: Int { return 16 }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.LDMARP }
+    var description: String { return "LD (\(String(format: "0x%04X", address))),\(source)" }
 }
