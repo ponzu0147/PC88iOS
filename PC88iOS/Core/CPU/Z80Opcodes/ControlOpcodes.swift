@@ -52,8 +52,15 @@ public struct JPInstruction: Z80Instruction {
     
     var size: UInt16 { return 3 }
     var cycles: Int { return 10 }
-    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) }
-    var description: String { return "JP \(condition), \(String(format: "0x%04X", address))" }
+    var cycleInfo: InstructionCycles { 
+        return InstructionCycles.standard(
+            opcodeFetch: true, 
+            memoryReads: 2
+        ) 
+    }
+    var description: String { 
+        return "JP \(condition), \(String(format: "0x%04X", address))" 
+    }
 }
 
 /// JR命令（相対ジャンプ）
@@ -73,8 +80,16 @@ public struct JRInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 }
     var cycles: Int { return condition == .none ? 12 : 7 }
-    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 5) }
-    var description: String { return "JR \(condition), \(offset)" }
+    var cycleInfo: InstructionCycles { 
+        return InstructionCycles.standard(
+            opcodeFetch: true, 
+            memoryReads: 1, 
+            internalCycles: 5
+        ) 
+    }
+    var description: String { 
+        return "JR \(condition), \(offset)" 
+    }
 }
 
 /// CALL命令（サブルーチンコール）
@@ -100,8 +115,17 @@ public struct CALLInstruction: Z80Instruction {
     
     var size: UInt16 { return 3 }
     var cycles: Int { return condition == .none ? 17 : 10 }
-    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 2, internalCycles: 1) }
-    var description: String { return "CALL \(condition), \(String(format: "0x%04X", address))" }
+    var cycleInfo: InstructionCycles { 
+        return InstructionCycles.standard(
+            opcodeFetch: true, 
+            memoryReads: 2, 
+            memoryWrites: 2, 
+            internalCycles: 1
+        ) 
+    }
+    var description: String { 
+        return "CALL \(condition), \(String(format: "0x%04X", address))" 
+    }
 }
 
 /// RET命令（サブルーチンリターン）
@@ -125,8 +149,15 @@ public struct RETInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return condition == .none ? 10 : 5 }
-    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) }
-    var description: String { return "RET \(condition)" }
+    var cycleInfo: InstructionCycles { 
+        return InstructionCycles.standard(
+            opcodeFetch: true, 
+            memoryReads: 2
+        ) 
+    }
+    var description: String { 
+        return "RET \(condition)" 
+    }
 }
 
 /// RST命令（リスタート）
@@ -146,6 +177,13 @@ struct RSTInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 11 }
-    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryWrites: 2) }
-    var description: String { return "RST \(String(format: "0x%02X", address))" }
+    var cycleInfo: InstructionCycles { 
+        return InstructionCycles.standard(
+            opcodeFetch: true, 
+            memoryWrites: 2
+        ) 
+    }
+    var description: String { 
+        return "RST \(String(format: "0x%02X", address))" 
+    }
 }
