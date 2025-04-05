@@ -7,6 +7,7 @@
 
 import Foundation
 import os.log
+import PC88iOS
 
 /// アイドルループ検出用のフィルタプロトコル
 protocol InstructionTraceFilterProtocol {
