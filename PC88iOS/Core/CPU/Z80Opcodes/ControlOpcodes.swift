@@ -51,10 +51,7 @@ public struct JPInstruction: Z80Instruction {
     var size: UInt16 { return 3 }
     var cycles: Int { return 10 }
     var cycleInfo: InstructionCycles { 
-        return InstructionCycles.standard(
-            opcodeFetch: true, 
-            memoryReads: 2
-        ) 
+        return Z80InstructionCycles.JP
     }
     var description: String { 
         let addressStr = String(format: "0x%04X", address)
@@ -81,11 +78,7 @@ public struct JRInstruction: Z80Instruction {
     var size: UInt16 { return 2 }
     var cycles: Int { return condition == .none ? 12 : 7 }
     var cycleInfo: InstructionCycles { 
-        return InstructionCycles.standard(
-            opcodeFetch: true, 
-            memoryReads: 1, 
-            internalCycles: 5
-        ) 
+        return Z80InstructionCycles.JR
     }
     var description: String { 
         return "JR \(condition), \(offset)" 
@@ -116,12 +109,7 @@ public struct CALLInstruction: Z80Instruction {
     var size: UInt16 { return 3 }
     var cycles: Int { return condition == .none ? 17 : 10 }
     var cycleInfo: InstructionCycles { 
-        return InstructionCycles.standard(
-            opcodeFetch: true, 
-            memoryReads: 2, 
-            memoryWrites: 2, 
-            internalCycles: 1
-        ) 
+        return Z80InstructionCycles.CALL
     }
     var description: String { 
         let addressStr = String(format: "0x%04X", address)
@@ -151,10 +139,7 @@ public struct RETInstruction: Z80Instruction {
     var size: UInt16 { return 1 }
     var cycles: Int { return condition == .none ? 10 : 5 }
     var cycleInfo: InstructionCycles { 
-        return InstructionCycles.standard(
-            opcodeFetch: true, 
-            memoryReads: 2
-        ) 
+        return Z80InstructionCycles.JP
     }
     var description: String { 
         return "RET \(condition)" 
@@ -179,10 +164,7 @@ struct RSTInstruction: Z80Instruction {
     var size: UInt16 { return 1 }
     var cycles: Int { return 11 }
     var cycleInfo: InstructionCycles { 
-        return InstructionCycles.standard(
-            opcodeFetch: true, 
-            memoryWrites: 2
-        ) 
+        return Z80InstructionCycles.RST
     }
     var description: String { 
         return "RST \(String(format: "0x%02X", address))" 
