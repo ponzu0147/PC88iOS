@@ -3,7 +3,6 @@
 //
 
 import Foundation
-import UIKit
 
 class Z80InstructionDecoder {
     
@@ -419,13 +418,13 @@ class Z80InstructionDecoder {
         }
         
         if opcode == 0x18 {
-            let offset = Int8(bitPattern: memory.readByte(at: pc))
+            let offset = Int8(bitPattern: memory.readByte(at: programCounter))
             return JRInstruction(condition: .none, offset: offset)
         }
         
         if (opcode & 0xE7) == 0x20 {
             let condition = decodeCondition((opcode >> 3) & 0x03)
-            let offset = Int8(bitPattern: memory.readByte(at: pc))
+            let offset = Int8(bitPattern: memory.readByte(at: programCounter))
             return JRInstruction(condition: condition, offset: offset)
         }
         
