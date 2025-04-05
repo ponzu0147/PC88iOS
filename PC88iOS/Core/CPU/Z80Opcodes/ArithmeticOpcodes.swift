@@ -191,6 +191,7 @@ struct INCRegInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value: UInt8
+        var cycles = 4
         
         switch register {
         case .regA: value = registers.regA
@@ -236,6 +237,7 @@ struct DECRegInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value: UInt8
+        var cycles = 4
         
         switch register {
         case .regA: value = registers.regA
