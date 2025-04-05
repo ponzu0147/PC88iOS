@@ -39,8 +39,8 @@ struct ADDHLInstruction: Z80Instruction {
     let source: RegisterPairOperand
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-　      let hl = registers.regHL
-=lue = source.read(from: registers)
+        let hl = registers.regHL
+        let value = source.read(from: registers)
         
         let halfCarry = ((hl & 0x0FFF) + (value & 0x0FFF)) > 0x0FFF
         
