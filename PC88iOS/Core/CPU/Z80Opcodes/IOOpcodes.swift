@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import PC88iOS
 
 /// OUT (n),A命令（指定ポートに値を出力）
 struct OUTInstruction: Z80Instruction {

@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import PC88iOS
 
 class Z80InstructionDecoder {
     
@@ -213,12 +214,12 @@ class Z80InstructionDecoder {
         case 0xC5: // PUSH BC
             return PUSHInstruction(register: .bc)
         case 0xD3: // OUT (n), A
-            let port = memory.readByte(at: pc)
+            let port = memory.readByte(at: programCounter)
             return OUTInstruction(port: port)
         case 0xD5: // PUSH DE
             return PUSHInstruction(register: .de)
         case 0xDB: // IN A,(n)
-            let port = memory.readByte(at: pc)
+            let port = memory.readByte(at: programCounter)
             return INInstruction(port: port)
         case 0xE1: // POP HL
             return POPInstruction(register: .hl)
@@ -237,19 +238,19 @@ class Z80InstructionDecoder {
         case 0xFB: // EI
             return EIInstruction()
         case 0xFD: // IYプレフィックス
-            return decodeIYPrefixedInstruction(memory: memory, pc: pc)
+            return decodeIYPrefixedInstruction(memory: memory, programCounter: programCounter)
         default:
-            if let instruction = decodeArithmeticInstruction(opcode, memory: memory, pc: pc) {
+            if let instruction = decodeArithmeticInstruction(opcode, memory: memory, programCounter: programCounter) {
                 return instruction
-            } else if let instruction = decodeLogicalInstruction(opcode, memory: memory, pc: pc) {
+            } else if let instruction = decodeLogicalInstruction(opcode, memory: memory, programCounter: programCounter) {
                 return instruction
-            } else if let instruction = decodeControlInstruction(opcode, memory: memory, pc: pc) {
+            } else if let instruction = decodeControlInstruction(opcode, memory: memory, programCounter: programCounter) {
                 return instruction
-            } else if let instruction = decodeLoadInstruction(opcode, memory: memory, pc: pc) {
+            } else if let instruction = decodeLoadInstruction(opcode, memory: memory, programCounter: programCounter) {
                 return instruction
-            } else if let instruction = decodeStackInstruction(opcode, memory: memory, pc: pc) {
+            } else if let instruction = decodeStackInstruction(opcode, memory: memory, programCounter: programCounter) {
                 return instruction
-            } else if let instruction = decodeIOInstruction(opcode, memory: memory, pc: pc) {
+            } else if let instruction = decodeIOInstruction(opcode, memory: memory, programCounter: programCounter) {
                 return instruction
             } else {
                 return UnimplementedInstruction(opcode: opcode)
@@ -258,14 +259,14 @@ class Z80InstructionDecoder {
     }
     
     
-    private func decodeArithmeticInstruction(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+    private func decodeArithmeticInstruction(_ opcode: UInt8, memory: MemoryAccessing, programCounter: UInt16) -> Z80Instruction? {
         if (opcode & 0xF8) == 0x80 {
             let reg = decodeRegister8(opcode & 0x07)
             return ADDInstruction(source: convertToRegisterOperand(reg))
         }
         
         if opcode == 0xC6 {
-            let value = memory.readByte(at: pc)
+            let value = memory.readByte(at: programCounter)
             return ADDInstruction(source: .immediate(value))
         }
         
@@ -279,7 +280,7 @@ class Z80InstructionDecoder {
         }
         
         if opcode == 0xD6 {
-            let value = memory.readByte(at: pc)
+            let value = memory.readByte(at: programCounter)
             return SUBInstruction(source: .immediate(value))
         }
         
@@ -325,7 +326,7 @@ class Z80InstructionDecoder {
         }
         
         if opcode == 0x10 {
-            let offset = memory.readByte(at: pc)
+            let offset = memory.readByte(at: programCounter)
             return DJNZInstruction(offset: Int8(bitPattern: offset))
         }
         
@@ -336,14 +337,14 @@ class Z80InstructionDecoder {
         return nil
     }
     
-    private func decodeLogicalInstruction(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+    private func decodeLogicalInstruction(_ opcode: UInt8, memory: MemoryAccessing, programCounter: UInt16) -> Z80Instruction? {
         if (opcode & 0xF8) == 0xA0 {
             let reg = decodeRegister8(opcode & 0x07)
             return ANDInstruction(source: convertToRegisterOperand(reg))
         }
         
         if opcode == 0xE6 {
-            let value = memory.readByte(at: pc)
+            let value = memory.readByte(at: programCounter)
             return ANDInstruction(source: .immediate(value))
         }
         
@@ -357,7 +358,7 @@ class Z80InstructionDecoder {
         }
         
         if opcode == 0xF6 {
-            let value = memory.readByte(at: pc)
+            let value = memory.readByte(at: programCounter)
             return ORInstruction(source: .immediate(value))
         }
         
@@ -371,7 +372,7 @@ class Z80InstructionDecoder {
         }
         
         if opcode == 0xEE {
-            let value = memory.readByte(at: pc)
+            let value = memory.readByte(at: programCounter)
             return XORInstruction(source: .immediate(value))
         }
         
@@ -385,7 +386,7 @@ class Z80InstructionDecoder {
         }
         
         if opcode == 0xFE {
-            let value = memory.readByte(at: pc)
+            let value = memory.readByte(at: programCounter)
             return CPInstruction(source: .immediate(value))
         }
         
@@ -403,8 +404,8 @@ class Z80InstructionDecoder {
             // 安全なメモリアクセス
             let lowByte = memory.readByte(at: programCounter)
             // 安全なアドレス計算
-            let nextPC = programCounter < UInt16.max ? programCounter + 1 : programCounter
-            let highByte = memory.readByte(at: nextPC)
+            let nextProgramCounter = programCounter < UInt16.max ? programCounter + 1 : programCounter
+            let highByte = memory.readByte(at: nextProgramCounter)
             let address = UInt16(highByte) << 8 | UInt16(lowByte)
             return JPInstruction(condition: .none, address: address)
         }
@@ -464,7 +465,7 @@ class Z80InstructionDecoder {
         return nil
     }
     
-    private func decodeLoadInstruction(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+    private func decodeLoadInstruction(_ opcode: UInt8, memory: MemoryAccessing, programCounter: UInt16) -> Z80Instruction? {
         if (opcode & 0xC0) == 0x40 && opcode != 0x76 { // 0x76はHALT
             let dst = decodeRegister8((opcode >> 3) & 0x07)
             let src = decodeRegister8(opcode & 0x07)
@@ -570,18 +571,18 @@ class Z80InstructionDecoder {
         }
     }
     
-    private func decodeIYPrefixedInstruction(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction {
-        let nextOpcode = memory.readByte(at: pc)
-        let nextPc = pc &+ 1
+    private func decodeIYPrefixedInstruction(memory: MemoryAccessing, programCounter: UInt16) -> Z80Instruction {
+        let nextOpcode = memory.readByte(at: programCounter)
+        let nextProgramCounter = programCounter &+ 1
         
         switch nextOpcode {
         case 0x21: // LD IY,nn
-            let lowByte = memory.readByte(at: nextPc)
-            let highByte = memory.readByte(at: nextPc &+ 1)
+            let lowByte = memory.readByte(at: nextProgramCounter)
+            let highByte = memory.readByte(at: nextProgramCounter &+ 1)
             let value = UInt16(highByte) << 8 | UInt16(lowByte)
             return LDIYInstruction(value: value)
         default:
-            let instruction = decode(nextOpcode, memory: memory, pc: nextPc)
+            let instruction = decode(nextOpcode, memory: memory, programCounter: nextProgramCounter)
             return IYPrefixedInstruction(instruction: instruction)
         }
     }
