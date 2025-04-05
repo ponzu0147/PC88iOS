@@ -5,7 +5,7 @@
 import Foundation
 
 struct RLCAInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let carry = (registers.a & 0x80) != 0
         registers.a = (registers.a << 1) | (carry ? 1 : 0)
         
@@ -23,7 +23,7 @@ struct RLCAInstruction: Z80Instruction {
 }
 
 struct RRCAInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let carry = (registers.a & 0x01) != 0
         registers.a = (registers.a >> 1) | (carry ? 0x80 : 0)
         
@@ -41,7 +41,7 @@ struct RRCAInstruction: Z80Instruction {
 }
 
 struct EXAFInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let tempA = registers.a
         let tempF = registers.f
         
@@ -63,7 +63,7 @@ struct EXAFInstruction: Z80Instruction {
 struct DJNZInstruction: Z80Instruction {
     let offset: Int8
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         registers.b = registers.b &- 1
         
         if registers.b != 0 {
@@ -84,8 +84,8 @@ struct DJNZInstruction: Z80Instruction {
 struct IYPrefixedInstruction: Z80Instruction {
     let instruction: Z80Instruction
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
-        let baseCycles = instruction.execute(cpu: cpu, registers: &registers, memory: memory, io: io)
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
+        let baseCycles = instruction.execute(cpu: cpu, registers: &registers, memory: memory, inputOutput: inputOutput)
         return baseCycles + 4 // IYプレフィックスの追加サイクル
     }
     
@@ -98,7 +98,7 @@ struct IYPrefixedInstruction: Z80Instruction {
 struct LDIYInstruction: Z80Instruction {
     let value: UInt16
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         registers.iy = value
         return cycles
     }
