@@ -42,6 +42,8 @@ identifier_name:
     - sp # Z80 スタックポインタ
     - pc # Z80 プログラムカウンタ
     - io # 入出力アクセス
+    - DI # Z80 割り込み禁止命令
+    - EI # Z80 割り込み許可命令
 
 # 関数の長さ
 function_body_length:
