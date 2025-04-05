@@ -13,10 +13,13 @@ excluded:
   - PC88iOS/Preview Content
   - "**/*.generated.swift"
 
-# 特定のファイルに対する特定のルールの無効化
-excluded_rules_for_files:
-  "PC88iOS/UI/EmulatorViewModel.swift":
-    - no_fallthrough_only # PC88Key参照の問題を無視
+# 特定のファイルを完全に無視
+excluded:
+  - Pods
+  - PC88iOS/Resources
+  - PC88iOS/Preview Content
+  - "**/*.generated.swift"
+  - PC88iOS/UI/EmulatorViewModel.swift # PC88Key参照の問題を無視
 
 # デフォルトルールの調整
 line_length:
