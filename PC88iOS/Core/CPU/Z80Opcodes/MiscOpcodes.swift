@@ -7,8 +7,8 @@ import PC88iOS
 
 struct RLCAInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        let carry = (registers.a & 0x80) != 0
-        registers.a = (registers.a << 1) | (carry ? 1 : 0)
+        let carry = (registers.regA & 0x80) != 0
+        registers.regA = (registers.regA << 1) | (carry ? 1 : 0)
         
         registers.setFlag(Z80Registers.Flags.carry, value: carry)
         registers.setFlag(Z80Registers.Flags.halfCarry, value: false)
@@ -25,8 +25,8 @@ struct RLCAInstruction: Z80Instruction {
 
 struct RRCAInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        let carry = (registers.a & 0x01) != 0
-        registers.a = (registers.a >> 1) | (carry ? 0x80 : 0)
+        let carry = (registers.regA & 0x01) != 0
+        registers.regA = (registers.regA >> 1) | (carry ? 0x80 : 0)
         
         registers.setFlag(Z80Registers.Flags.carry, value: carry)
         registers.setFlag(Z80Registers.Flags.halfCarry, value: false)
@@ -43,14 +43,14 @@ struct RRCAInstruction: Z80Instruction {
 
 struct EXAFInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        let tempA = registers.a
-        let tempF = registers.f
+        let tempA = registers.regA
+        let tempF = registers.regF
         
-        registers.a = registers.aPrime
-        registers.f = registers.fPrime
+        registers.regA = registers.regAPrime
+        registers.regF = registers.regFPrime
         
-        registers.aPrime = tempA
-        registers.fPrime = tempF
+        registers.regAPrime = tempA
+        registers.regFPrime = tempF
         
         return cycles
     }
@@ -65,13 +65,13 @@ struct DJNZInstruction: Z80Instruction {
     let offset: Int8
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        registers.b = registers.b &- 1
+        registers.regB = registers.regB &- 1
         
-        if registers.b != 0 {
-            registers.pc = UInt16(Int(registers.pc) + Int(offset) + 2)
+        if registers.regB != 0 {
+            registers.programCounter = UInt16(Int(registers.programCounter) + Int(offset) + 2)
             return 13 // ジャンプする場合
         } else {
-            registers.pc = registers.pc &+ size
+            registers.programCounter = registers.programCounter &+ size
             return 8 // ジャンプしない場合
         }
     }
@@ -100,7 +100,7 @@ struct LDIYInstruction: Z80Instruction {
     let value: UInt16
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        registers.iy = value
+        registers.regIY = value
         return cycles
     }
     
