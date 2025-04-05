@@ -326,7 +326,7 @@ class Z80InstructionDecoder {
         }
         
         if opcode == 0x10 {
-            let offset = memory.readByte(at: pc)
+            let offset = memory.readByte(at: programCounter)
             return DJNZInstruction(offset: Int8(bitPattern: offset))
         }
         
