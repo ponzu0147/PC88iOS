@@ -10,7 +10,7 @@ struct ADDInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true) }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.ADD }
     var description: String { return "ADD A," + sourceDescription() }
     
     private func sourceDescription() -> String {
@@ -67,7 +67,7 @@ struct ADCInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true) }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.ADC }
     var description: String { return "ADC A," + sourceDescription() }
     
     private func sourceDescription() -> String {
@@ -126,7 +126,7 @@ struct SUBInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true) }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.SUB }
     var description: String { return "SUB A," + sourceDescription() }
     
     private func sourceDescription() -> String {
@@ -229,7 +229,7 @@ struct INCRegInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true) }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.INCREG }
     var description: String { return "INC \(register)" }
 }
 
@@ -275,6 +275,6 @@ struct DECRegInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true) }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.DECREG }
     var description: String { return "DEC \(register)" }
 }
