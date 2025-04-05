@@ -3,7 +3,7 @@
 //
 
 import Foundation
-
+import UIKit
 
 class Z80InstructionDecoder {
     
@@ -588,78 +588,10 @@ class Z80InstructionDecoder {
     }
 }
 
-/// NOP命令
-struct NOPInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        return cycles
-    }
-    
-    var size: UInt16 { return 1 }
-    var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP }
-    var description: String { return "NOP" }
-}
 
-/// HALT命令
-struct HALTInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        // CPUをホルト状態にする
-        cpu.halt()
-        return cycles
-    }
-    
-    var size: UInt16 { return 1 }
-    var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.HALT }
-    var description: String { return "HALT" }
-}
 
-/// DI命令（割り込み禁止）
-struct DISInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        // 割り込み禁止（CPUExecutingプロトコルのメソッドを使用）
-        (cpu as CPUExecuting).setInterruptEnabled(false)
-        return cycles
-    }
-    
-    var size: UInt16 { return 1 }
-    var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.DI }
-    var description: String { return "DI" }
-}
 
-/// EI命令（割り込み許可）
-struct EIInstruction: Z80Instruction {
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        // 割り込み許可（CPUExecutingプロトコルのメソッドを使用）
-        (cpu as CPUExecuting).setInterruptEnabled(true)
-        return cycles
-    }
-    
-    var size: UInt16 { return 1 }
-    var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.EI }
-    var description: String { return "EI" }
-}
 
-/// 未実装命令
-struct UnimplementedInstruction: Z80Instruction {
-    let opcode: UInt8
-    
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        // PCの計算で整数オーバーフローを防止
-        let pc = registers.pc > 0 ? registers.pc - 1 : 0
-        let opcodeHex = String(opcode, radix: 16, uppercase: true)
-        let pcHex = String(pc, radix: 16, uppercase: true)
-        PC88Logger.cpu.warning("未実装の命令 0x\(opcodeHex) at PC=0x\(pcHex)")
-        return cycles
-    }
-    
-    var size: UInt16 { return 1 }
-    var cycles: Int { return 4 }
-    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP } // 未実装命令はNOPと同じサイクル情報を使用
-    var description: String { return "UNIMPLEMENTED \(String(format: "0x%02X", opcode))" }
-}
 
 /// POP命令 - スタックから値を取得してレジスタペアに格納
 struct POPInstruction: Z80Instruction {
