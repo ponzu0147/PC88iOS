@@ -4,6 +4,7 @@
 
 import Foundation
 
+
 class Z80InstructionDecoder {
     
     // オペランドソースとターゲットは別ファイルで定義されているので使用
@@ -587,24 +588,6 @@ class Z80InstructionDecoder {
     }
 }
 
-/// Z80命令の基本プロトコル
-protocol Z80Instruction {
-    /// 命令を実行
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int
-    
-    /// 命令のサイズ（バイト数）
-    var size: UInt16 { get }
-    
-    /// 命令の実行に必要なサイクル数
-    var cycles: Int { get }
-    
-    /// 命令の詳細なサイクル情報
-    var cycleInfo: InstructionCycles { get }
-    
-    /// 命令の文字列表現
-    var description: String { get }
-}
-
 /// NOP命令
 struct NOPInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
@@ -1036,3 +1019,13 @@ struct LDIYInstruction: Z80Instruction {
     var cycleInfo: InstructionCycles { return InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) }
     var description: String { return "LD IY,\(String(format: "0x%04X", value))" }
 }
+
+
+
+
+
+
+
+
+
+
