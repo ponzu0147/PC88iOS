@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import PC88iOS
 
 /// AND命令（A &= r）
 struct ANDInstruction: Z80Instruction {

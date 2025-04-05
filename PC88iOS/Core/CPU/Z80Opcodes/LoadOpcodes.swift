@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import PC88iOS
 
 /// LD r,r'命令（レジスタ間コピー）
 struct LDRegRegInstruction: Z80Instruction {

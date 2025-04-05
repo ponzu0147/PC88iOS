@@ -3,11 +3,12 @@
 //
 
 import Foundation
+import PC88iOS
 
 struct INCRegPairInstruction: Z80Instruction {
     let register: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = register.read(from: registers)
         register.write(to: &registers, value: value &+ 1)
         return cycles
@@ -22,7 +23,7 @@ struct INCRegPairInstruction: Z80Instruction {
 struct DECRegPairInstruction: Z80Instruction {
     let register: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = register.read(from: registers)
         register.write(to: &registers, value: value &- 1)
         return cycles
@@ -37,7 +38,7 @@ struct DECRegPairInstruction: Z80Instruction {
 struct ADDHLInstruction: Z80Instruction {
     let source: RegisterPairOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let hl = registers.hl
         let value = source.read(from: registers)
         
@@ -65,7 +66,7 @@ struct ADDHLInstruction: Z80Instruction {
 struct SBCInstruction: Z80Instruction {
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers)
         let carryValue: UInt8 = registers.getFlag(Z80Registers.Flags.carry) ? 1 : 0
         
@@ -96,7 +97,7 @@ struct LDDirectMemRegInstruction: Z80Instruction {
     let address: UInt16
     let source: RegisterOperand
     
-    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, io: IOAccessing) -> Int {
+    func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers)
         memory.writeByte(value, at: address)
         return cycles
