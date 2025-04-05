@@ -86,50 +86,53 @@ enum RegisterOperand {
 
 /// レジスタペアオペランド
 enum RegisterPairOperand {
-    case af, bc, de, hl, sp, afAlt
+    case registerAF, registerBC, registerDE, registerHL, registerSP, registerAFAlt
     
     func read(from registers: Z80Registers) -> UInt16 {
         switch self {
-        case .af: return UInt16(registers.regA) << 8 | UInt16(registers.regF)
-        case .bc: return UInt16(registers.regB) << 8 | UInt16(registers.regC)
-        case .de: return UInt16(registers.regD) << 8 | UInt16(registers.regE)
-        case .hl: return registers.regHL
-        case .sp: return registers.regSP
-        case .afAlt: return UInt16(registers.regAAlt) << 8 | UInt16(registers.regFAlt)
+        case .registerAF: return UInt16(registers.regA) << 8 | UInt16(registers.regF)
+        case .registerBC: return UInt16(registers.regB) << 8 | UInt16(registers.regC)
+        case .registerDE: return UInt16(registers.regD) << 8 | UInt16(registers.regE)
+        case .registerHL: return registers.regHL
+        case .registerSP: return registers.regSP
+        case .registerAFAlt: return UInt16(registers.regAAlt) << 8 | UInt16(registers.regFAlt)
+
         }
     }
     
     func write(to registers: inout Z80Registers, value: UInt16) {
         switch self {
-        case .af:
+        case .registerAF:
             registers.regA = UInt8(value >> 8)
             registers.regF = UInt8(value & 0xFF)
-        case .bc:
+        case .registerBC:
             registers.regB = UInt8(value >> 8)
             registers.regC = UInt8(value & 0xFF)
-        case .de:
+        case .registerDE:
             registers.regD = UInt8(value >> 8)
             registers.regE = UInt8(value & 0xFF)
-        case .hl:
+        case .registerHL:
             registers.regHL = value
-        case .sp:
+        case .registerSP:
             registers.regSP = value
-        case .afAlt:
+        case .registerAFAlt:
             registers.regAAlt = UInt8(value >> 8)
             registers.regFAlt = UInt8(value & 0xFF)
+        default:
+            PC88Logger.cpu.error("不正なレジスタペアタイプです")
         }
     }
 }
 
 /// メモリアドレスオペランド
 enum AddressOperand {
-    case bc, de, hl, direct(UInt16)
+    case registerBC, registerDE, registerHL, direct(UInt16)
     
     func getAddress(from registers: Z80Registers) -> UInt16 {
         switch self {
-        case .bc: return UInt16(registers.regB) << 8 | UInt16(registers.regC)
-        case .de: return UInt16(registers.regD) << 8 | UInt16(registers.regE)
-        case .hl: return registers.regHL
+        case .registerBC: return UInt16(registers.regB) << 8 | UInt16(registers.regC)
+        case .registerDE: return UInt16(registers.regD) << 8 | UInt16(registers.regE)
+        case .registerHL: return registers.regHL
         case .direct(let address): return address
         }
     }
@@ -137,15 +140,15 @@ enum AddressOperand {
 
 /// 拡張メモリアドレスオペランド
 enum MemoryAddressOperand {
-    case hl, bc, de, ix(offset: Int8), iy(offset: Int8), direct(address: UInt16)
+    case registerHL, registerBC, registerDE, registerIX(offset: Int8), registerIY(offset: Int8), direct(address: UInt16)
     
     func getAddress(from registers: Z80Registers) -> UInt16 {
         switch self {
-        case .hl: return registers.regHL
-        case .bc: return registers.regBC
-        case .de: return registers.regDE
-        case .ix(let offset): return UInt16(Int(registers.regIX) + Int(offset))
-        case .iy(let offset): return UInt16(Int(registers.regIY) + Int(offset))
+        case .registerHL: return registers.regHL
+        case .registerBC: return registers.regBC
+        case .registerDE: return registers.regDE
+        case .registerIX(let offset): return UInt16(Int(registers.regIX) + Int(offset))
+        case .registerIY(let offset): return UInt16(Int(registers.regIY) + Int(offset))
         case .direct(let address): return address
         }
     }
