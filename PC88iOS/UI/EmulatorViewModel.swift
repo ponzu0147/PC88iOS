@@ -118,32 +118,34 @@ class EmulatorViewModel: ObservableObject {
         case "8": return .num8
         case "9": return .num9
         case "0": return .num0
-        case "a": return .a
-        case "b": return .b
-        case "c": return .c
-        case "d": return .d
-        case "e": return .e
-        case "f": return .f
-        case "g": return .g
-        case "h": return .h
-        case "i": return .i
-        case "j": return .j
-        case "k": return .k
-        case "l": return .l
-        case "m": return .m
-        case "n": return .n
-        case "o": return .o
-        case "p": return .p
-        case "q": return .q
-        case "r": return .r
-        case "s": return .s
-        case "t": return .t
-        case "u": return .u
-        case "v": return .v
-        case "w": return .w
-        case "x": return .x
-        case "y": return .y
-        case "z": return .z
+        case "a": return .keyA
+        case "b": return .keyB
+        case "c": return .keyC
+        case "d": return .keyD
+        case "e": return .keyE
+        case "f": return .keyF
+        case "g": return .keyG
+        case "h": return .keyH
+        case "i": return .keyI
+        case "j": return .keyJ
+        case "k": return .keyK
+            
+        case "l": return .keyL
+        case "m": return .keyM
+        case "n": return .keyN
+            
+        case "o": return .keyO
+        case "p": return .keyP
+        case "q": return .keyQ
+        case "r": return .keyR
+        case "s": return .keyS
+        case "t": return .keyT
+        case "u": return .keyU
+        case "v": return .keyV
+        case "w": return .keyW
+        case "x": return .keyX
+        case "y": return .keyY
+        case "z": return .keyZ
         case "space": return .space
         case "return", "enter": return .returnKey
         case "f1": return .f1
