@@ -547,9 +547,8 @@ class Z80CPU: CPUExecuting {
     }
     
     /// PC周辺のメモリダンプを取得
-    private func getMemoryDumpAroundPC(pc
-                                       : UInt16) -> String {
-        var memoryDump = ""
+    private func getMemoryDumpAroundPC(pc: UInt16) -> String {
+       var memoryDump = ""
         for offset in 0..<4 {
             let addr = pc &+ UInt16(offset)
             if addr < 0xFFFF {
