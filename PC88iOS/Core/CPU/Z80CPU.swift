@@ -216,9 +216,9 @@ class Z80CPU: CPUExecuting {
         }
         
         // 命令フェッチ
-        let programCounter = registers.regPC
+        let programCounter = registers.pc
         let opcode = memory.readByte(at: programCounter)
-        registers.regPC = registers.regPC &+ 1 // 安全な加算を使用
+        registers.pc = registers.pc &+ 1 // 安全な加算を使用
         
         // アイドル検出のための履歴更新
         if idleDetectionEnabled {
@@ -315,7 +315,7 @@ class Z80CPU: CPUExecuting {
     func enableInstructionTrace() {
         instructionTraceEnabled = true
         instructionTraceCount = 0
-        PC88Logger.cpu.debug("*** 命令トレースを開始します (PC=\(String(format: "%04X", self.registers.regPC))) ***")
+        PC88Logger.cpu.debug("*** 命令トレースを開始します (PC=\(String(format: "%04X", self.registers.pc))) ***")
     }
     
     /// 命令トレースを無効化
@@ -326,7 +326,7 @@ class Z80CPU: CPUExecuting {
     
     /// プログラムカウンタを設定
     func setProgramCounter(_ address: UInt16) {
-        registers.regPC = address
+        registers.pc = address
         PC88Logger.cpu.debug("プログラムカウンタを設定: 0x\(String(format: "%04X", address))")
     }
     
@@ -449,7 +449,7 @@ class Z80CPU: CPUExecuting {
     /// 相対ジャンプ
     func jump(by offset: Int8) {
         // PCにオフセットを加算
-        registers.regPC = UInt16(Int(registers.regPC) + Int(offset))
+        registers.pc = UInt16(Int(registers.pc) + Int(offset))
     }
     
     // MARK: - Private Methods
@@ -457,7 +457,7 @@ class Z80CPU: CPUExecuting {
     /// 命令実行
     private func executeInstruction(_ opcode: UInt8) -> Int {
         // デコード
-        let instruction = decoder.decode(opcode, memory: memory, pc: registers.regPC)
+        let instruction = decoder.decode(opcode, memory: memory, pc: registers.pc)
         
         // トレース処理
         handleInstructionTrace(opcode, instruction)
@@ -487,7 +487,7 @@ class Z80CPU: CPUExecuting {
         guard instructionTraceEnabled && instructionTraceCount < maxInstructionTraceCount else { return }
         
         // フィルタが設定されている場合はそれを適用
-        let shouldTrace = instructionTraceFilter?.shouldTrace(programCounter: registers.regPC) ?? true
+        let shouldTrace = instructionTraceFilter?.shouldTrace(programCounter: registers.pc) ?? true
         guard shouldTrace else { return }
         
         // トレースメッセージを生成して出力
@@ -502,7 +502,7 @@ class Z80CPU: CPUExecuting {
     
     /// トレースメッセージを生成
     private func generateTraceMessage(opcode: UInt8, instruction: Z80Instruction) -> String {
-        let programCounter = registers.regPC
+        let programCounter = registers.pc
         let opcodeStr = String(format: "%02X", opcode)
         let instructionDesc = instruction.description
         
@@ -519,12 +519,12 @@ class Z80CPU: CPUExecuting {
     
     /// レジスタ情報をフォーマットした文字列を返す
     private func formatRegisterInfo() -> String {
-        let regA = String(format: "%02X", registers.regA)
-        let regBC = String(format: "%04X", registers.regBC)
-        let regDE = String(format: "%04X", registers.regDE)
-        let regHL = String(format: "%04X", registers.regHL)
-        let regSP = String(format: "%04X", registers.regSP)
-        let regF = String(format: "%02X", registers.regF)
+        let regA = String(format: "%02X", registers.a)
+        let regBC = String(format: "%04X", registers.bc)
+        let regDE = String(format: "%04X", registers.de)
+        let regHL = String(format: "%04X", registers.hl)
+        let regSP = String(format: "%04X", registers.sp)
+        let regF = String(format: "%02X", registers.f)
         
         return "A=\(regA) F=\(regF) BC=\(regBC) DE=\(regDE) HL=\(regHL) SP=\(regSP)"
     }
@@ -553,7 +553,7 @@ class Z80CPU: CPUExecuting {
     /// 未実装命令の処理
     private func handleUnimplementedInstruction(_ opcode: UInt8, _ instruction: UnimplementedInstruction) -> Int {
         // 安全なPCの計算
-        let previousPC = registers.regPC > 0 ? registers.regPC - 1 : 0
+        let previousPC = registers.pc > 0 ? registers.pc - 1 : 0
         
         // 詳細なデバッグ情報を出力
         logUnimplementedInstructionWarning(opcode: opcode, pc: previousPC)
@@ -595,11 +595,11 @@ class Z80CPU: CPUExecuting {
     
     /// レジスタ状態をログに出力
     private func logRegisterState() {
-        let regState = "A=0x\(String(registers.regA, radix: 16)) " +
-                      "BC=0x\(String(registers.regBC, radix: 16)) " +
-                      "DE=0x\(String(registers.regDE, radix: 16)) " +
-                      "HL=0x\(String(registers.regHL, radix: 16)) " +
-                      "SP=0x\(String(registers.regSP, radix: 16))"
+        let regState = "A=0x\(String(registers.a, radix: 16)) " +
+                      "BC=0x\(String(registers.bc, radix: 16)) " +
+                      "DE=0x\(String(registers.de, radix: 16)) " +
+                      "HL=0x\(String(registers.hl, radix: 16)) " +
+                      "SP=0x\(String(registers.sp, radix: 16))"
         PC88Logger.cpu.debug("レジスタ状態: \(regState)")
     }
     
@@ -741,19 +741,19 @@ extension Z80CPU {
     private func captureIdleLoopContext() {
         // レジスタ状態を記録
         idleLoopContext["registers"] = [
-            "a": registers.regA,
-            "bc": registers.regBC,
-            "de": registers.regDE,
-            "hl": registers.regHL,
-            "sp": registers.regSP,
+            "a": registers.a,
+            "bc": registers.bc,
+            "de": registers.de,
+            "hl": registers.hl,
+            "sp": registers.sp,
             "pc": idleLoopPC,
-            "ix": registers.regIX,
-            "iy": registers.regIY
+            "ix": registers.ix,
+            "iy": registers.iy
             // Shadow registers are not directly accessible
         ]
         
         // フラグ状態を記録
-        let flags = registers.regF
+        let flags = registers.f
         idleLoopContext["flags"] = [
             "s": (flags & 0x80) != 0,
             "z": (flags & 0x40) != 0,
@@ -775,7 +775,7 @@ extension Z80CPU {
         
         // スタックの状態を記録（SPから数バイト）
         var stackDump: [String: UInt8] = [:]
-        let stackStart = Int(registers.regSP)
+        let stackStart = Int(registers.sp)
         let stackEnd = min(0xFFFF, stackStart + 16)
         
         for addr in stackStart...stackEnd {
@@ -913,39 +913,39 @@ extension Z80CPU {
     /// レジスタ値の取得（命令実装から使用）
     func getRegister(_ reg: RegisterType) -> UInt16 {
         switch reg {
-        case .afPair: return registers.regAF
-        case .bcPair: return registers.regBC
-        case .dePair: return registers.regDE
-        case .hlPair: return registers.regHL
-        case .ixPair: return registers.regIX
-        case .iyPair: return registers.regIY
-        case .stackPointer: return registers.regSP
-        case .programCounter: return registers.regPC
+        case .afPair: return registers.af
+        case .bcPair: return registers.bc
+        case .dePair: return registers.de
+        case .hlPair: return registers.hl
+        case .ixPair: return registers.ix
+        case .iyPair: return registers.iy
+        case .stackPointer: return registers.sp
+        case .programCounter: return registers.pc
         }
     }
     
     /// レジスタ値の設定（命令実装から使用）
     func setRegister(_ reg: RegisterType, value: UInt16) {
         switch reg {
-        case .afPair: registers.regAF = value
-        case .bcPair: registers.regBC = value
-        case .dePair: registers.regDE = value
-        case .hlPair: registers.regHL = value
-        case .ixPair: registers.regIX = value
-        case .iyPair: registers.regIY = value
-        case .stackPointer: registers.regSP = value
-        case .programCounter: registers.regPC = value
+        case .afPair: registers.af = value
+        case .bcPair: registers.bc = value
+        case .dePair: registers.de = value
+        case .hlPair: registers.hl = value
+        case .ixPair: registers.ix = value
+        case .iyPair: registers.iy = value
+        case .stackPointer: registers.sp = value
+        case .programCounter: registers.pc = value
         }
     }
     
     /// プログラムカウンタ（PC）を設定
     func setPC(_ value: UInt16) {
-        registers.regPC = value
+        registers.pc = value
     }
     
     /// スタックポインタ（SP）を設定
     func setSP(_ value: UInt16) {
-        registers.regSP = value
+        registers.sp = value
     }
     
     /// ホルト状態を設定
@@ -955,12 +955,12 @@ extension Z80CPU {
     
     /// 現在のプログラムカウンタ（PC）を取得
     func getPC() -> UInt16 {
-        return registers.regPC
+        return registers.pc
     }
     
     /// 現在のスタックポインタ（SP）を取得
     func getSP() -> UInt16 {
-        return registers.regSP
+        return registers.sp
     }
 }
 

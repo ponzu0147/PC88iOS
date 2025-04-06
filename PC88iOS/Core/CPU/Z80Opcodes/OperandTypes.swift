@@ -9,7 +9,7 @@ import Foundation
 
 /// レジスタオペランド
 enum RegisterOperand {
-    case regA, regB, regC, regD, regE, regH, regL, regF
+    case a, b, c, d, e, h, l, f
     case immediate(UInt8)
     case memory
     
@@ -42,14 +42,14 @@ enum RegisterOperand {
     
     private func readFromRegister(_ registers: Z80Registers) -> UInt8 {
         switch self {
-        case .regA: return registers.regA
-        case .regB: return registers.regB
-        case .regC: return registers.regC
-        case .regD: return registers.regD
-        case .regE: return registers.regE
-        case .regH: return registers.regH
-        case .regL: return registers.regL
-        case .regF: return registers.regF
+        case .a: return registers.a
+        case .b: return registers.b
+        case .c: return registers.c
+        case .d: return registers.d
+        case .e: return registers.e
+        case .h: return registers.h
+        case .l: return registers.l
+        case .f: return registers.f
         default:
             PC88Logger.cpu.error("不正なレジスタタイプです")
             return 0
@@ -58,7 +58,7 @@ enum RegisterOperand {
     
     private func readFromMemory(_ registers: Z80Registers, _ memory: MemoryAccessing?) -> UInt8 {
         if let memory = memory {
-            return memory.readByte(at: registers.regHL)
+            return memory.readByte(at: registers.hl)
         } else {
             PC88Logger.cpu.debug("警告: memoryが指定されていません")
             return 0
@@ -78,14 +78,14 @@ enum RegisterOperand {
     
     private func writeToRegister(_ registers: inout Z80Registers, _ value: UInt8) {
         switch self {
-        case .regA: registers.regA = value
-        case .regB: registers.regB = value
-        case .regC: registers.regC = value
-        case .regD: registers.regD = value
-        case .regE: registers.regE = value
-        case .regH: registers.regH = value
-        case .regL: registers.regL = value
-        case .regF: registers.regF = value
+        case .a: registers.a = value
+        case .b: registers.b = value
+        case .c: registers.c = value
+        case .d: registers.d = value
+        case .e: registers.e = value
+        case .h: registers.h = value
+        case .l: registers.l = value
+        case .f: registers.f = value
         default:
             PC88Logger.cpu.error("不正なレジスタタイプです")
         }
@@ -93,7 +93,7 @@ enum RegisterOperand {
     
     private func writeToMemory(_ registers: Z80Registers, _ value: UInt8, _ memory: MemoryAccessing?) {
         if let memory = memory {
-            memory.writeByte(value, at: registers.regHL)
+            memory.writeByte(value, at: registers.hl)
         } else {
             PC88Logger.cpu.debug("警告: memoryが指定されていません")
         }
@@ -113,12 +113,12 @@ enum RegisterPairOperand {
     
     func read(from registers: Z80Registers) -> UInt16 {
         switch self {
-        case .registerAF: return UInt16(registers.regA) << 8 | UInt16(registers.regF)
-        case .registerBC: return UInt16(registers.regB) << 8 | UInt16(registers.regC)
-        case .registerDE: return UInt16(registers.regD) << 8 | UInt16(registers.regE)
-        case .registerHL: return registers.regHL
-        case .registerSP: return registers.regSP
-        case .registerAFAlt: return UInt16(registers.regAAlt) << 8 | UInt16(registers.regFAlt)
+        case .registerAF: return UInt16(registers.a) << 8 | UInt16(registers.f)
+        case .registerBC: return UInt16(registers.b) << 8 | UInt16(registers.c)
+        case .registerDE: return UInt16(registers.d) << 8 | UInt16(registers.e)
+        case .registerHL: return registers.hl
+        case .registerSP: return registers.sp
+        case .registerAFAlt: return UInt16(registers.aAlt) << 8 | UInt16(registers.fAlt)
 
         }
     }
@@ -126,8 +126,8 @@ enum RegisterPairOperand {
     func write(to registers: inout Z80Registers, value: UInt16) {
         switch self {
         case .registerAF:
-            registers.regA = UInt8(value >> 8)
-            registers.regF = UInt8(value & 0xFF)
+            registers.a = UInt8(value >> 8)
+            registers.f = UInt8(value & 0xFF)
         case .registerBC:
             registers.regB = UInt8(value >> 8)
             registers.regC = UInt8(value & 0xFF)
