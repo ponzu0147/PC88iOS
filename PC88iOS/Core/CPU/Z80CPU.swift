@@ -569,9 +569,9 @@ class Z80CPU: CPUExecuting {
     }
     
     /// 未実装命令の警告をログに出力
-    private func logUnimplementedInstructionWarning(opcode: UInt8, pc: UInt16) {
+    private func logUnimplementedInstructionWarning(opcode: UInt8, programCounter: UInt16) {
         let opcodeStr = String(opcode, radix: 16, uppercase: true)
-        let pcStr = String(pc, radix: 16, uppercase: true)
+        let pcStr = String(programCounter, radix: 16, uppercase: true)
         PC88Logger.cpu.warning("警告: 未実装の命令 0x\(opcodeStr) at PC=0x\(pcStr)")
     }
     

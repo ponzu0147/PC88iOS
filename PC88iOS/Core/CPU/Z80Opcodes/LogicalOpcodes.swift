@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import PC88iOS
 
 struct ANDInstruction: Z80Instruction {
     let source: RegisterOperand
@@ -75,4 +76,3 @@ struct XORInstruction: Z80Instruction {
     var cycleInfo: InstructionCycles { return Z80InstructionCycles.logicalXorReg }
     var description: String { return "XOR \(source)" }
 }
-
