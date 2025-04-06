@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import PC88iOS
 
 struct JPInstruction: Z80Instruction {
     let condition: JumpCondition
