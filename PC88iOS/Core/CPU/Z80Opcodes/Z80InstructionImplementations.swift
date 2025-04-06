@@ -58,7 +58,7 @@ struct UnimplementedInstruction: Z80Instruction {
     let opcode: UInt8
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        let pc = registers.programCounter > 0 ? registers.programCounter - 1 : 0
+        let pc = registers.pc > 0 ? registers.pc - 1 : 0
         let opcodeHex = String(opcode, radix: 16, uppercase: true)
         let pcHex = String(pc, radix: 16, uppercase: true)
         PC88Logger.cpu.warning("未実装の命令 0x\(opcodeHex) at PC=0x\(pcHex)")
