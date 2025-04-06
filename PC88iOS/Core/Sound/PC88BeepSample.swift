@@ -11,7 +11,7 @@ import Foundation
 /// ドレミファソラシドを4MHzモードを基準に各音1秒ずつ鳴らす
 class PC88BeepSample {
     /// I/Oポートアクセス
-    private let io: IOAccessing
+    private let inputOutput: IOAccessing
     
     /// CPUクロック
     private let cpuClock: PC88CPUClock
@@ -33,7 +33,7 @@ class PC88BeepSample {
     ///   - io: I/Oポートアクセス
     ///   - cpuClock: CPUクロック
     init(io: IOAccessing, cpuClock: PC88CPUClock) {
-        self.io = io
+        self.inputOutput = io
         self.cpuClock = cpuClock
     }
     
@@ -55,14 +55,14 @@ class PC88BeepSample {
         
         // I/Oポート0x40に0x20を書き込む（ビープ音ON）
         // 参考コード: ld a,$20 / out ($40),a
-        io.writePort(0x40, value: 0x20)
+        inputOutput.writePort(0x40, value: 0x20)
     }
     
     /// ビープ音を停止
     private func stopBeep() {
         // ビープ音を停止するには0を書き込む
         // 参考コード: ld a,0 / out ($40),a
-        io.writePort(0x40, value: 0)
+        inputOutput.writePort(0x40, value: 0)
     }
     
     /// 指定した時間（秒）だけ待機

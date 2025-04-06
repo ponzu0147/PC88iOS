@@ -17,7 +17,7 @@ class PC88ScreenBase: ScreenRendering {
     internal var memory: MemoryAccessing?
     
     /// I/Oアクセス
-    internal var io: IOAccessing?
+    internal var inputOutput: IOAccessing?
     
     /// テキストVRAM (1行120バイト: 80文字 + 40バイトの属性)
     internal var textVRAM = [UInt8](repeating: 0, count: 120 * 25)
@@ -321,12 +321,12 @@ class PC88ScreenBase: ScreenRendering {
     
     /// I/Oアクセスを設定
     func setIO(_ io: IOAccessing) {
-        self.io = io
+        self.inputOutput = io
     }
     
     /// I/Oアクセスを接続
     func connectIO(_ io: IOAccessing) {
-        self.io = io
+        self.inputOutput = io
     }
     
     /// フォントデータを設定

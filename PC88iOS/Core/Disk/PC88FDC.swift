@@ -40,7 +40,7 @@ class PC88FDC: FDCEmulating {
     // MARK: - プロパティ
     
     /// I/Oアクセス
-    private var io: IOAccessing?
+    private var inputOutput: IOAccessing?
     
     /// ディスクイメージ（最大2ドライブ）
     private var diskImages: [DiskImageAccessing?] = [nil, nil]
@@ -115,7 +115,7 @@ class PC88FDC: FDCEmulating {
     
     /// I/Oアクセスを接続
     func connectIO(_ io: IOAccessing) {
-        self.io = io
+        self.inputOutput = io
     }
     
     /// ディスクイメージをロード
@@ -295,7 +295,7 @@ class PC88FDC: FDCEmulating {
         interruptRequest = true
         
         // 割り込み要求を送信
-        if let io = io as? PC88IO {
+        if let io = inputOutput as? PC88IO {
             io.requestInterrupt(from: .fdc)
         }
     }
