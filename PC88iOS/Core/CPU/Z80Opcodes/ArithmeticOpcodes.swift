@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import PC88iOS
 
 struct ADDInstruction: Z80Instruction {
     let source: RegisterOperand
