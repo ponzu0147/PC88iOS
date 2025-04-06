@@ -12,10 +12,10 @@ struct POPInstruction: Z80Instruction {
         
         register.write(to: &registers, value: value)
         
-        if registers.stackPointer <= UInt16.max - 2 {
-            registers.stackPointer = registers.stackPointer &+ 2
+        if registers.sp <= UInt16.max - 2 {
+            registers.sp = registers.sp &+ 2
         } else {
-            registers.stackPointer = 0
+            registers.sp = 0
             PC88Logger.cpu.warning("スタックポインタがオーバーフローしました")
         }
         
@@ -34,13 +34,13 @@ struct PUSHInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = register.read(from: registers)
         
-        if registers.stackPointer >= 2 {
-            registers.stackPointer = registers.stackPointer &- 2
+        if registers.sp >= 2 {
+            registers.sp = registers.sp &- 2
         } else {
-            registers.stackPointer = 0xFFFF
+            registers.sp = 0xFFFF
             PC88Logger.cpu.warning("スタックポインタがオーバーフローしました")
         }
-        memory.writeWord(value, at: registers.stackPointer)
+        memory.writeWord(value, at: registers.sp)
         
         return cycles
     }

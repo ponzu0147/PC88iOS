@@ -24,7 +24,7 @@ struct ANDInstruction: Z80Instruction {
     
     var size: UInt16 { return source.isImmediate ? 2 : 1 }
     var cycles: Int { return source.isImmediate ? 7 : (source.isMemory ? 7 : 4) }
-    var cycleInfo: InstructionCycles { return InstructionCycles.logicalAndReg }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.logicalAndReg }
     var description: String { return "AND \(source)" }
 }
 
@@ -48,7 +48,7 @@ struct ORInstruction: Z80Instruction {
     
     var size: UInt16 { return source.isImmediate ? 2 : 1 }
     var cycles: Int { return source.isImmediate ? 7 : (source.isMemory ? 7 : 4) }
-    var cycleInfo: InstructionCycles { return InstructionCycles.logicalOrReg }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.logicalOrReg }
     var description: String { return "OR \(source)" }
 }
 
@@ -72,7 +72,7 @@ struct XORInstruction: Z80Instruction {
     
     var size: UInt16 { return source.isImmediate ? 2 : 1 }
     var cycles: Int { return source.isImmediate ? 7 : (source.isMemory ? 7 : 4) }
-    var cycleInfo: InstructionCycles { return InstructionCycles.logicalXorReg }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.logicalXorReg }
     var description: String { return "XOR \(source)" }
 }
 

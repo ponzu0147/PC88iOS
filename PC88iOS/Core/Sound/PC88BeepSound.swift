@@ -122,8 +122,8 @@ class PC88BeepSound: SoundChipEmulating {
             } else {
                 // 上位バイトと組み合わせて周波数値を設定
                 let highByte = value
-                frequencyValue = UInt16(highByte) << 8 | UInt16(self.lowByte)
-                PC88Logger.sound.debug("データポート上位バイト書き込み: 0x\(String(format: "%02X", value)), 周波数値: \(frequencyValue)")
+                self.frequencyValue = UInt16(highByte) << 8 | UInt16(self.lowByte)
+                PC88Logger.sound.debug("データポート上位バイト書き込み: 0x\(String(format: "%02X", value)), 周波数値: \(self.frequencyValue)")
                 updateFrequency()
                 self.isFirstByte = true
             }
@@ -135,7 +135,7 @@ class PC88BeepSound: SoundChipEmulating {
             
             // 周波数値が0の場合はスピーカーを有効にしない
             // これにより8秒おきのプツっという音を防止
-            if frequencyValue == 0 && newState {
+            if self.frequencyValue == 0 && newState {
                 PC88Logger.sound.debug("周波数値が0のためスピーカーを有効にしません")
                 return
             }
@@ -165,8 +165,8 @@ class PC88BeepSound: SoundChipEmulating {
                     // generateSamplesメソッド内で処理される
                 }
                 
-                speakerEnabled = newState
-                PC88Logger.sound.debug("スピーカー状態変更: \(speakerEnabled ? "有効" : "無効")")
+                self.speakerEnabled = newState
+                PC88Logger.sound.debug("スピーカー状態変更: \(self.speakerEnabled ? "有効" : "無効")")
             }
             break
             
@@ -327,7 +327,7 @@ class PC88BeepSound: SoundChipEmulating {
         // 位相増分を計算
         phaseIncrement = frequency / sampleRate
         
-        PC88Logger.sound.debug("周波数を更新: \(frequency)Hz, 分周器値: \(frequencyValue)")
+        PC88Logger.sound.debug("周波数を更新: \(frequency)Hz, 分周器値: \(self.frequencyValue)")
     }
     
     /// オーディオエンジンのセットアップ

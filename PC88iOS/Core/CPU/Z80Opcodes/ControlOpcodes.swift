@@ -10,10 +10,10 @@ struct JPInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         if checkCondition(condition, registers: registers) {
-            registers.programCounter = address
+            registers.pc = address
             return cycles
         } else {
-            registers.programCounter = registers.programCounter &+ size
+            registers.pc = registers.pc &+ size
             return cycles
         }
     }
@@ -36,10 +36,10 @@ struct JRInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         if checkCondition(condition, registers: registers) {
-            registers.programCounter = UInt16(Int(registers.programCounter) + Int(offset) + 2)
+            registers.pc = UInt16(Int(registers.pc) + Int(offset) + 2)
             return condition == .none ? 12 : 12 // 条件付きジャンプも同じサイクル数
         } else {
-            registers.programCounter = registers.programCounter &+ size
+            registers.pc = registers.pc &+ size
             return condition == .none ? 7 : 7 // 条件付きジャンプも同じサイクル数
         }
     }
@@ -62,17 +62,17 @@ struct CALLInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         if checkCondition(condition, registers: registers) {
-            let returnAddress = registers.programCounter &+ size
+            let returnAddress = registers.pc &+ size
             
             registers.sp = registers.sp &- 2
             
             memory.writeWord(returnAddress, at: registers.sp)
             
-            registers.programCounter = address
+            registers.pc = address
             
             return condition == .none ? 17 : 17 // 条件付きコールも同じサイクル数
         } else {
-            registers.programCounter = registers.programCounter &+ size
+            registers.pc = registers.pc &+ size
             return condition == .none ? 10 : 10 // 条件付きコールも同じサイクル数
         }
     }
@@ -98,11 +98,11 @@ struct RETInstruction: Z80Instruction {
             
             registers.sp = registers.sp &+ 2
             
-            registers.programCounter = returnAddress
+            registers.pc = returnAddress
             
             return condition == .none ? 10 : 11 // 条件付きリターンは11サイクル
         } else {
-            registers.programCounter = registers.programCounter &+ size
+            registers.pc = registers.pc &+ size
             return condition == .none ? 5 : 5 // 条件が満たされない場合は5サイクル
         }
     }
@@ -123,13 +123,13 @@ struct RSTInstruction: Z80Instruction {
     let address: UInt8
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        let returnAddress = registers.programCounter &+ size
+        let returnAddress = registers.pc &+ size
         
         registers.sp = registers.sp &- 2
         
         memory.writeWord(returnAddress, at: registers.sp)
         
-        registers.programCounter = UInt16(address)
+        registers.pc = UInt16(address)
         
         return cycles
     }

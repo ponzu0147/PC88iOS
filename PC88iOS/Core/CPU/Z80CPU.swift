@@ -216,13 +216,13 @@ class Z80CPU: CPUExecuting {
         }
         
         // 命令フェッチ
-        let programCounter = registers.pc
-        let opcode = memory.readByte(at: programCounter)
+        let pc = registers.pc
+        let opcode = memory.readByte(at: pc)
         registers.pc = registers.pc &+ 1 // 安全な加算を使用
         
         // アイドル検出のための履歴更新
         if idleDetectionEnabled {
-            updateInstructionHistory(programCounter: programCounter, opcode: opcode)
+            updateInstructionHistory(programCounter: pc, opcode: opcode)
         }
         
         // 命令実行
@@ -617,8 +617,8 @@ class Z80CPU: CPUExecuting {
                 memoryWrites: 2,
                 internalCycles: 1
             )
-            pushWord(registers.regPC)
-            registers.regPC = 0x0066
+            pushWord(registers.pc)
+            registers.pc = 0x0066
             return cycles.tStates
             
         case .int:
@@ -631,8 +631,8 @@ class Z80CPU: CPUExecuting {
                     memoryWrites: 2,
                     internalCycles: 2
                 )
-                pushWord(registers.regPC)
-                registers.regPC = 0x0038
+                pushWord(registers.pc)
+                registers.pc = 0x0038
                 return cycles.tStates
             }
             return 0
@@ -642,27 +642,27 @@ class Z80CPU: CPUExecuting {
     /// スタックにワード値をプッシュ
     func pushWord(_ value: UInt16, to registers: inout Z80Registers, memory: MemoryAccessing) {
         // 安全な減算処理
-        if registers.regSP >= 2 {
-            registers.regSP = registers.regSP &- 2
+        if registers.sp >= 2 {
+            registers.sp = registers.sp &- 2
         } else {
             // オーバーフローを防止するため、スタックポインタをメモリの最上部に設定
-            registers.regSP = 0xFFFF
+            registers.sp = 0xFFFF
             PC88Logger.cpu.warning("警告: スタックポインタがオーバーフローしました")
         }
-        memory.writeWord(value, at: registers.regSP)
+        memory.writeWord(value, at: registers.sp)
     }
     
     /// スタックにワード値をプッシュ (内部用)
     private func pushWord(_ value: UInt16) {
         // 安全な減算処理
-        if registers.regSP >= 2 {
-            registers.regSP = registers.regSP &- 2
+        if registers.sp >= 2 {
+            registers.sp = registers.sp &- 2
         } else {
             // オーバーフローを防止するため、スタックポインタをメモリの最上部に設定
-            registers.regSP = 0xFFFF
+            registers.sp = 0xFFFF
             PC88Logger.cpu.warning("警告: スタックポインタがオーバーフローしました")
         }
-        memory.writeWord(value, at: registers.regSP)
+        memory.writeWord(value, at: registers.sp)
     }
     
     // MARK: - アイドル検出関連
@@ -670,7 +670,7 @@ class Z80CPU: CPUExecuting {
     /// 命令履歴を更新
     private func updateInstructionHistory(programCounter: UInt16, opcode: UInt8) {
         // 履歴に追加
-        instructionHistory.append((programCounter: programCounter, opcode: opcode))
+        instructionHistory.append((pc: programCounter, opcode: opcode))
         
         // 履歴が長すぎる場合は古いものを削除
         let maxHistorySize = 20 // 最大20命令を記録

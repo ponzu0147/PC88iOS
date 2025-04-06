@@ -45,11 +45,11 @@ struct EXAFInstruction: Z80Instruction {
         let tempA = registers.a
         let tempF = registers.f
         
-        registers.a = registers.aPrime
-        registers.f = registers.fPrime
+        registers.a = registers.aAlt
+        registers.f = registers.fAlt
         
-        registers.aPrime = tempA
-        registers.fPrime = tempF
+        registers.aAlt = tempA
+        registers.fAlt = tempF
         
         return cycles
     }
@@ -70,7 +70,7 @@ struct DJNZInstruction: Z80Instruction {
             registers.pc = UInt16(Int(registers.pc) + Int(offset) + 2)
             return 13 // ジャンプする場合
         } else {
-            registers.programCounter = registers.programCounter &+ size
+            registers.pc = registers.pc &+ size
             return 8 // ジャンプしない場合
         }
     }
