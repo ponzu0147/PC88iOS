@@ -45,11 +45,11 @@ struct EXAFInstruction: Z80Instruction {
         let tempA = registers.a
         let tempF = registers.f
         
-        registers.a = registers.aPrime
-        registers.f = registers.fPrime
+        registers.a = registers.aAlt
+        registers.f = registers.fAlt
         
-        registers.aPrime = tempA
-        registers.fPrime = tempF
+        registers.aAlt = tempA
+        registers.fAlt = tempF
         
         return cycles
     }
