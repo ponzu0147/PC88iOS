@@ -512,7 +512,7 @@ class EmulatorViewInternalModel: ObservableObject {
             // タイマーの間隔も更新
             updateTimerInterval(fps: fps)
             
-            PC88Logger.app.debug("フレームレートを\(currentFPS)fpsに切り替えました")
+            PC88Logger.app.debug("フレームレートを\(self.currentFPS)fpsに切り替えました")
         }
     }
     
