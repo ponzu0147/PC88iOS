@@ -91,7 +91,7 @@ struct IYPrefixedInstruction: Z80Instruction {
     
     var size: UInt16 { return instruction.size + 1 } // プレフィックスバイト分を追加
     var cycles: Int { return instruction.cycles + 4 } // プレフィックスの追加サイクル
-    var cycleInfo: PC88iOS.InstructionCycles { return instruction.cycleInfo } // 基本的には元の命令のサイクル情報
+    var cycleInfo: InstructionCycles { return instruction.cycleInfo } // 基本的には元の命令のサイクル情報
     var description: String { return "IY: \(instruction.description)" }
 }
 
