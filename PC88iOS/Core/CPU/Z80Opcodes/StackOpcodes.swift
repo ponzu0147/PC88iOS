@@ -24,7 +24,7 @@ struct POPInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 10 }
-    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.POP }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.POP }
     var description: String { return "POP \(register)" }
 }
 
@@ -47,6 +47,6 @@ struct PUSHInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 11 }
-    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.PUSH }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.PUSH }
     var description: String { return "PUSH \(register)" }
 }

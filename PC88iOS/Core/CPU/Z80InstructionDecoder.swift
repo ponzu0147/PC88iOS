@@ -30,7 +30,7 @@ class Z80InstructionDecoder {
         case 0x00: // NOP
             return NOPInstruction()
         case 0x03: // INC BC
-            return INCRegPairInstruction(register: .bc)
+            return INCRegPairInstruction(register: .registerBC)
         case 0x07: // RLCA
             return RLCAInstruction()
         case 0x08: // EX AF,AF'
@@ -40,27 +40,27 @@ class Z80InstructionDecoder {
         case 0x10: // DJNZ
             return decodeDJNZ(memory: memory, pc: pc)
         case 0x11: // LD DE,nn
-            return decodeLDRegPairImm(.de, memory: memory, pc: pc)
+            return decodeLDRegPairImm(.registerDE, memory: memory, pc: pc)
         case 0x12: // LD (DE),A
-            return LDMemRegInstruction(address: .de, source: .regA)
+            return LDMemRegInstruction(address: .registerDE, source: .regA)
         case 0x13: // INC DE
-            return INCRegPairInstruction(register: .de)
+            return INCRegPairInstruction(register: .registerDE)
         case 0x21: // LD HL,nn
-            return decodeLDRegPairImm(.hl, memory: memory, pc: pc)
+            return decodeLDRegPairImm(.registerHL, memory: memory, pc: pc)
         case 0x23: // INC HL
-            return INCRegPairInstruction(register: .hl)
+            return INCRegPairInstruction(register: .registerHL)
         case 0x02: // LD (BC),A
-            return LDMemRegInstruction(address: .bc, source: .regA)
+            return LDMemRegInstruction(address: .registerBC, source: .regA)
         case 0x1A: // LD A,(DE)
-            return LDRegMemInstruction(destination: .regA, address: .de)
+            return LDRegMemInstruction(destination: .regA, address: .registerDE)
         case 0x32: // LD (nn),A
             return decodeLDDirectMemReg(memory: memory, pc: pc)
         case 0x3A: // LD A,(nn)
             return decodeLDRegMemAddr(memory: memory, pc: pc)
         case 0x3B: // DEC SP
-            return DECRegPairInstruction(register: .sp)
+            return DECRegPairInstruction(register: .registerSP)
         case 0x01: // LD BC,nn
-            return decodeLDRegPairImm(.bc, memory: memory, pc: pc)
+            return decodeLDRegPairImm(.registerBC, memory: memory, pc: pc)
         case 0x04: // INC B
             return INCRegInstruction(register: .regB)
         case 0x05: // DEC B
@@ -68,7 +68,7 @@ class Z80InstructionDecoder {
         case 0x06: // LD B,n
             return decodeLDRegImm(.regB, memory: memory, pc: pc)
         case 0x0A: // LD A,(BC)
-            return LDRegMemInstruction(destination: .regA, address: .bc)
+            return LDRegMemInstruction(destination: .regA, address: .registerBC)
         case 0x0C: // INC C
             return INCRegInstruction(register: .regC)
         case 0x0D: // DEC C
@@ -104,9 +104,9 @@ class Z80InstructionDecoder {
         case 0x2E: // LD L,n
             return decodeLDRegImm(.regL, memory: memory, pc: pc)
         case 0x31: // LD SP,nn
-            return decodeLDRegPairImm(.sp, memory: memory, pc: pc)
+            return decodeLDRegPairImm(.registerSP, memory: memory, pc: pc)
         case 0x33: // INC SP
-            return INCRegPairInstruction(register: .sp)
+            return INCRegPairInstruction(register: .registerSP)
         case 0x36: // LD (HL),n
             return decodeLDMemImm(memory: memory, pc: pc)
         case 0x18: // JR n
@@ -120,7 +120,7 @@ class Z80InstructionDecoder {
         case 0x38: // JR C,n
             return decodeJR(.carry, memory: memory, pc: pc)
         case 0x39: // ADD HL,SP
-            return ADDHLInstruction(source: .sp)
+            return ADDHLInstruction(source: .registerSP)
         case 0x76: // HALT
             return HALTInstruction()
         case 0xC0: // RET NZ
@@ -156,29 +156,29 @@ class Z80InstructionDecoder {
         case 0x98: // SBC A,B
             return SBCInstruction(source: .regB)
         case 0xC5: // PUSH BC
-            return PUSHInstruction(register: .bc)
+            return PUSHInstruction(register: .registerBC)
         case 0xD3: // OUT (n), A
             return decodeOUT(memory: memory, pc: pc)
         case 0xD5: // PUSH DE
-            return PUSHInstruction(register: .de)
+            return PUSHInstruction(register: .registerDE)
         case 0xDB: // IN A,(n)
             return decodeIN(memory: memory, pc: pc)
         case 0xE1: // POP HL
-            return POPInstruction(register: .hl)
+            return POPInstruction(register: .registerHL)
         case 0xE5: // PUSH HL
-            return PUSHInstruction(register: .hl)
+            return PUSHInstruction(register: .registerHL)
         case 0x2F: // CPL
             return CPLInstruction()
         case 0xC1: // POP BC
-            return POPInstruction(register: .bc)
+            return POPInstruction(register: .registerBC)
         case 0xD1: // POP DE
-            return POPInstruction(register: .de)
+            return POPInstruction(register: .registerDE)
         case 0xF1: // POP AF
-            return POPInstruction(register: .af)
+            return POPInstruction(register: .registerAF)
         case 0xF3: // DI
             return DISInstruction()
         case 0xF5: // PUSH AF
-            return PUSHInstruction(register: .af)
+            return PUSHInstruction(register: .registerAF)
         case 0xFB: // EI
             return EIInstruction()
         case 0xFD: // IYプレフィックス
@@ -226,19 +226,19 @@ class Z80InstructionDecoder {
         let lowByte = memory.readByte(at: pc)
         let highByte = memory.readByte(at: pc &+ 1)
         let address = UInt16(highByte) << 8 | UInt16(lowByte)
-        return LDMemAddrRegPairInstruction(address: address, source: .hl)
+        return LDMemAddrRegPairInstruction(address: address, source: .registerHL)
     }
     
     private func decodeLDRegPairMemAddr(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction {
         let lowByte = memory.readByte(at: pc)
         let highByte = memory.readByte(at: pc &+ 1)
         let address = UInt16(highByte) << 8 | UInt16(lowByte)
-        return LDRegPairMemAddrInstruction(destination: .hl, address: address)
+        return LDRegPairMemAddrInstruction(destination: .registerHL, address: address)
     }
     
     private func decodeLDMemImm(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction {
         let value = memory.readByte(at: pc)
-        return LDMemImmInstruction(address: .hl, value: value)
+        return LDMemImmInstruction(address: .registerHL, value: value)
     }
     
     private func decodeJR(_ condition: JumpCondition, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction {
@@ -427,20 +427,20 @@ class Z80InstructionDecoder {
         
         if (opcode & 0xC7) == 0x46 {
             let reg = decodeRegister8((opcode >> 3) & 0x07)
-            return LDRegMemInstruction(destination: convertToRegisterOperand(reg), address: .hl)
+            return LDRegMemInstruction(destination: convertToRegisterOperand(reg), address: .registerHL)
         }
         
         if (opcode & 0xF8) == 0x70 {
             let reg = decodeRegister8(opcode & 0x07)
-            return LDMemRegInstruction(address: .hl, source: convertToRegisterOperand(reg))
+            return LDMemRegInstruction(address: .registerHL, source: convertToRegisterOperand(reg))
         }
         
         if opcode == 0x31 {
-            return decodeLDRegPairImm(.sp, memory: memory, pc: pc)
+            return decodeLDRegPairImm(.registerSP, memory: memory, pc: pc)
         }
         
         if opcode == 0x01 {
-            return decodeLDRegPairImm(.bc, memory: memory, pc: pc)
+            return decodeLDRegPairImm(.registerBC, memory: memory, pc: pc)
         }
         
         return nil
@@ -496,6 +496,7 @@ class Z80InstructionDecoder {
         case .e: return .regE
         case .h: return .regH
         case .l: return .regL
+        case .f: return .regF
         }
     }
 }

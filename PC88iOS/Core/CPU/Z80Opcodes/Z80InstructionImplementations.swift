@@ -12,7 +12,7 @@ struct NOPInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.NOP }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.NOP }
     var description: String { return "NOP" }
 }
 
@@ -24,7 +24,7 @@ struct HALTInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.HALT }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.HALT }
     var description: String { return "HALT" }
 }
 
@@ -37,7 +37,7 @@ struct DISInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.DI }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.DI }
     var description: String { return "DI" }
 }
 
@@ -50,7 +50,7 @@ struct EIInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.EI }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.EI }
     var description: String { return "EI" }
 }
 
@@ -67,6 +67,6 @@ struct UnimplementedInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 4 }
-    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.UNIMPLEMENTED }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.UNIMPLEMENTED }
     var description: String { return "UNIMPLEMENTED 0x\(String(opcode, radix: 16, uppercase: true))" }
 }

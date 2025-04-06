@@ -11,7 +11,7 @@ protocol Z80Instruction {
     
     var cycles: Int { get }
     
-    var cycleInfo: PC88iOS.InstructionCycles { get }
+    var cycleInfo: InstructionCycles { get }
     
     var description: String { get }
 }

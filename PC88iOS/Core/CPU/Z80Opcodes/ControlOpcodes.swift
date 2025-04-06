@@ -20,7 +20,7 @@ struct JPInstruction: Z80Instruction {
     
     var size: UInt16 { return 3 }
     var cycles: Int { return condition == .none ? 10 : 10 } // 条件付きジャンプも同じサイクル数
-    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.JP }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.JP }
     var description: String {
         if condition == .none {
             return "JP \(String(format: "0x%04X", address))"
@@ -46,7 +46,7 @@ struct JRInstruction: Z80Instruction {
     
     var size: UInt16 { return 2 }
     var cycles: Int { return condition == .none ? 12 : 7 } // 条件が満たされない場合は7サイクル
-    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.JR }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.JR }
     var description: String {
         if condition == .none {
             return "JR \(offset)"
@@ -79,7 +79,7 @@ struct CALLInstruction: Z80Instruction {
     
     var size: UInt16 { return 3 }
     var cycles: Int { return condition == .none ? 17 : 10 } // 条件が満たされない場合は10サイクル
-    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.CALL }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.CALL }
     var description: String {
         if condition == .none {
             return "CALL \(String(format: "0x%04X", address))"
@@ -109,7 +109,7 @@ struct RETInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return condition == .none ? 10 : 5 } // 条件が満たされない場合は5サイクル
-    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.RET }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.RET }
     var description: String {
         if condition == .none {
             return "RET"
@@ -136,7 +136,7 @@ struct RSTInstruction: Z80Instruction {
     
     var size: UInt16 { return 1 }
     var cycles: Int { return 11 }
-    var cycleInfo: PC88iOS.InstructionCycles { return PC88iOS.Z80InstructionCycles.RST }
+    var cycleInfo: InstructionCycles { return Z80InstructionCycles.RST }
     var description: String { return "RST \(String(format: "0x%02X", address))" }
 }
 
