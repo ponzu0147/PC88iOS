@@ -229,15 +229,15 @@ class D88DiskImage: DiskImageAccessing {
         let nameData = data.subdata(in: 0..<16)
         diskName = String(data: nameData, encoding: .shiftJIS) ?? ""
         diskName = diskName.trimmingCharacters(in: .controlCharacters)
-        PC88Logger.disk.debug("ディスク名: \(diskName)")
+        PC88Logger.disk.debug("ディスク名: \(self.diskName)")
         
         // 書き込み保護フラグ
         writeProtected = data[0x1A] != 0
-        PC88Logger.disk.debug("書き込み保護: \(writeProtected)")
+        PC88Logger.disk.debug("書き込み保護: \(self.writeProtected)")
         
         // ディスクの種類
         diskType = data[0x1B]
-        PC88Logger.disk.debug("ディスクタイプ: \(getDiskTypeString()) (\(diskType))")
+        PC88Logger.disk.debug("ディスクタイプ: \(self.getDiskTypeString()) (\(self.diskType))")
         
         // トラックテーブルの読み取り
         for i in 0..<maxTracks {
@@ -454,7 +454,7 @@ class D88DiskImage: DiskImageAccessing {
     }
     
     private func findTrack0Sector(sector: Int) -> (data: Data?, size: Int, sizeN: UInt8) {
-        PC88Logger.disk.debug("トラック0を検索: ディスクタイプ=\(getDiskTypeString()), 期待セクタ数=\(getExpectedSectorsPerTrack())")
+        PC88Logger.disk.debug("トラック0を検索: ディスクタイプ=\(self.getDiskTypeString()), 期待セクタ数=\(self.getExpectedSectorsPerTrack())")
         
         // 有効なセクタデータを保持する変数
         var validSectorData: Data? = nil
@@ -472,7 +472,7 @@ class D88DiskImage: DiskImageAccessing {
         for trackData in track0Data {
             // すべてのセクタをチェック
             for (index, sectorInfo) in trackData.sectors.enumerated() {
-                let sectorSize = calculateSectorSizeFromN(sectorInfo.id.size)
+                let sectorSize = self.calculateSectorSizeFromN(sectorInfo.id.size)
                 PC88Logger.disk.debug("    セクタ\(index): C=\(sectorInfo.id.cylinder), H=\(sectorInfo.id.head), R=\(sectorInfo.id.record), N=\(sectorInfo.id.size) (\(sectorSize)バイト), データサイズ=\(sectorInfo.data.count)")
                 
                 // セクタIDの検証
@@ -573,9 +573,9 @@ class D88DiskImage: DiskImageAccessing {
     /// - Parameters:
     /// - Returns: セクタデータ、失敗した場合はnil
     func readSector(track: Int, sector: Int) -> [UInt8]? {
-        var validSectorData: Data? = nil
-        var validSectorSize: Int = 0
-        var validSectorN: UInt8 = 0
+        var _: Data? = nil
+        var _: Int = 0
+        var _: UInt8 = 0
         
         // トラックとセクタの範囲チェック
         guard track >= 0 && track < maxTracks && sector >= 1 && sector <= maxSectorsPerTrack else {
@@ -628,7 +628,7 @@ class D88DiskImage: DiskImageAccessing {
         
         // 有効なセクタが見つかった場合は返す
         if let data = validSectorData {
-            PC88Logger.disk.debug("  トラック0のセクタ\(sector)の候補を使用します: N=\(validSectorN) (\(calculateSectorSizeFromN(validSectorN))バイト), データサイズ=\(validSectorSize)")
+            PC88Logger.disk.debug("  トラック0のセクタ\(sector)の候補を使用します: N=\(validSectorN) (\(self.calculateSectorSizeFromN(validSectorN))バイト), データサイズ=\(validSectorSize)")
             return [UInt8](data)
         }
         
@@ -666,14 +666,14 @@ class D88DiskImage: DiskImageAccessing {
             if !nonEmptySectors.isEmpty {
                 let (trackIndex, sectorInfo) = nonEmptySectors.first!
                 let dataSize = sectorInfo.data.count
-                PC88Logger.disk.debug("  トラック\(sectorData[trackIndex].track)で有効なセクタ\(sector)を発見しました: データサイズ=\(dataSize)")
+                PC88Logger.disk.debug("  トラック\(self.sectorData[trackIndex].track)で有効なセクタ\(sector)を発見しました: データサイズ=\(dataSize)")
                 validSectorData = sectorInfo.data
                 validSectorSize = dataSize
                 validSectorN = sectorInfo.id.size
             } else if !matchingSectors.isEmpty {
                 let (trackIndex, sectorInfo) = matchingSectors.first!
                 let dataSize = sectorInfo.data.count
-                PC88Logger.disk.debug("  トラック\(sectorData[trackIndex].track)でFFで埋められたセクタ\(sector)を発見しました: データサイズ=\(dataSize)")
+                PC88Logger.disk.debug("  トラック\(self.sectorData[trackIndex].track)でFFで埋められたセクタ\(sector)を発見しました: データサイズ=\(dataSize)")
                 validSectorData = sectorInfo.data
                 validSectorSize = dataSize
                 validSectorN = sectorInfo.id.size
@@ -886,17 +886,22 @@ class D88DiskImage: DiskImageAccessing {
         // OS部分のデータを取得
         let osData = [UInt8](diskData.subdata(in: alphaMiniDosOsOffset..<alphaMiniDosOsOffset + osSize))
         
-        PC88Logger.disk.debug("  ALPHA-MINI-DOSのOS部分を抽出しました: オフセット=0x\(String(format: "%04X", alphaMiniDosOsOffset)), サイズ=\(osData.count)バイト")
+        PC88Logger.disk.debug("  ALPHA-MINI-DOSのOS部分を抽出しました: オフセット=0x\(String(format: "%04X", self.alphaMiniDosOsOffset)), サイズ=\(osData.count)バイト")
         
         // OS部分の最初の32バイトを表示
         PC88Logger.disk.debug("  OS部分の最初の32バイト:")
+        var hexLine = ""
         for i in 0..<min(32, osData.count) {
             if i % 16 == 0 && i > 0 {
-                PC88Logger.disk.debug("")
+                PC88Logger.disk.debug("\(hexLine)")
+                hexLine = ""
             }
-            PC88Logger.disk.debug(String(format: "%02X ", osData[i]), terminator: "")
+            hexLine += String(format: "%02X ", osData[i])
         }
-        PC88Logger.disk.debug("")
+        // 残りのデータがあれば出力
+        if !hexLine.isEmpty {
+            PC88Logger.disk.debug("\(hexLine)")
+        }
         
         // OS部分の特徴を確認
         PC88Logger.disk.debug("  OS部分の特徴を確認中...")

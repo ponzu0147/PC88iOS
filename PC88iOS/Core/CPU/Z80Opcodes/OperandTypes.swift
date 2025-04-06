@@ -13,6 +13,22 @@ enum RegisterOperand {
     case immediate(UInt8)
     case memory
     
+    /// 即値オペランドかどうか
+    var isImmediate: Bool {
+        switch self {
+        case .immediate: return true
+        default: return false
+        }
+    }
+    
+    /// メモリオペランドかどうか
+    var isMemory: Bool {
+        switch self {
+        case .memory: return true
+        default: return false
+        }
+    }
+    
     func read(from registers: Z80Registers, memory: MemoryAccessing? = nil) -> UInt8 {
         switch self {
         case .a, .b, .c, .d, .e, .h, .l, .f:
@@ -88,6 +104,13 @@ enum RegisterOperand {
 enum RegisterPairOperand {
     case registerAF, registerBC, registerDE, registerHL, registerSP, registerAFAlt
     
+    // 短縮形のプロパティ
+    var af: RegisterPairOperand { return .registerAF }
+    var bc: RegisterPairOperand { return .registerBC }
+    var de: RegisterPairOperand { return .registerDE }
+    var hl: RegisterPairOperand { return .registerHL }
+    var sp: RegisterPairOperand { return .registerSP }
+    
     func read(from registers: Z80Registers) -> UInt16 {
         switch self {
         case .registerAF: return UInt16(registers.a) << 8 | UInt16(registers.f)
@@ -127,6 +150,11 @@ enum RegisterPairOperand {
 /// メモリアドレスオペランド
 enum AddressOperand {
     case registerBC, registerDE, registerHL, direct(UInt16)
+    
+    // 短縮形のプロパティ
+    var bc: AddressOperand { return .registerBC }
+    var de: AddressOperand { return .registerDE }
+    var hl: AddressOperand { return .registerHL }
     
     func getAddress(from registers: Z80Registers) -> UInt16 {
         switch self {

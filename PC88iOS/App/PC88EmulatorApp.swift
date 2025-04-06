@@ -89,7 +89,7 @@ struct PC88EmulatorApp: App {
                     }
                 }
         }
-        .onChange(of: scenePhase) { newPhase in
+        .onChange(of: scenePhase) { oldPhase, newPhase in
             appState.scenePhase = newPhase
             handleScenePhaseChange(newPhase)
         }

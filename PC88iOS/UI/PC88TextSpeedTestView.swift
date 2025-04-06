@@ -241,7 +241,7 @@ struct PC88TextSpeedTestView: View {
         
         // Z80 CPUを初期化
         if let memory = memory, let io = io {
-            cpu = Z80CPU(memory: memory, io: io, cpuClock: cpuClock)
+            cpu = Z80CPU(memory: memory, ioDevice: io, cpuClock: cpuClock)
             cpu?.initialize()
         }
         
