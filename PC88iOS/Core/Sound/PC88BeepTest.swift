@@ -31,7 +31,7 @@ class PC88BeepTest {
     // MARK: - プロパティ
     
     /// I/Oアクセス
-    private let io: PC88IO
+    private let inputOutput: PC88IO
     
     /// CPUクロック
     private let cpuClock: PC88CPUClock
@@ -43,10 +43,9 @@ class PC88BeepTest {
     
     /// 初期化
     /// - Parameters:
-    ///   - io: I/Oアクセス
     ///   - cpuClock: CPUクロック
-    init(io: PC88IO, cpuClock: PC88CPUClock) {
-        self.io = io
+    init(inputOutput: PC88IO, cpuClock: PC88CPUClock) {
+        self.inputOutput = inputOutput
         self.cpuClock = cpuClock
     }
     
@@ -55,15 +54,15 @@ class PC88BeepTest {
     /// ビープテストを初期化する
     func initialize() {
         // スピーカーを無効化
-        let speakerControl = io.readPort(0x42)
-        io.writePort(0x42, value: speakerControl & ~0x03)
+        let speakerControl = inputOutput.readPort(0x42)
+        inputOutput.writePort(0x42, value: speakerControl & ~0x03)
         
         // 8253 PITを初期化（チャネル2、モード3、バイナリカウント）
-        io.writePort(0x77, value: 0xB6)
+        inputOutput.writePort(0x77, value: 0xB6)
         
         // 分周値を0に設定
-        io.writePort(0x75, value: 0x00)
-        io.writePort(0x75, value: 0x00)
+        inputOutput.writePort(0x75, value: 0x00)
+        inputOutput.writePort(0x75, value: 0x00)
         
         PC88Logger.sound.debug("ビープテストを初期化しました")
     }
@@ -71,8 +70,8 @@ class PC88BeepTest {
     /// ビープテストを停止する
     func stop() {
         // スピーカーを無効化
-        let speakerControl = io.readPort(0x42)
-        io.writePort(0x42, value: speakerControl & ~0x03)
+        let speakerControl = inputOutput.readPort(0x42)
+        inputOutput.writePort(0x42, value: speakerControl & ~0x03)
         
         PC88Logger.sound.debug("ビープテストを停止しました")
     }
@@ -96,7 +95,7 @@ class PC88BeepTest {
             guard let self = self else { return }
             
             // 8253 PITを初期化（チャネル2、モード3、バイナリカウント）
-            self.io.writePort(0x77, value: 0xB6)
+            self.inputOutput.writePort(0x77, value: 0xB6)
             
             // 各音階を順番に鳴らす
             for note in notes {
@@ -105,12 +104,12 @@ class PC88BeepTest {
                     let divider = UInt16(self.pitClock / frequency)
                     
                     // 分周値を下位バイト、上位バイトの順に送信
-                    self.io.writePort(0x75, value: UInt8(divider & 0xFF))
-                    self.io.writePort(0x75, value: UInt8(divider >> 8))
+                    self.inputOutput.writePort(0x75, value: UInt8(divider & 0xFF))
+                    self.inputOutput.writePort(0x75, value: UInt8(divider >> 8))
                     
                     // スピーカーを有効化
-                    let speakerControl = self.io.readPort(0x42)
-                    self.io.writePort(0x42, value: speakerControl | 0x03)
+                    let speakerControl = self.inputOutput.readPort(0x42)
+                    self.inputOutput.writePort(0x42, value: speakerControl | 0x03)
                     
                     // 音の長さに応じて待機
                     let duration = self.calculateDuration()
@@ -119,8 +118,8 @@ class PC88BeepTest {
             }
             
             // スピーカーを無効化
-            let speakerControl = self.io.readPort(0x42)
-            self.io.writePort(0x42, value: speakerControl & ~0x03)
+            let speakerControl = self.inputOutput.readPort(0x42)
+            self.inputOutput.writePort(0x42, value: speakerControl & ~0x03)
             
             // 再生中フラグをリセット
             DispatchQueue.main.async {

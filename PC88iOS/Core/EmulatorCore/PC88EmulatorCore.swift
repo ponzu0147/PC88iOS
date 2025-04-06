@@ -169,14 +169,14 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         memory = PC88Memory()
         
         // I/Oの初期化
-        io = PC88IO()
+        inputOutput = PC88IO()
     }
     
     /// CPUの初期化
     private func initializeCPU() {
         guard let memory = memory, let inputOutput = inputOutput else { return }
         
-        cpu = Z80CPU(memory: memory, io: inputOutput)
+        cpu = Z80CPU(memory: memory, inputOutput: inputOutput)
         
         // CPUクロックモードを設定
         if let z80 = cpu as? Z80CPU {
@@ -228,12 +228,12 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         soundChip = YM2203Emulator()
         
         guard let soundChip = soundChip as? YM2203Emulator,
-              let io = inputOutput as? PC88IO else { return }
+              let ioController = inputOutput as? PC88IO else { return }
         
         soundChip.initialize(sampleRate: 44100.0)
         // デフォルトで中品質モードに設定
         soundChip.setQualityMode(SoundQualityMode.medium)
-        io.connectSoundChip(soundChip)
+        ioController.connectSoundChip(soundChip)
     }
     
     /// ビープ音生成の初期化
@@ -241,13 +241,13 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         beepSound = PC88BeepSound()
         
         guard let beepSound = beepSound,
-              let io = inputOutput as? PC88IO else { return }
+              let ioController = inputOutput as? PC88IO else { return }
         
         beepSound.initialize(sampleRate: 44100.0)
-        io.connectBeepSound(beepSound)
+        ioController.connectBeepSound(beepSound)
         
         // ビープ音テスト機能の初期化
-        beepTest = PC88BeepTest(io: inputOutput, cpuClock: cpuClock)
+        beepTest = PC88BeepTest(inputOutput: inputOutput, cpuClock: cpuClock)
     }
     
     /// 初期ディスクイメージの読み込みと初期画面表示
