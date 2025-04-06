@@ -38,7 +38,8 @@ class PC88AttributeHandler {
     /// 色属性を設定
     func setColorAttribute(line: Int, startColumn: Int, color: UInt8) {
         guard line >= 0 && line < (settings.is20LineMode ? PC88ScreenConstants.textHeight20 : PC88ScreenConstants.textHeight25) else { return }
-        guard startColumn >= 0 && startColumn < (settings.is40ColumnMode ? PC88ScreenConstants.textWidth40 : PC88ScreenConstants.textWidth80) else { return }
+        let maxWidth = settings.is40ColumnMode ? PC88ScreenConstants.textWidth40 : PC88ScreenConstants.textWidth80
+        guard startColumn >= 0 && startColumn < maxWidth else { return }
         guard settings.isColorMode else { return }  // カラーモードのみ有効
         
         // アトリビュートの開始位置を計算
@@ -112,7 +113,8 @@ class PC88AttributeHandler {
     /// 装飾属性を設定
     func setDecorationAttribute(line: Int, startColumn: Int, decoration: PC88Decoration, underline: Bool = false, upperline: Bool = false) {
         guard line >= 0 && line < (settings.is20LineMode ? PC88ScreenConstants.textHeight20 : PC88ScreenConstants.textHeight25) else { return }
-        guard startColumn >= 0 && startColumn < (settings.is40ColumnMode ? PC88ScreenConstants.textWidth40 : PC88ScreenConstants.textWidth80) else { return }
+        let maxWidth = settings.is40ColumnMode ? PC88ScreenConstants.textWidth40 : PC88ScreenConstants.textWidth80
+        guard startColumn >= 0 && startColumn < maxWidth else { return }
         
         // アトリビュートの開始位置を計算
         let lineOffset = line * PC88ScreenConstants.textVRAMBytesPerLine
@@ -205,9 +207,19 @@ class PC88AttributeHandler {
     }
     
     /// 指定位置の属性を取得
-    func getAttribute(line: Int, column: Int) -> (attributeType: PC88AttributeType, value: UInt8, hasUnderline: Bool, hasUpperline: Bool)? {
-        guard line >= 0 && line < (settings.is20LineMode ? PC88ScreenConstants.textHeight20 : PC88ScreenConstants.textHeight25) else { return nil }
-        guard column >= 0 && column < (settings.is40ColumnMode ? PC88ScreenConstants.textWidth40 : PC88ScreenConstants.textWidth80) else { return nil }
+    /// アトリビュート情報を格納する構造体
+    struct AttributeInfo {
+        let attributeType: PC88AttributeType
+        let value: UInt8
+        let hasUnderline: Bool
+        let hasUpperline: Bool
+    }
+    
+    func getAttribute(line: Int, column: Int) -> AttributeInfo? {
+        let maxHeight = settings.is20LineMode ? PC88ScreenConstants.textHeight20 : PC88ScreenConstants.textHeight25
+        guard line >= 0 && line < maxHeight else { return nil }
+        let maxWidth = settings.is40ColumnMode ? PC88ScreenConstants.textWidth40 : PC88ScreenConstants.textWidth80
+        guard column >= 0 && column < maxWidth else { return nil }
         
         // 行のオフセットを計算
         let lineOffset = line * PC88ScreenConstants.textVRAMBytesPerLine
@@ -257,19 +269,27 @@ class PC88AttributeHandler {
             value = attrValue & 0x07
         }
         
-        return (attributeType, value, hasUnderline, hasUpperline)
+        return AttributeInfo(attributeType: attributeType, value: value, hasUnderline: hasUnderline, hasUpperline: hasUpperline)
     }
     
     /// 指定位置の装飾を取得
-    func getDecoration(line: Int, column: Int) -> (decoration: PC88Decoration, hasUnderline: Bool, hasUpperline: Bool, shouldDisplay: Bool)? {
+    /// 装飾情報を格納する構造体
+    struct DecorationInfo {
+        let decoration: PC88Decoration
+        let hasUnderline: Bool
+        let hasUpperline: Bool
+        let shouldDisplay: Bool
+    }
+    
+    func getDecoration(line: Int, column: Int) -> DecorationInfo? {
         guard let attr = getAttribute(line: line, column: column) else {
             // デフォルト値を返す
-            return (PC88Decoration.normal, false, false, true)
+            return DecorationInfo(decoration: PC88Decoration.normal, hasUnderline: false, hasUpperline: false, shouldDisplay: true)
         }
         
         // 色属性の場合は装飾なし
         if attr.attributeType == .color {
-            return (PC88Decoration.normal, false, false, true)
+            return DecorationInfo(decoration: PC88Decoration.normal, hasUnderline: false, hasUpperline: false, shouldDisplay: true)
         }
         
         // 装飾値からPC88Decorationを取得
@@ -283,7 +303,7 @@ class PC88AttributeHandler {
             shouldDisplay = false
         }
         
-        return (decoration, attr.hasUnderline, attr.hasUpperline, shouldDisplay)
+        return DecorationInfo(decoration: decoration, hasUnderline: attr.hasUnderline, hasUpperline: attr.hasUpperline, shouldDisplay: shouldDisplay)
     }
     
     /// 指定位置の色を取得

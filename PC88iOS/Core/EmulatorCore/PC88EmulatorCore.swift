@@ -176,7 +176,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     private func initializeCPU() {
         guard let memory = memory, let io = io else { return }
         
-        cpu = Z80CPU(memory: memory, io: io)
+        cpu = Z80CPU(memory: memory, ioDevice: io)
         
         // CPUクロックモードを設定
         if let z80 = cpu as? Z80CPU {
@@ -628,7 +628,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// フレームスキップを設定
     func setFrameSkip(_ skip: Int) {
         frameSkip = max(0, min(skip, 10)) // 0〜10の範囲に制限
-        PC88Logger.core.debug("フレームスキップを設定: \(frameSkip)")
+        PC88Logger.core.debug("フレームスキップを設定: \(self.frameSkip)")
         shouldResetMetrics = true
     }
     
@@ -662,7 +662,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                 soundChip.setQualityMode(SoundQualityMode.medium)
             }
             
-            PC88Logger.core.debug("省電力モードを有効化しました（フレームレート: \(targetFPS)fps）")
+            PC88Logger.core.debug("省電力モードを有効化しました（フレームレート: \(self.targetFPS)fps）")
         } else {
             // 省電力モード無効時の設定
             setFrameSkip(0) // すべてのフレームを描画
@@ -1003,8 +1003,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         let endAddressHex = String(format: "%04X", memoryOffset - 1)
         PC88Logger.disk.debug(
-            "ALPHA-MINI-DOSのOS部分のロードが完了しました: 0xD000-0x\(endAddressHex) " +
-            "(合計: \(totalBytesLoaded) バイト)"
+            "ALPHA-MINI-DOSのOS部分のロードが完了しました: 0xD000-0x\(endAddressHex) (合計: \(totalBytesLoaded) バイト)"
         )
         
         return memoryOffset
@@ -1024,7 +1023,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         if index == 0 {
             PC88Logger.disk.debug("  最初のセクタの内容 (16バイト):")
             for i in 0..<min(16, sectorData.count) {
-                PC88Logger.disk.debug(String(format: "%02X ", sectorData[i]), terminator: "")
+                let byteStr = String(format: "%02X ", sectorData[i])
+                PC88Logger.disk.debug("\(byteStr)")
             }
             PC88Logger.disk.debug("")
         }
@@ -1428,7 +1428,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     internal func updateScreen() {
         // フレームスキップの処理
         // frameCounterはemulationLoopで更新される
-        if frameSkip > 0 && (frameCounter % UInt(frameSkip + 1) != 0) {
+        if self.frameSkip > 0 && (frameCounter % UInt(self.frameSkip + 1) != 0) {
             // フレームスキップ中は描画をスキップ
             return
         }
@@ -1638,12 +1638,12 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                             // 従来の方法で初期化
                             // Z80 CPUの初期状態を設定
                             z80.setPC(0xC000)  // プログラムカウンタをIPLの先頭に設定
-                            z80.setRegister(.af, value: 0x0000)  // Aレジスタとフラグをクリア
-                            z80.setRegister(.bc, value: 0x0000)  // BCレジスタをクリア
-                            z80.setRegister(.de, value: 0x0000)  // DEレジスタをクリア
-                            z80.setRegister(.hl, value: 0x0000)  // HLレジスタをクリア
-                            z80.setRegister(.ix, value: 0x0000)  // IXレジスタをクリア
-                            z80.setRegister(.iy, value: 0x0000)  // IYレジスタをクリア
+                            z80.setRegisterPair(.af, value: 0x0000)  // Aレジスタとフラグをクリア
+                            z80.setRegisterPair(.bc, value: 0x0000)  // BCレジスタをクリア
+                            z80.setRegisterPair(.de, value: 0x0000)  // DEレジスタをクリア
+                            z80.setRegisterPair(.hl, value: 0x0000)  // HLレジスタをクリア
+                            z80.setRegisterPair(.ix, value: 0x0000)  // IXレジスタをクリア
+                            z80.setRegisterPair(.iy, value: 0x0000)  // IYレジスタをクリア
                             z80.setSP(0xF000)  // スタックポインタを設定
                             
                             // 割り込みを無効化
@@ -1665,7 +1665,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                         PC88Logger.memory.debug("IPLメモリ内容確認 (0xC000-0xC00F):")
                         for i in 0..<16 {
                             let byte = pc88Memory.readByte(at: 0xC000 + UInt16(i))
-                            PC88Logger.memory.debug(String(format: "%02X ", byte), terminator: "")
+                            let byteStr = String(format: "%02X ", byte)
+                            PC88Logger.memory.debug("\(byteStr)")
                         }
                         PC88Logger.memory.debug("")
                     }

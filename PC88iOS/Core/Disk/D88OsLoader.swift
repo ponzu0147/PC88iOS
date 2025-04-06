@@ -138,6 +138,10 @@ protocol CpuControlling {
     /// - Parameter address: 設定するアドレス
     func setProgramCounter(address: Int)
     
+    /// CPUの実行開始アドレスを設定
+    /// - Parameter address: 開始アドレス
+    func setStartAddress(_ address: UInt16)
+    
     /// CPU実行を開始する
     func startExecution()
     

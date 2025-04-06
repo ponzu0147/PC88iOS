@@ -7,6 +7,10 @@
 
 import Foundation
 
+// 必要なファイルをインポート
+// Swiftは同じモジュール内のファイルは自動的にインポートされるため、明示的なインポートは不要
+// ここではプロトコルやクラスの再定義を避ける
+
 /// PC88EmulatorCoreにAlphaMiniDosLoaderを統合するための拡張
 class PC88AlphaMiniDosIntegration {
     // MARK: - プロパティ
@@ -49,7 +53,7 @@ class PC88AlphaMiniDosIntegration {
 }
 
 /// PC88MemoryをMemoryAccessingプロトコルに適合させるアダプタ
-class PC88MemoryAdapter: PC88iOS.MemoryAccessing {
+class PC88MemoryAdapter: MemoryAccessing {
     // MARK: - プロパティ
     
     /// PC88Memory
@@ -113,7 +117,7 @@ class PC88MemoryAdapter: PC88iOS.MemoryAccessing {
 }
 
 /// Z80CPUをCpuControllingプロトコルに適合させるアダプタ
-class Z80CPUAdapter: PC88iOS.CpuControlling {
+class Z80CPUAdapter: CpuControlling {
     // MARK: - プロパティ
     
     /// Z80CPU
@@ -149,7 +153,7 @@ class Z80CPUAdapter: PC88iOS.CpuControlling {
         // ホルト状態を解除
         if cpu.isHalted() {
             // ホルト状態の場合、割り込みを発生させて再開
-            cpu.requestInterrupt(.int)
+            cpu.requestInterrupt(.nmi)
         }
     }
     

@@ -29,10 +29,10 @@ class TemporaryTraceFilter: InstructionTraceFilterProtocol {
     
     func shouldTrace(pc: UInt16) -> Bool {
         guard let cpu = cpu else { return false }
-        cpu.instructionTraceCount += 1
-        if cpu.instructionTraceCount >= maxCount {
-            cpu.instructionTraceEnabled = originalTraceEnabled
-            cpu.instructionTraceFilter = originalFilter
+        cpu.incrementInstructionTraceCount()
+        if cpu.getInstructionTraceCount() >= maxCount {
+            cpu.setInstructionTraceEnabled(originalTraceEnabled)
+            cpu.setInstructionTraceFilter(originalFilter)
             return false
         }
         return true
@@ -92,6 +92,23 @@ class Z80CPU: CPUExecuting {
     private var instructionTraceEnabled = false
     private var instructionTraceCount = 0
     private let maxInstructionTraceCount = 100 // 最大トレース数
+    
+    // トレース機能用のアクセサメソッド
+    func incrementInstructionTraceCount() {
+        instructionTraceCount += 1
+    }
+    
+    func getInstructionTraceCount() -> Int {
+        return instructionTraceCount
+    }
+    
+    func setInstructionTraceEnabled(_ enabled: Bool) {
+        instructionTraceEnabled = enabled
+    }
+    
+    func setInstructionTraceFilter(_ filter: InstructionTraceFilterProtocol?) {
+        instructionTraceFilter = filter
+    }
     
     // CPUクロック管理
     let cpuClock: PC88CPUClock
@@ -472,7 +489,7 @@ class Z80CPU: CPUExecuting {
         currentMCycle = 0
         
         // 実行
-        let cycles = instruction.execute(cpu: self, registers: &registers, memory: memory, io: ioDevice)
+        let cycles = instruction.execute(cpu: self, registers: &registers, memory: memory, inputOutput: ioDevice)
         
         // サイクル情報をリセット
         currentInstructionCycles = nil
@@ -492,7 +509,7 @@ class Z80CPU: CPUExecuting {
         
         // トレースメッセージを生成して出力
         let traceMessage = generateTraceMessage(opcode: opcode, instruction: instruction)
-        PC88Logger.cpu.debug(traceMessage)
+        PC88Logger.cpu.debug("\(traceMessage)")
         
         instructionTraceCount += 1
         
@@ -531,7 +548,7 @@ class Z80CPU: CPUExecuting {
     
     /// PC周辺のメモリダンプを取得
     private func getMemoryDumpAroundPC(pc: UInt16) -> String {
-        var memoryDump = ""
+       var memoryDump = ""
         for offset in 0..<4 {
             let addr = pc &+ UInt16(offset)
             if addr < 0xFFFF {
@@ -819,9 +836,9 @@ extension Z80CPU {
             // 命令列を出力
             PC88Logger.cpu.info("Instructions:")
             for (index, opcode) in idleLoopInstructions.enumerated() {
-                let programCounter = (idleLoopPC + UInt16(index)) & 0xFFFF
-                let instruction = decoder.decode(opcode, memory: memory, pc: programCounter)
-                PC88Logger.cpu.info("  \(String(format: "0x%04X", programCounter)): \(String(format: "%02X", opcode)) - \(instruction.description)")
+                let pc = (idleLoopPC + UInt16(index)) & 0xFFFF
+                let instruction = decoder.decode(opcode, memory: memory, pc: pc)
+                PC88Logger.cpu.info("  \(String(format: "0x%04X", pc)): \(String(format: "%02X", opcode)) - \(instruction.description)")
             }
             
             // レジスタ状態を出力
@@ -919,8 +936,8 @@ extension Z80CPU {
         case .hlPair: return registers.hl
         case .ixPair: return registers.ix
         case .iyPair: return registers.iy
-        case .stackPointer: return registers.sp
-        case .programCounter: return registers.pc
+        case .sp: return registers.sp
+        case .pc: return registers.pc
         }
     }
     
@@ -933,8 +950,8 @@ extension Z80CPU {
         case .hlPair: registers.hl = value
         case .ixPair: registers.ix = value
         case .iyPair: registers.iy = value
-        case .stackPointer: registers.sp = value
-        case .programCounter: registers.pc = value
+        case .sp: registers.sp = value
+        case .pc: registers.pc = value
         }
     }
     
@@ -966,5 +983,5 @@ extension Z80CPU {
 
 /// レジスタタイプ
 enum RegisterType {
-    case afPair, bcPair, dePair, hlPair, ixPair, iyPair, stackPointer, programCounter
+    case afPair, bcPair, dePair, hlPair, ixPair, iyPair, sp, pc
 }

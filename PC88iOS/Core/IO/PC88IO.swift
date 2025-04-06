@@ -358,11 +358,11 @@ class PC88IO: IOAccessing {
             return (3, Int(key.rawValue - 0x30))
             
         // アルファベットキー (STROBE 4-8)
-        case .a, .b, .c, .d, .e, .f, .g, .h, .i, .j:
+        case .keyA, .keyB, .keyC, .keyD, .keyE, .keyF, .keyG, .keyH, .keyI, .keyJ:
             return (4, Int(key.rawValue - 0x41))
-        case .k, .l, .m, .n, .o, .p, .q, .r, .s, .t:
+        case .keyK, .keyL, .keyM, .keyN, .keyO, .keyP, .keyQ, .keyR, .keyS, .keyT:
             return (5, Int(key.rawValue - 0x4B))
-        case .u, .v, .w, .x, .y, .z:
+        case .keyU, .keyV, .keyW, .keyX, .keyY, .keyZ:
             return (6, Int(key.rawValue - 0x55))
             
         // 記号キー (STROBE 9-10)
