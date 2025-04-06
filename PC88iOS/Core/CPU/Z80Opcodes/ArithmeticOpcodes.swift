@@ -11,7 +11,7 @@ struct ADDInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
-        let regA = registers.regA
+        let regA = registers.a
         
         let halfCarry = ((regA & 0x0F) + (value & 0x0F)) > 0x0F
         
@@ -21,7 +21,7 @@ struct ADDInstruction: Z80Instruction {
         
         let overflow = (regA & 0x80) == (value & 0x80) && (result & 0x80) != (regA & 0x80)
         
-        registers.regA = result
+        registers.a = result
         
         registers.setFlag(Z80Registers.Flags.zero, value: result == 0)
         registers.setFlag(Z80Registers.Flags.sign, value: (result & 0x80) != 0)
@@ -44,7 +44,7 @@ struct SUBInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
-        let regA = registers.regA
+        let regA = registers.a
         
         let halfCarry = (regA & 0x0F) < (value & 0x0F)
         
@@ -54,7 +54,7 @@ struct SUBInstruction: Z80Instruction {
         
         let overflow = (regA & 0x80) != (value & 0x80) && (result & 0x80) != (regA & 0x80)
         
-        registers.regA = result
+        registers.a = result
         
         registers.setFlag(Z80Registers.Flags.zero, value: result == 0)
         registers.setFlag(Z80Registers.Flags.sign, value: (result & 0x80) != 0)
@@ -135,7 +135,7 @@ struct CPInstruction: Z80Instruction {
     
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
         let value = source.read(from: registers, memory: memory)
-        let regA = registers.regA
+        let regA = registers.a
         
         let halfCarry = (regA & 0x0F) < (value & 0x0F)
         
@@ -163,7 +163,7 @@ struct CPInstruction: Z80Instruction {
 
 struct CPLInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
-        registers.regA = ~registers.regA
+        registers.a = ~registers.a
         
         registers.setFlag(Z80Registers.Flags.halfCarry, value: true)
         registers.setFlag(Z80Registers.Flags.subtract, value: true)

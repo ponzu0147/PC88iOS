@@ -10,108 +10,108 @@ import Foundation
 /// Z80 CPUのレジスタセット
 struct Z80Registers {
     // メインレジスタ
-    var regA: UInt8 = 0
-    var regF: UInt8 = 0
-    var regB: UInt8 = 0
-    var regC: UInt8 = 0
-    var regD: UInt8 = 0
-    var regE: UInt8 = 0
-    var regH: UInt8 = 0
-    var regL: UInt8 = 0
+    var a: UInt8 = 0
+    var f: UInt8 = 0
+    var b: UInt8 = 0
+    var c: UInt8 = 0
+    var d: UInt8 = 0
+    var e: UInt8 = 0
+    var h: UInt8 = 0
+    var l: UInt8 = 0
     
     // 代替レジスタ
-    var regAAlt: UInt8 = 0
-    var regFAlt: UInt8 = 0
-    var regBAlt: UInt8 = 0
-    var regCAlt: UInt8 = 0
-    var regDAlt: UInt8 = 0
-    var regEAlt: UInt8 = 0
-    var regHAlt: UInt8 = 0
-    var regLAlt: UInt8 = 0
+    var aAlt: UInt8 = 0
+    var fAlt: UInt8 = 0
+    var bAlt: UInt8 = 0
+    var cAlt: UInt8 = 0
+    var dAlt: UInt8 = 0
+    var eAlt: UInt8 = 0
+    var hAlt: UInt8 = 0
+    var lAlt: UInt8 = 0
     
     // 特殊レジスタ
-    var regIX: UInt16 = 0
-    var regIY: UInt16 = 0
+    var ix: UInt16 = 0
+    var iy: UInt16 = 0
     var sp: UInt16 = 0
-    var programCounter: UInt16 = 0
+    var pc: UInt16 = 0
     
     // 割り込み関連レジスタ
-    var regI: UInt8 = 0
-    var regR: UInt8 = 0
+    var i: UInt8 = 0
+    var r: UInt8 = 0
     
     // 割り込みフラグ
     var iff1: Bool = false
     var iff2: Bool = false
     
     /// レジスタペア AF の取得・設定
-    var regAF: UInt16 {
-        get { return UInt16(regA) << 8 | UInt16(regF) }
+    var af: UInt16 {
+        get { return UInt16(a) << 8 | UInt16(f) }
         set {
-            regA = UInt8(newValue >> 8)
-            regF = UInt8(newValue & 0xFF)
+            a = UInt8(newValue >> 8)
+            f = UInt8(newValue & 0xFF)
         }
     }
     
     /// レジスタペア BC の取得・設定
-    var regBC: UInt16 {
-        get { return UInt16(regB) << 8 | UInt16(regC) }
+    var bc: UInt16 {
+        get { return UInt16(b) << 8 | UInt16(c) }
         set {
-            regB = UInt8(newValue >> 8)
-            regC = UInt8(newValue & 0xFF)
+            b = UInt8(newValue >> 8)
+            c = UInt8(newValue & 0xFF)
         }
     }
     
     /// レジスタペア DE の取得・設定
-    var regDE: UInt16 {
-        get { return UInt16(regD) << 8 | UInt16(regE) }
+    var de: UInt16 {
+        get { return UInt16(d) << 8 | UInt16(e) }
         set {
-            regD = UInt8(newValue >> 8)
-            regE = UInt8(newValue & 0xFF)
+            d = UInt8(newValue >> 8)
+            e = UInt8(newValue & 0xFF)
         }
     }
     
     /// レジスタペア HL の取得・設定
-    var regHL: UInt16 {
-        get { return UInt16(regH) << 8 | UInt16(regL) }
+    var hl: UInt16 {
+        get { return UInt16(h) << 8 | UInt16(l) }
         set {
-            regH = UInt8(newValue >> 8)
-            regL = UInt8(newValue & 0xFF)
+            h = UInt8(newValue >> 8)
+            l = UInt8(newValue & 0xFF)
         }
     }
     
     /// 代替レジスタペア AF' の取得・設定
-    var regAFAlt: UInt16 {
-        get { return UInt16(regAAlt) << 8 | UInt16(regFAlt) }
+    var afAlt: UInt16 {
+        get { return UInt16(aAlt) << 8 | UInt16(fAlt) }
         set {
-            regAAlt = UInt8(newValue >> 8)
-            regFAlt = UInt8(newValue & 0xFF)
+            aAlt = UInt8(newValue >> 8)
+            fAlt = UInt8(newValue & 0xFF)
         }
     }
     
     /// 代替レジスタペア BC' の取得・設定
-    var regBCAlt: UInt16 {
-        get { return UInt16(regBAlt) << 8 | UInt16(regCAlt) }
+    var bcAlt: UInt16 {
+        get { return UInt16(bAlt) << 8 | UInt16(cAlt) }
         set {
-            regBAlt = UInt8(newValue >> 8)
-            regCAlt = UInt8(newValue & 0xFF)
+            bAlt = UInt8(newValue >> 8)
+            cAlt = UInt8(newValue & 0xFF)
         }
     }
     
     /// 代替レジスタペア DE' の取得・設定
-    var regDEAlt: UInt16 {
-        get { return UInt16(regDAlt) << 8 | UInt16(regEAlt) }
+    var deAlt: UInt16 {
+        get { return UInt16(dAlt) << 8 | UInt16(eAlt) }
         set {
-            regDAlt = UInt8(newValue >> 8)
-            regEAlt = UInt8(newValue & 0xFF)
+            dAlt = UInt8(newValue >> 8)
+            eAlt = UInt8(newValue & 0xFF)
         }
     }
     
     /// 代替レジスタペア HL' の取得・設定
-    var regHLAlt: UInt16 {
-        get { return UInt16(regHAlt) << 8 | UInt16(regLAlt) }
+    var hlAlt: UInt16 {
+        get { return UInt16(hAlt) << 8 | UInt16(lAlt) }
         set {
-            regHAlt = UInt8(newValue >> 8)
-            regLAlt = UInt8(newValue & 0xFF)
+            hAlt = UInt8(newValue >> 8)
+            lAlt = UInt8(newValue & 0xFF)
         }
     }
     
@@ -128,59 +128,59 @@ struct Z80Registers {
     /// フラグの設定
     mutating func setFlag(_ flag: UInt8, value: Bool) {
         if value {
-            regF |= flag
+            f |= flag
         } else {
-            regF &= ~flag
+            f &= ~flag
         }
     }
     
     /// フラグの取得
     func getFlag(_ flag: UInt8) -> Bool {
-        return (regF & flag) != 0
+        return (f & flag) != 0
     }
     
     /// レジスタの交換（EXX命令用）
     mutating func exchangeRegisters() {
-        swap(&regB, &regBAlt)
-        swap(&regC, &regCAlt)
-        swap(&regD, &regDAlt)
-        swap(&regE, &regEAlt)
-        swap(&regH, &regHAlt)
-        swap(&regL, &regLAlt)
+        swap(&b, &bAlt)
+        swap(&c, &cAlt)
+        swap(&d, &dAlt)
+        swap(&e, &eAlt)
+        swap(&h, &hAlt)
+        swap(&l, &lAlt)
     }
     
     /// AF と AF' の交換（EX AF,AF'命令用）
     mutating func exchangeAF() {
-        swap(&regA, &regAAlt)
-        swap(&regF, &regFAlt)
+        swap(&a, &aAlt)
+        swap(&f, &fAlt)
     }
     
     /// レジスタのリセット
     mutating func reset() {
-        regA = 0
-        regF = 0
-        regB = 0
-        regC = 0
-        regD = 0
-        regE = 0
-        regH = 0
-        regL = 0
+        a = 0
+        f = 0
+        b = 0
+        c = 0
+        d = 0
+        e = 0
+        h = 0
+        l = 0
         
-        regAAlt = 0
-        regFAlt = 0
-        regBAlt = 0
-        regCAlt = 0
-        regDAlt = 0
-        regEAlt = 0
-        regHAlt = 0
-        regLAlt = 0
+        aAlt = 0
+        fAlt = 0
+        bAlt = 0
+        cAlt = 0
+        dAlt = 0
+        eAlt = 0
+        hAlt = 0
+        lAlt = 0
         
-        regIX = 0
-        regIY = 0
-        regSP = 0xFFFF  // スタックポインタの初期値
-        regPC = 0       // プログラムカウンタの初期値
+        ix = 0
+        iy = 0
+        sp = 0xFFFF  // スタックポインタの初期値
+        pc = 0       // プログラムカウンタの初期値
         
-        regI = 0
-        regR = 0
+        i = 0
+        r = 0
     }
 }
