@@ -487,7 +487,7 @@ class EmulatorViewInternalModel: ObservableObject {
         // エミュレーションループが確実に開始されるように少し待ってから再度更新
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.updateScreen()
-            PC88Logger.app.debug("クロックモードを変更しました: " + (self?.clockFrequency ?? ""))
+            PC88Logger.app.debug("クロックモードを変更しました: \(self?.clockFrequency ?? "")")
         }
     }
     
