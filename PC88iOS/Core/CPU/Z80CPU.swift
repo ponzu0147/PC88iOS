@@ -123,7 +123,7 @@ class Z80CPU: CPUExecuting {
     private var currentTState: Int = 0
     
     // 現在実行中の命令のサイクル情報
-    private var currentInstructionCycles: PC88iOS.InstructionCycles?
+    private var currentInstructionCycles: InstructionCycles?
     
     /// 初期化
     init(memory: MemoryAccessing, ioDevice: IOAccessing, cpuClock: PC88CPUClock = PC88CPUClock()) {
