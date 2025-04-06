@@ -10,7 +10,7 @@ import os.log
 
 /// アイドルループ検出用のフィルタプロトコル
 protocol InstructionTraceFilterProtocol {
-    func shouldTrace(programCounter: UInt16) -> Bool
+    func shouldTrace(pc: UInt16) -> Bool
 }
 
 /// A temporary filter that limits trace count
@@ -27,7 +27,7 @@ class TemporaryTraceFilter: InstructionTraceFilterProtocol {
         self.originalTraceEnabled = originalTraceEnabled
     }
     
-    func shouldTrace(programCounter: UInt16) -> Bool {
+    func shouldTrace(pc: UInt16) -> Bool {
         guard let cpu = cpu else { return false }
         cpu.instructionTraceCount += 1
         if cpu.instructionTraceCount >= maxCount {
@@ -222,7 +222,7 @@ class Z80CPU: CPUExecuting {
         
         // アイドル検出のための履歴更新
         if idleDetectionEnabled {
-            updateInstructionHistory(programCounter: pc, opcode: opcode)
+            updateInstructionHistory(pc: pc, opcode: opcode)
         }
         
         // 命令実行
@@ -487,7 +487,7 @@ class Z80CPU: CPUExecuting {
         guard instructionTraceEnabled && instructionTraceCount < maxInstructionTraceCount else { return }
         
         // フィルタが設定されている場合はそれを適用
-        let shouldTrace = instructionTraceFilter?.shouldTrace(programCounter: registers.pc) ?? true
+        let shouldTrace = instructionTraceFilter?.shouldTrace(pc: registers.pc) ?? true
         guard shouldTrace else { return }
         
         // トレースメッセージを生成して出力
@@ -502,7 +502,7 @@ class Z80CPU: CPUExecuting {
     
     /// トレースメッセージを生成
     private func generateTraceMessage(opcode: UInt8, instruction: Z80Instruction) -> String {
-        let programCounter = registers.pc
+        let pc = registers.pc
         let opcodeStr = String(format: "%02X", opcode)
         let instructionDesc = instruction.description
         
@@ -510,9 +510,9 @@ class Z80CPU: CPUExecuting {
         let registerInfo = formatRegisterInfo()
         
         // メモリダンプを取得
-        let memoryDump = getMemoryDumpAroundPC(programCounter: programCounter)
+        let memoryDump = getMemoryDumpAroundPC(pc: pc)
         
-        return "TRACE[\(instructionTraceCount)]: PC=\(String(format: "%04X", programCounter)) " +
+        return "TRACE[\(instructionTraceCount)]: PC=\(String(format: "%04X", pc)) " +
                "OP=\(opcodeStr) \(instructionDesc) | " +
                "\(registerInfo) | MEM=[\(memoryDump)]"
     }
@@ -530,10 +530,10 @@ class Z80CPU: CPUExecuting {
     }
     
     /// PC周辺のメモリダンプを取得
-    private func getMemoryDumpAroundPC(programCounter: UInt16) -> String {
+    private func getMemoryDumpAroundPC(pc: UInt16) -> String {
         var memoryDump = ""
         for offset in 0..<4 {
-            let addr = programCounter &+ UInt16(offset)
+            let addr = pc &+ UInt16(offset)
             if addr < 0xFFFF {
                 let byte = memory.readByte(at: addr)
                 memoryDump += String(format: "%02X ", byte)
@@ -668,9 +668,9 @@ class Z80CPU: CPUExecuting {
     // MARK: - アイドル検出関連
     
     /// 命令履歴を更新
-    private func updateInstructionHistory(programCounter: UInt16, opcode: UInt8) {
+    private func updateInstructionHistory(pc: UInt16, opcode: UInt8) {
         // 履歴に追加
-        instructionHistory.append((pc: programCounter, opcode: opcode))
+        instructionHistory.append((pc: pc, opcode: opcode))
         
         // 履歴が長すぎる場合は古いものを削除
         let maxHistorySize = 20 // 最大20命令を記録
