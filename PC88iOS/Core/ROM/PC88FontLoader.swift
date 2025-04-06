@@ -42,7 +42,7 @@ class PC88FontLoader {
             // 8x8フォントデータを抽出
             if fontROMData.count >= 2048 {
                 font8x8 = Array(fontROMData.prefix(2048))
-                PC88Logger.core.debug("8x8フォントデータを読み込みました (サイズ: \(font8x8?.count ?? 0) バイト)")
+                PC88Logger.core.debug("8x8フォントデータを読み込みました (サイズ: \(self.font8x8?.count ?? 0) バイト)")
             } else {
                 PC88Logger.core.error("8x8フォントデータの読み込みに失敗しました: データサイズ不足")
                 return false
@@ -51,7 +51,7 @@ class PC88FontLoader {
             // 8x16フォントデータを抽出
             if fontROMData.count >= 4096 {
                 font8x16 = Array(fontROMData.suffix(from: 2048))
-                PC88Logger.core.debug("8x16フォントデータを読み込みました (サイズ: \(font8x16?.count ?? 0) バイト)")
+                PC88Logger.core.debug("8x16フォントデータを読み込みました (サイズ: \(self.font8x16?.count ?? 0) バイト)")
                 
                 // デバッグ用に最初の数バイトを表示
                 if let font = font8x16, !font.isEmpty {
@@ -73,7 +73,7 @@ class PC88FontLoader {
             // 8x8フォントデータを抽出
             if fontROMData.count >= 2048 {
                 font8x8 = Array(fontROMData.prefix(2048))
-                PC88Logger.core.debug("8x8フォントデータを読み込みました (サイズ: \(font8x8?.count ?? 0) バイト)")
+                PC88Logger.core.debug("8x8フォントデータを読み込みました (サイズ: \(self.font8x8?.count ?? 0) バイト)")
             } else {
                 PC88Logger.core.error("8x8フォントデータの読み込みに失敗しました: データサイズ不足")
                 return false
@@ -82,7 +82,7 @@ class PC88FontLoader {
             // 8x16フォントデータを抽出
             if fontROMData.count >= 4096 {
                 font8x16 = Array(fontROMData.suffix(from: 2048))
-                PC88Logger.core.debug("8x16フォントデータを読み込みました (サイズ: \(font8x16?.count ?? 0) バイト)")
+                PC88Logger.core.debug("8x16フォントデータを読み込みました (サイズ: \(self.font8x16?.count ?? 0) バイト)")
             } else {
                 PC88Logger.core.error("8x16フォントデータの読み込みに失敗しました: データサイズ不足")
                 return false

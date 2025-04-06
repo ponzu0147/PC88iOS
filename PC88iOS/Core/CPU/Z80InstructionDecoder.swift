@@ -25,16 +25,75 @@ class Z80InstructionDecoder {
     }
     
     
+    // MARK: - Basic Instructions
+    
     private func decodeBasicInstruction(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+        // 命令をカテゴリごとに分割して処理
+        if let instruction = decodeBasicGroup1(opcode) {
+            return instruction
+        } else if let instruction = decodeBasicGroup2(opcode, memory: memory, pc: pc) {
+            return instruction
+        } else if let instruction = decodeBasicGroup3(opcode, memory: memory, pc: pc) {
+            return instruction
+        }
+        
+        return nil
+    }
+    
+    private func decodeBasicGroup1(_ opcode: UInt8) -> Z80Instruction? {
+        // 命令をさらに小さなグループに分割
+        if let instruction = decodeBasicGroup1A(opcode) {
+            return instruction
+        } else if let instruction = decodeBasicGroup1B(opcode) {
+            return instruction
+        } else if let instruction = decodeBasicGroup1C(opcode) {
+            return instruction
+        } else if let instruction = decodeBasicGroup1D(opcode) {
+            return instruction
+        }
+        
+        return nil
+    }
+    
+    // 基本命令グループ1A: 0x00-0x2F
+    private func decodeBasicGroup1A(_ opcode: UInt8) -> Z80Instruction? {
+        if let instruction = decodeBasicGroup1A1(opcode) {
+            return instruction
+        } else if let instruction = decodeBasicGroup1A2(opcode) {
+            return instruction
+        }
+        return nil
+    }
+    
+    // 基本命令グループ1A1: 0x00-0x17
+    private func decodeBasicGroup1A1(_ opcode: UInt8) -> Z80Instruction? {
         switch opcode {
         case 0x00: // NOP
             return NOPInstruction()
+        case 0x01: // LD BC,nn
+            return decodeLDRegPairImm(.registerBC, memory: memory, pc: pc)
+        case 0x02: // LD (BC),A
+            return LDMemRegInstruction(address: .registerBC, source: .a)
         case 0x03: // INC BC
             return INCRegPairInstruction(register: .registerBC)
+        case 0x04: // INC B
+            return INCRegInstruction(register: .b)
+        case 0x05: // DEC B
+            return DECRegInstruction(register: .b)
+        case 0x06: // LD B,n
+            return decodeLDRegImm(.b, memory: memory, pc: pc)
         case 0x07: // RLCA
             return RLCAInstruction()
         case 0x08: // EX AF,AF'
             return EXAFInstruction()
+        case 0x0A: // LD A,(BC)
+            return LDRegMemInstruction(destination: .a, address: .registerBC)
+        case 0x0C: // INC C
+            return INCRegInstruction(register: .c)
+        case 0x0D: // DEC C
+            return DECRegInstruction(register: .c)
+        case 0x0E: // LD C,n
+            return decodeLDRegImm(.c, memory: memory, pc: pc)
         case 0x0F: // RRCA
             return RRCAInstruction()
         case 0x10: // DJNZ
@@ -42,95 +101,119 @@ class Z80InstructionDecoder {
         case 0x11: // LD DE,nn
             return decodeLDRegPairImm(.registerDE, memory: memory, pc: pc)
         case 0x12: // LD (DE),A
-            return LDMemRegInstruction(address: .registerDE, source: .regA)
+            return LDMemRegInstruction(address: .registerDE, source: .a)
         case 0x13: // INC DE
             return INCRegPairInstruction(register: .registerDE)
+        case 0x14: // INC D
+            return INCRegInstruction(register: .d)
+        case 0x15: // DEC D
+            return DECRegInstruction(register: .d)
+        case 0x16: // LD D,n
+            return decodeLDRegImm(.d, memory: memory, pc: pc)
+        case 0x18: // JR n
+            return decodeJR(.none, memory: memory, pc: pc)
+        default:
+            return nil
+        }
+    }
+    
+    // 基本命令グループ1A2: 0x1A-0x2F
+    private func decodeBasicGroup1A2(_ opcode: UInt8) -> Z80Instruction? {
+        switch opcode {
+        case 0x1A: // LD A,(DE)
+            return LDRegMemInstruction(destination: .a, address: .registerDE)
+        case 0x1C: // INC E
+            return INCRegInstruction(register: .e)
+        case 0x1D: // DEC E
+            return DECRegInstruction(register: .e)
+        case 0x1E: // LD E,n
+            return decodeLDRegImm(.e, memory: memory, pc: pc)
+        case 0x20: // JR NZ,n
+            return decodeJR(.notZero, memory: memory, pc: pc)
         case 0x21: // LD HL,nn
             return decodeLDRegPairImm(.registerHL, memory: memory, pc: pc)
-        case 0x23: // INC HL
-            return INCRegPairInstruction(register: .registerHL)
-        case 0x02: // LD (BC),A
-            return LDMemRegInstruction(address: .registerBC, source: .regA)
-        case 0x1A: // LD A,(DE)
-            return LDRegMemInstruction(destination: .regA, address: .registerDE)
-        case 0x32: // LD (nn),A
-            return decodeLDDirectMemReg(memory: memory, pc: pc)
-        case 0x3A: // LD A,(nn)
-            return decodeLDRegMemAddr(memory: memory, pc: pc)
-        case 0x3B: // DEC SP
-            return DECRegPairInstruction(register: .registerSP)
-        case 0x01: // LD BC,nn
-            return decodeLDRegPairImm(.registerBC, memory: memory, pc: pc)
-        case 0x04: // INC B
-            return INCRegInstruction(register: .regB)
-        case 0x05: // DEC B
-            return DECRegInstruction(register: .regB)
-        case 0x06: // LD B,n
-            return decodeLDRegImm(.regB, memory: memory, pc: pc)
-        case 0x0A: // LD A,(BC)
-            return LDRegMemInstruction(destination: .regA, address: .registerBC)
-        case 0x0C: // INC C
-            return INCRegInstruction(register: .regC)
-        case 0x0D: // DEC C
-            return DECRegInstruction(register: .regC)
-        case 0x0E: // LD C,n
-            return decodeLDRegImm(.regC, memory: memory, pc: pc)
-        case 0x14: // INC D
-            return INCRegInstruction(register: .regD)
-        case 0x15: // DEC D
-            return DECRegInstruction(register: .regD)
-        case 0x16: // LD D,n
-            return decodeLDRegImm(.regD, memory: memory, pc: pc)
-        case 0x1C: // INC E
-            return INCRegInstruction(register: .regE)
-        case 0x1D: // DEC E
-            return DECRegInstruction(register: .regE)
-        case 0x1E: // LD E,n
-            return decodeLDRegImm(.regE, memory: memory, pc: pc)
         case 0x22: // LD (nn),HL
             return decodeLDMemAddrRegPair(memory: memory, pc: pc)
+        case 0x23: // INC HL
+            return INCRegPairInstruction(register: .registerHL)
         case 0x24: // INC H
-            return INCRegInstruction(register: .regH)
+            return INCRegInstruction(register: .h)
         case 0x25: // DEC H
-            return DECRegInstruction(register: .regH)
+            return DECRegInstruction(register: .h)
         case 0x26: // LD H,n
-            return decodeLDRegImm(.regH, memory: memory, pc: pc)
+            return decodeLDRegImm(.h, memory: memory, pc: pc)
+        case 0x28: // JR Z,n
+            return decodeJR(.zero, memory: memory, pc: pc)
         case 0x2A: // LD HL,(nn)
             return decodeLDRegPairMemAddr(memory: memory, pc: pc)
         case 0x2C: // INC L
-            return INCRegInstruction(register: .regL)
+            return INCRegInstruction(register: .l)
         case 0x2D: // DEC L
-            return DECRegInstruction(register: .regL)
+            return DECRegInstruction(register: .l)
         case 0x2E: // LD L,n
-            return decodeLDRegImm(.regL, memory: memory, pc: pc)
+            return decodeLDRegImm(.l, memory: memory, pc: pc)
+        case 0x2F: // CPL
+            return CPLInstruction()
+        default:
+            return nil
+        }
+    }
+    
+    // 基本命令グループ1B: 0x30-0x76
+    private func decodeBasicGroup1B(_ opcode: UInt8) -> Z80Instruction? {
+        switch opcode {
+        case 0x30: // JR NC,n
+            return decodeJR(.notCarry, memory: memory, pc: pc)
         case 0x31: // LD SP,nn
             return decodeLDRegPairImm(.registerSP, memory: memory, pc: pc)
+        case 0x32: // LD (nn),A
+            return decodeLDDirectMemReg(memory: memory, pc: pc)
         case 0x33: // INC SP
             return INCRegPairInstruction(register: .registerSP)
         case 0x36: // LD (HL),n
             return decodeLDMemImm(memory: memory, pc: pc)
-        case 0x18: // JR n
-            return decodeJR(.none, memory: memory, pc: pc)
-        case 0x20: // JR NZ,n
-            return decodeJR(.notZero, memory: memory, pc: pc)
-        case 0x28: // JR Z,n
-            return decodeJR(.zero, memory: memory, pc: pc)
-        case 0x30: // JR NC,n
-            return decodeJR(.notCarry, memory: memory, pc: pc)
         case 0x38: // JR C,n
             return decodeJR(.carry, memory: memory, pc: pc)
         case 0x39: // ADD HL,SP
             return ADDHLInstruction(source: .registerSP)
+        case 0x3A: // LD A,(nn)
+            return decodeLDRegMemAddr(memory: memory, pc: pc)
+        case 0x3B: // DEC SP
+            return DECRegPairInstruction(register: .registerSP)
         case 0x76: // HALT
             return HALTInstruction()
+        default:
+            return nil
+        }
+    }
+    
+    // 基本命令グループ1C: 0x98-0xDA
+    private func decodeBasicGroup1C(_ opcode: UInt8) -> Z80Instruction? {
+        if let instruction = decodeBasicGroup1C1(opcode) {
+            return instruction
+        } else if let instruction = decodeBasicGroup1C2(opcode) {
+            return instruction
+        }
+        return nil
+    }
+    
+    // 基本命令グループ1C1: 0x98-0xCD
+    private func decodeBasicGroup1C1(_ opcode: UInt8) -> Z80Instruction? {
+        switch opcode {
+        case 0x98: // SBC A,B
+            return SBCInstruction(source: .b)
         case 0xC0: // RET NZ
             return RETInstruction(condition: .notZero)
+        case 0xC1: // POP BC
+            return POPInstruction(register: .registerBC)
         case 0xC2: // JP NZ,nn
             return decodeJP(.notZero, memory: memory, pc: pc)
         case 0xC3: // JP nn
             return decodeJP(.none, memory: memory, pc: pc)
         case 0xC4: // CALL NZ,nn
             return decodeCALL(.notZero, memory: memory, pc: pc)
+        case 0xC5: // PUSH BC
+            return PUSHInstruction(register: .registerBC)
         case 0xC8: // RET Z
             return RETInstruction(condition: .zero)
         case 0xC9: // RET
@@ -141,38 +224,46 @@ class Z80InstructionDecoder {
             return decodeCALL(.zero, memory: memory, pc: pc)
         case 0xCD: // CALL nn
             return decodeCALL(.none, memory: memory, pc: pc)
+        default:
+            return nil
+        }
+    }
+    
+    // 基本命令グループ1C2: 0xD0-0xDA
+    private func decodeBasicGroup1C2(_ opcode: UInt8) -> Z80Instruction? {
+        switch opcode {
         case 0xD0: // RET NC
             return RETInstruction(condition: .notCarry)
+        case 0xD1: // POP DE
+            return POPInstruction(register: .registerDE)
         case 0xD2: // JP NC,nn
             return decodeJP(.notCarry, memory: memory, pc: pc)
+        case 0xD3: // OUT (n), A
+            return decodeOUT(memory: memory, pc: pc)
         case 0xD4: // CALL NC,nn
             return decodeCALL(.notCarry, memory: memory, pc: pc)
+        case 0xD5: // PUSH DE
+            return PUSHInstruction(register: .registerDE)
         case 0xD8: // RET C
             return RETInstruction(condition: .carry)
         case 0xDA: // JP C,nn
             return decodeJP(.carry, memory: memory, pc: pc)
-        case 0xDC: // CALL C,nn
-            return decodeCALL(.carry, memory: memory, pc: pc)
-        case 0x98: // SBC A,B
-            return SBCInstruction(source: .regB)
-        case 0xC5: // PUSH BC
-            return PUSHInstruction(register: .registerBC)
-        case 0xD3: // OUT (n), A
-            return decodeOUT(memory: memory, pc: pc)
-        case 0xD5: // PUSH DE
-            return PUSHInstruction(register: .registerDE)
+        default:
+            return nil
+        }
+    }
+    
+    // 基本命令グループ1D: 0xDB-0xFF
+    private func decodeBasicGroup1D(_ opcode: UInt8) -> Z80Instruction? {
+        switch opcode {
         case 0xDB: // IN A,(n)
             return decodeIN(memory: memory, pc: pc)
+        case 0xDC: // CALL C,nn
+            return decodeCALL(.carry, memory: memory, pc: pc)
         case 0xE1: // POP HL
             return POPInstruction(register: .registerHL)
         case 0xE5: // PUSH HL
             return PUSHInstruction(register: .registerHL)
-        case 0x2F: // CPL
-            return CPLInstruction()
-        case 0xC1: // POP BC
-            return POPInstruction(register: .registerBC)
-        case 0xD1: // POP DE
-            return POPInstruction(register: .registerDE)
         case 0xF1: // POP AF
             return POPInstruction(register: .registerAF)
         case 0xF3: // DI
@@ -207,14 +298,14 @@ class Z80InstructionDecoder {
         let lowByte = memory.readByte(at: pc)
         let highByte = memory.readByte(at: pc &+ 1)
         let address = UInt16(highByte) << 8 | UInt16(lowByte)
-        return LDDirectMemRegInstruction(address: address, source: .regA)
+        return LDDirectMemRegInstruction(address: address, source: .a)
     }
     
     private func decodeLDRegMemAddr(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction {
         let lowByte = memory.readByte(at: pc)
         let highByte = memory.readByte(at: pc &+ 1)
         let address = UInt16(highByte) << 8 | UInt16(lowByte)
-        return LDRegMemAddrInstruction(destination: .regA, address: address)
+        return LDRegMemAddrInstruction(destination: .a, address: address)
     }
     
     private func decodeLDRegImm(_ register: RegisterOperand, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction {
@@ -489,14 +580,14 @@ class Z80InstructionDecoder {
     
     private func convertToRegisterOperand(_ reg: Register8) -> RegisterOperand {
         switch reg {
-        case .a: return .regA
-        case .b: return .regB
-        case .c: return .regC
-        case .d: return .regD
-        case .e: return .regE
-        case .h: return .regH
-        case .l: return .regL
-        case .f: return .regF
+        case .a: return .a
+        case .b: return .b
+        case .c: return .c
+        case .d: return .d
+        case .e: return .e
+        case .h: return .h
+        case .l: return .l
+        case .f: return .f
         }
     }
 }

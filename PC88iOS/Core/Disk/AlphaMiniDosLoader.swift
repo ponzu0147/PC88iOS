@@ -8,6 +8,11 @@
 import Foundation
 import os.log
 
+// 注：Swiftは同じモジュール内のファイルは自動的にインポートされるため、明示的なインポートは不要
+// ここではプロトコルやクラスの再定義を避ける
+
+// プロトコルや別の型はプロジェクト内の他のファイルで定義されているため、ここでは再定義しない
+
 /// ALPHA-MINI-DOSディスクイメージを専用に読み込むためのクラス
 /// 
 /// このクラスはALPHA-MINI-DOS形式のディスクイメージからIPLとOSを抽出し、
@@ -178,11 +183,14 @@ class AlphaMiniDosLoader {
             
             // 最初の数セクタのみログ表示
             if index < 3 {
-                log("  OSセクタ\(index+1)をメモリにロードしました: 0x\(String(format: "%04X", previousOffset))-0x\(String(format: "%04X", memoryOffset - 1)) (有効データ: \(validData ? "あり" : "なし"))")
+                let rangeStr = "0x\(String(format: "%04X", previousOffset))-0x\(String(format: "%04X", memoryOffset - 1))"
+                let dataStr = "(有効データ: \(validData ? "あり" : "なし"))"
+                log("  OSセクタ\(index+1)をメモリにロードしました: \(rangeStr) \(dataStr)")
             }
         }
         
-        log("OS部分のロードが完了しました: 0x\(String(format: "%04X", osLoadAddress))-0x\(String(format: "%04X", memoryOffset - 1)) (合計: \(totalBytesLoaded) バイト)")
+        let addressRange = "0x\(String(format: "%04X", osLoadAddress))-0x\(String(format: "%04X", memoryOffset - 1))"
+        log("OS部分のロードが完了しました: \(addressRange) (合計: \(totalBytesLoaded) バイト)")
         
         // 最初の16バイトをログに出力
         logMemoryContents(startAddress: osLoadAddress, length: 16, label: "OS")
@@ -225,7 +233,8 @@ class AlphaMiniDosLoader {
     private func logMemoryContents(startAddress: UInt16, length: Int, label: String) {
         guard loggingEnabled else { return }
         
-        var logMessage = "\(label)メモリ内容確認 (0x\(String(format: "%04X", startAddress))-0x\(String(format: "%04X", startAddress + UInt16(length) - 1))): "
+        let addrRange = "0x\(String(format: "%04X", startAddress))-0x\(String(format: "%04X", startAddress + UInt16(length) - 1))"
+        var logMessage = "\(label)メモリ内容確認 (\(addrRange)): "
         
         for i in 0..<length {
             let byte = memory.readByte(at: startAddress + UInt16(i))
@@ -243,6 +252,11 @@ class AlphaMiniDosLoader {
         guard loggingEnabled else { return }
         
         let prefix = isError ? "ALPHA-MINI-DOSローダー [エラー]: " : "ALPHA-MINI-DOSローダー: "
-        PC88Logger.disk.debug("\(prefix)\(message)")
+        // PC88Loggerを使用してロギング
+        if isError {
+            PC88Logger.disk.error("\(prefix)\(message)")
+        } else {
+            PC88Logger.disk.debug("\(prefix)\(message)")
+        }
     }
 }

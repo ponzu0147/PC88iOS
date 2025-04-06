@@ -10,7 +10,7 @@ import os.log
 
 /// アイドルループ検出用のフィルタプロトコル
 protocol InstructionTraceFilterProtocol {
-    func shouldTrace(programCounter: UInt16) -> Bool
+    func shouldTrace(pc: UInt16) -> Bool
 }
 
 /// A temporary filter that limits trace count
@@ -27,12 +27,12 @@ class TemporaryTraceFilter: InstructionTraceFilterProtocol {
         self.originalTraceEnabled = originalTraceEnabled
     }
     
-    func shouldTrace(programCounter: UInt16) -> Bool {
+    func shouldTrace(pc: UInt16) -> Bool {
         guard let cpu = cpu else { return false }
-        cpu.instructionTraceCount += 1
-        if cpu.instructionTraceCount >= maxCount {
-            cpu.instructionTraceEnabled = originalTraceEnabled
-            cpu.instructionTraceFilter = originalFilter
+        cpu.incrementInstructionTraceCount()
+        if cpu.getInstructionTraceCount() >= maxCount {
+            cpu.setInstructionTraceEnabled(originalTraceEnabled)
+            cpu.setInstructionTraceFilter(originalFilter)
             return false
         }
         return true
@@ -92,6 +92,23 @@ class Z80CPU: CPUExecuting {
     private var instructionTraceEnabled = false
     private var instructionTraceCount = 0
     private let maxInstructionTraceCount = 100 // 最大トレース数
+    
+    // トレース機能用のアクセサメソッド
+    func incrementInstructionTraceCount() {
+        instructionTraceCount += 1
+    }
+    
+    func getInstructionTraceCount() -> Int {
+        return instructionTraceCount
+    }
+    
+    func setInstructionTraceEnabled(_ enabled: Bool) {
+        instructionTraceEnabled = enabled
+    }
+    
+    func setInstructionTraceFilter(_ filter: InstructionTraceFilterProtocol?) {
+        instructionTraceFilter = filter
+    }
     
     // CPUクロック管理
     let cpuClock: PC88CPUClock
@@ -222,7 +239,7 @@ class Z80CPU: CPUExecuting {
         
         // アイドル検出のための履歴更新
         if idleDetectionEnabled {
-            updateInstructionHistory(programCounter: pc, opcode: opcode)
+            updateInstructionHistory(pc: pc, opcode: opcode)
         }
         
         // 命令実行
@@ -472,7 +489,7 @@ class Z80CPU: CPUExecuting {
         currentMCycle = 0
         
         // 実行
-        let cycles = instruction.execute(cpu: self, registers: &registers, memory: memory, io: ioDevice)
+        let cycles = instruction.execute(cpu: self, registers: &registers, memory: memory, inputOutput: ioDevice)
         
         // サイクル情報をリセット
         currentInstructionCycles = nil
@@ -487,12 +504,12 @@ class Z80CPU: CPUExecuting {
         guard instructionTraceEnabled && instructionTraceCount < maxInstructionTraceCount else { return }
         
         // フィルタが設定されている場合はそれを適用
-        let shouldTrace = instructionTraceFilter?.shouldTrace(programCounter: registers.pc) ?? true
+        let shouldTrace = instructionTraceFilter?.shouldTrace(pc: registers.pc) ?? true
         guard shouldTrace else { return }
         
         // トレースメッセージを生成して出力
         let traceMessage = generateTraceMessage(opcode: opcode, instruction: instruction)
-        PC88Logger.cpu.debug(traceMessage)
+        PC88Logger.cpu.debug("\(traceMessage)")
         
         instructionTraceCount += 1
         
@@ -502,7 +519,7 @@ class Z80CPU: CPUExecuting {
     
     /// トレースメッセージを生成
     private func generateTraceMessage(opcode: UInt8, instruction: Z80Instruction) -> String {
-        let programCounter = registers.pc
+        let pc = registers.pc
         let opcodeStr = String(format: "%02X", opcode)
         let instructionDesc = instruction.description
         
@@ -510,9 +527,9 @@ class Z80CPU: CPUExecuting {
         let registerInfo = formatRegisterInfo()
         
         // メモリダンプを取得
-        let memoryDump = getMemoryDumpAroundPC(programCounter: programCounter)
+        let memoryDump = getMemoryDumpAroundPC(pc: pc)
         
-        return "TRACE[\(instructionTraceCount)]: PC=\(String(format: "%04X", programCounter)) " +
+        return "TRACE[\(instructionTraceCount)]: PC=\(String(format: "%04X", pc)) " +
                "OP=\(opcodeStr) \(instructionDesc) | " +
                "\(registerInfo) | MEM=[\(memoryDump)]"
     }
@@ -530,10 +547,11 @@ class Z80CPU: CPUExecuting {
     }
     
     /// PC周辺のメモリダンプを取得
-    private func getMemoryDumpAroundPC(programCounter: UInt16) -> String {
+    private func getMemoryDumpAroundPC(pc
+                                       : UInt16) -> String {
         var memoryDump = ""
         for offset in 0..<4 {
-            let addr = programCounter &+ UInt16(offset)
+            let addr = pc &+ UInt16(offset)
             if addr < 0xFFFF {
                 let byte = memory.readByte(at: addr)
                 memoryDump += String(format: "%02X ", byte)
@@ -668,9 +686,9 @@ class Z80CPU: CPUExecuting {
     // MARK: - アイドル検出関連
     
     /// 命令履歴を更新
-    private func updateInstructionHistory(programCounter: UInt16, opcode: UInt8) {
+    private func updateInstructionHistory(pc: UInt16, opcode: UInt8) {
         // 履歴に追加
-        instructionHistory.append((pc: programCounter, opcode: opcode))
+        instructionHistory.append((pc: pc, opcode: opcode))
         
         // 履歴が長すぎる場合は古いものを削除
         let maxHistorySize = 20 // 最大20命令を記録
@@ -819,9 +837,9 @@ extension Z80CPU {
             // 命令列を出力
             PC88Logger.cpu.info("Instructions:")
             for (index, opcode) in idleLoopInstructions.enumerated() {
-                let programCounter = (idleLoopPC + UInt16(index)) & 0xFFFF
-                let instruction = decoder.decode(opcode, memory: memory, pc: programCounter)
-                PC88Logger.cpu.info("  \(String(format: "0x%04X", programCounter)): \(String(format: "%02X", opcode)) - \(instruction.description)")
+                let pc = (idleLoopPC + UInt16(index)) & 0xFFFF
+                let instruction = decoder.decode(opcode, memory: memory, pc: pc)
+                PC88Logger.cpu.info("  \(String(format: "0x%04X", pc)): \(String(format: "%02X", opcode)) - \(instruction.description)")
             }
             
             // レジスタ状態を出力
@@ -919,8 +937,8 @@ extension Z80CPU {
         case .hlPair: return registers.hl
         case .ixPair: return registers.ix
         case .iyPair: return registers.iy
-        case .stackPointer: return registers.sp
-        case .programCounter: return registers.pc
+        case .sp: return registers.sp
+        case .pc: return registers.pc
         }
     }
     
@@ -933,8 +951,8 @@ extension Z80CPU {
         case .hlPair: registers.hl = value
         case .ixPair: registers.ix = value
         case .iyPair: registers.iy = value
-        case .stackPointer: registers.sp = value
-        case .programCounter: registers.pc = value
+        case .sp: registers.sp = value
+        case .pc: registers.pc = value
         }
     }
     
@@ -966,5 +984,5 @@ extension Z80CPU {
 
 /// レジスタタイプ
 enum RegisterType {
-    case afPair, bcPair, dePair, hlPair, ixPair, iyPair, stackPointer, programCounter
+    case afPair, bcPair, dePair, hlPair, ixPair, iyPair, sp, pc
 }
