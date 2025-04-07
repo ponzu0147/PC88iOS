@@ -91,6 +91,42 @@ struct EmulatorView: View {
                 
                 // 下段ボタン行
                 HStack(spacing: 15) {
+                    Button(action: viewModel.startTextScrollTest) {
+                        VStack {
+                            Image(systemName: "text.line.last.and.arrowtriangle.forward")
+                                .font(.system(size: 20))
+                            Text("スクロールテスト")
+                                .font(.caption)
+                        }
+                        .frame(minWidth: 70)
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    // スクロール速度調整ボタン
+                    HStack(spacing: 5) {
+                        Button(action: viewModel.decreaseTextScrollSpeed) {
+                            Image(systemName: "minus.circle")
+                                .font(.system(size: 20))
+                        }
+                        .buttonStyle(.borderless)
+                        
+                        VStack {
+                            Text("スクロール速度")
+                                .font(.caption)
+                        }
+                        
+                        Button(action: viewModel.increaseTextScrollSpeed) {
+                            Image(systemName: "plus.circle")
+                                .font(.system(size: 20))
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .frame(minWidth: 70)
+                    .padding(.horizontal, 5)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.gray, lineWidth: 1)
+                    )
 
                     Button(action: viewModel.playBeepSound) {
                         VStack {
@@ -559,6 +595,30 @@ class EmulatorViewInternalModel: ObservableObject {
     func playBeepSound() {
         if let core = emulatorCore as? PC88EmulatorCore {
             core.playBeepScale()
+        }
+    }
+    
+    /// テキストスクロールテストモードを開始
+    func startTextScrollTest() {
+        PC88Logger.app.debug("テキストスクロールテストモードを開始します")
+        if let core = emulatorCore as? PC88EmulatorCore {
+            core.startTextScrollTestMode()
+        }
+    }
+    
+    /// テキストスクロール速度を上げる
+    func increaseTextScrollSpeed() {
+        PC88Logger.app.debug("テキストスクロール速度を上げます")
+        if let core = emulatorCore as? PC88EmulatorCore {
+            core.increaseTextScrollSpeed()
+        }
+    }
+    
+    /// テキストスクロール速度を下げる
+    func decreaseTextScrollSpeed() {
+        PC88Logger.app.debug("テキストスクロール速度を下げます")
+        if let core = emulatorCore as? PC88EmulatorCore {
+            core.decreaseTextScrollSpeed()
         }
     }
     

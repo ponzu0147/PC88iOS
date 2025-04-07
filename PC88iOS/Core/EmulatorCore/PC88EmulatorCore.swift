@@ -45,7 +45,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     private var memory: PC88iOS.MemoryAccessing?
     
     /// I/Oアクセス
-    private var io: IOAccessing?
+    private var io: PC88IO?
     
     /// 画面レンダリング
     internal var screen: ScreenRendering?
@@ -128,6 +128,64 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// 内部のスクリーンオブジェクトを返す
     func getScreenObject() -> Any? {
         return screen
+    }
+    
+    // テキストスクロールテスト用のインスタンス
+    private var textScrollTest: PC88TextScrollTest?
+    
+    /// テキストスクロールテストモードを開始
+    func startTextScrollTestMode() {
+        PC88Logger.core.debug("テキストスクロールテストモードを開始します")
+        
+        // 現在の実行状態を保存
+        _ = state
+        
+        // エミュレータが実行中でない場合は一時的に開始
+        let needsRestart = (state != .running)
+        if needsRestart {
+            start()
+        }
+        
+        // テストモードの初期化
+        guard let pc88Screen = screen as? PC88ScreenBase,
+              let pc88Memory = memory,
+              let z80CPU = cpu as? Z80CPU else {
+            PC88Logger.core.error("テキストスクロールテストモードの初期化に失敗しました")
+            return
+        }
+        
+        // テキストスクロールテストクラスを初期化
+        textScrollTest = PC88TextScrollTest(screen: pc88Screen, memory: pc88Memory, cpu: z80CPU)
+        
+        // テストを開始
+        textScrollTest?.startTest()
+        
+        // 画面更新を強制
+        updateScreen()
+        
+        PC88Logger.core.debug("テキストスクロールテストモードが開始されました")
+    }
+    
+    /// テキストスクロール速度を上げる
+    func increaseTextScrollSpeed() {
+        guard let test = textScrollTest else {
+            PC88Logger.core.warning("テキストスクロールテストが実行されていません")
+            return
+        }
+        
+        PC88Logger.core.debug("テキストスクロール速度を上げます")
+        test.increaseSpeed()
+    }
+    
+    /// テキストスクロール速度を下げる
+    func decreaseTextScrollSpeed() {
+        guard let test = textScrollTest else {
+            PC88Logger.core.warning("テキストスクロールテストが実行されていません")
+            return
+        }
+        
+        PC88Logger.core.debug("テキストスクロール速度を下げます")
+        test.decreaseSpeed()
     }
     
 
@@ -343,9 +401,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         fdc.connectIO(io)
         
         // IOとFDCを相互接続
-        if let io = io as? PC88IO {
-            io.connectFDC(fdc)
-        }
+        io.connectFDC(fdc)
     }
     
     /// サウンド関連コンポーネントの初期化
@@ -359,7 +415,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         soundChip = YM2203Emulator()
         
         guard let soundChip = soundChip as? YM2203Emulator,
-              let io = io as? PC88IO else { return }
+              let io = io else { return }
         
         soundChip.initialize(sampleRate: 44100.0)
         // デフォルトで中品質モードに設定
@@ -372,7 +428,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         beepSound = PC88BeepSound()
         
         guard let beepSound = beepSound,
-              let io = io as? PC88IO else { return }
+              let io = io else { return }
         
         beepSound.initialize(sampleRate: 44100.0)
         io.connectBeepSound(beepSound)
@@ -657,8 +713,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         }
         
         // I/Oのリセット
-        if let io = io as? PC88IO {
-            io.reset()
+        if let ioInstance = io {
+            ioInstance.reset()
         }
         
         // FDCのリセット
@@ -906,38 +962,38 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         switch event {
         case .keyDown(let key):
             // キー入力の処理
-            if let io = io as? PC88IO {
-                io.keyDown(key)
+            if let ioInstance = io {
+                ioInstance.keyDown(key)
             }
             
         case .keyUp(let key):
             // キー入力の処理
-            if let io = io as? PC88IO {
-                io.keyUp(key)
+            if let ioInstance = io {
+                ioInstance.keyUp(key)
             }
             
         case .joystickButton(let button, let isPressed):
             // ジョイスティックボタンの処理
-            if let io = io as? PC88IO {
-                io.joystickButtonChanged(button, isPressed: isPressed)
+            if let ioInstance = io {
+                ioInstance.joystickButtonChanged(button, isPressed: isPressed)
             }
             
         case .joystickDirection(let direction, let value):
             // ジョイスティック方向の処理
-            if let io = io as? PC88IO {
-                io.joystickDirectionChanged(direction, value: value)
+            if let ioInstance = io {
+                ioInstance.joystickDirectionChanged(direction, value: value)
             }
             
         case .mouseMove(let x, let y):
             // マウス移動の処理
-            if let io = io as? PC88IO {
-                io.mouseMoved(x: x, y: y)
+            if let ioInstance = io {
+                ioInstance.mouseMoved(x: x, y: y)
             }
             
         case .mouseButton(let button, let isPressed):
             // マウスボタンの処理
-            if let io = io as? PC88IO {
-                io.mouseButtonChanged(button, isPressed: isPressed)
+            if let ioInstance = io {
+                ioInstance.mouseButtonChanged(button, isPressed: isPressed)
             }
             
         case .touchBegan(_, _), .touchMoved(_, _), .touchEnded(_, _):
@@ -1385,8 +1441,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         cpu?.requestInterrupt(.int)
         
         // 垂直同期割り込みをIOに通知
-        if let io = io as? PC88IO {
-            io.requestInterrupt(from: .vblank)
+        if let ioInstance = io {
+            ioInstance.requestInterrupt(from: .vblank)
         }
         
         // VBlank割り込み発生時に画面を更新
@@ -1757,7 +1813,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         }
         
         // I/Oポートの初期化
-        if let pc88IO = io as? PC88IO {
+        if let pc88IO = io {
             // 割り込みコントローラの初期化
             pc88IO.writePort(0xE4, value: 0x00) // 割り込みコントロールレジスタ
             pc88IO.writePort(0xE6, value: 0x00) // 割り込みマスクレジスタ

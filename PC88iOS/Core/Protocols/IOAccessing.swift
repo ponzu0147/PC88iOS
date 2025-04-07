@@ -21,6 +21,12 @@ protocol IOAccessing {
     /// 割り込み要求を発生させる
     func requestInterrupt()
     
+    /// 特定のソースからの割り込み要求を発生させる
+    func requestInterrupt(from source: PC88IO.InterruptSource)
+    
     /// 割り込みコントローラの状態を取得
     func getInterruptStatus() -> UInt8
+    
+    /// CRTCレジスタ更新時のコールバック
+    var onCRTCUpdated: ((UInt8, UInt8) -> Void)? { get set }
 }

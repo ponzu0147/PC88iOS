@@ -335,6 +335,8 @@ class PC88IO: IOAccessing {
         requestInterrupt(from: .keyboard)
     }
     
+
+    
     func getInterruptStatus() -> UInt8 {
         // 割り込み状態を返す
         return interruptRequestFlag & ~interruptMask
