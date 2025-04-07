@@ -3,7 +3,6 @@
 //
 
 import Foundation
-import PC88iOS
 
 class Z80InstructionDecoder {
     
@@ -41,7 +40,7 @@ class Z80InstructionDecoder {
         return nil
     }
     
-    private func decodeBasicGroup1(_ opcode: UInt8) -> Z80Instruction? {
+    private func decodeBasicGroup1(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         // 命令をさらに小さなグループに分割
         if let instruction = decodeBasicGroup1A(opcode, memory: memory, pc: pc) {
             return instruction
@@ -119,13 +118,19 @@ class Z80InstructionDecoder {
     
     // IYプレフィックス命令
     private func decodeIYPrefixedInstruction(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
-        // 次のオペコードを取得
-        let nextPC = pc + 1
-        _ = memory.readByte(at: nextPC)
+        let nextOpcode = memory.readByte(at: pc)
+        let nextPc = pc &+ 1
         
-        // TODO: 実際のIY命令のデコード処理を実装
-        // 現時点では未実装のため、nil（不明な命令）を返す
-        return nil
+        switch nextOpcode {
+        case 0x21: // LD IY,nn
+            let lowByte = memory.readByte(at: nextPc)
+            let highByte = memory.readByte(at: nextPc &+ 1)
+            let value = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDIYInstruction(value: value)
+        default:
+            let instruction = decode(nextOpcode, memory: memory, pc: nextPc)
+            return IYPrefixedInstruction(instruction: instruction)
+        }
     }
     
     // 基本命令グループ1A: 0x00-0x2F
@@ -610,22 +615,7 @@ class Z80InstructionDecoder {
         return nil
     }
     
-    
-    private func decodeIYPrefixedInstruction(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction {
-        let nextOpcode = memory.readByte(at: pc)
-        let nextPc = pc &+ 1
-        
-        switch nextOpcode {
-        case 0x21: // LD IY,nn
-            let lowByte = memory.readByte(at: nextPc)
-            let highByte = memory.readByte(at: nextPc &+ 1)
-            let value = UInt16(highByte) << 8 | UInt16(lowByte)
-            return LDIYInstruction(value: value)
-        default:
-            let instruction = decode(nextOpcode, memory: memory, pc: nextPc)
-            return IYPrefixedInstruction(instruction: instruction)
-        }
-    }
+
     
     
     private func decodeRegister8(_ code: UInt8) -> Register8 {

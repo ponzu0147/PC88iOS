@@ -141,8 +141,6 @@ enum RegisterPairOperand {
         case .registerAFAlt:
             registers.aAlt = UInt8(value >> 8)
             registers.fAlt = UInt8(value & 0xFF)
-        default:
-            PC88Logger.cpu.error("不正なレジスタペアタイプです")
         }
     }
 }
