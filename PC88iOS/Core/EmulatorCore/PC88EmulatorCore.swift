@@ -125,6 +125,11 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         return screenImage
     }
     
+    /// 内部のスクリーンオブジェクトを返す
+    func getScreenObject() -> Any? {
+        return screen
+    }
+    
 
     /// エミュレーション速度（1.0 = 通常速度）
     private var emulationSpeed: Float = 1.0
@@ -271,7 +276,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             guard let self = self else { return }
             
             // 画面更新をトリガー
-            if let screen = self.screen as? PC88ScreenBase {
+            if self.screen is PC88ScreenBase {
                 // デバッグモードの場合はログを出力
                 if self.isDebugMode {
                     print("CRTC更新検出: レジスタ=\(register), 値=0x\(String(format: "%02X", value))")
@@ -1571,12 +1576,21 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             return
         }
         
-        if let screen = screen {
+        if self.screen is PC88ScreenBase {
             // 画面更新開始時刻を記録（デバッグ用）
             let startTime = CFAbsoluteTimeGetCurrent()
             
             // 画面の描画処理
-            screenImage = screen.render()
+            if let screen = screen {
+                PC88Logger.screen.debug("画面の描画処理を実行します")
+                screenImage = screen.render()
+                
+                if screenImage == nil {
+                    PC88Logger.screen.warning("画面の描画に失敗しました: screenImageがnilです")
+                } else {
+                    PC88Logger.screen.debug("画面の描画に成功しました")
+                }
+            }
             
             // メモリとI/Oの状態を画面に反映
             // 画面の更新処理は、PC88Screenのrender()メソッド内で行われる
@@ -1590,8 +1604,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             
             // 画面更新通知（将来的な拡張のため）
             NotificationCenter.default.post(name: .screenUpdated, object: self)
-        } else if isDebugMode {
-            print("画面更新スキップ: screen is nil")
+        } else {
+            PC88Logger.screen.warning("画面更新スキップ: screen is not PC88ScreenBase")
         }
     }
     

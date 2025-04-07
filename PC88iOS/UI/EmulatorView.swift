@@ -598,15 +598,33 @@ class EmulatorViewInternalModel: ObservableObject {
     
     private func updateScreen() {
         // エミュレータコアから画面イメージを取得
+        PC88Logger.app.debug("画面更新を開始します")
+        
         if let image = emulatorCore?.getScreen() {
+            PC88Logger.app.debug("エミュレータコアから画面イメージを取得しました")
             screenImage = image
         } else {
             PC88Logger.app.warning("警告: エミュレータコアから画面イメージを取得できませんでした")
+            
+            // 画面イメージが取得できない場合、エミュレータコアを再初期化することを検討
+            if screenImage == nil {
+                PC88Logger.app.debug("画面イメージがnilのため、明示的に画面更新をリクエストします")
+                (emulatorCore as? PC88EmulatorCore)?.updateScreen()
+            }
         }
         
         // デバッグモードの設定をPC88TextRendererに反映
         if let core = emulatorCore as? PC88EmulatorCore {
             core.setTextRendererDebugMode(isDebugMode)
+            
+            // 画面の状態を確認
+            if let screen = core.getScreenObject() as? PC88ScreenBase {
+                PC88Logger.app.debug("PC88ScreenBaseオブジェクトが正常に取得できました")
+                // 画面更新を明示的にリクエスト
+                screen.requestScreenUpdate()
+            } else {
+                PC88Logger.app.warning("PC88ScreenBaseオブジェクトが取得できませんでした")
+            }
             
             // CPUの状態をデバッグ情報として追加
             if isDebugMode {

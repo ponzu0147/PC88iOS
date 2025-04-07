@@ -43,6 +43,9 @@ class PC88ScreenBase: ScreenRendering {
     /// 現在の画面モード
     internal var currentScreenMode: ScreenMode = .text
     
+    /// 画面更新リクエスト時のコールバック
+    var onScreenUpdateRequested: (() -> Void)?
+    
     // MARK: - コンポーネント
     
     /// カラーパレット
@@ -359,15 +362,6 @@ class PC88ScreenBase: ScreenRendering {
         textRenderer.setFontData(data)
     }
     
-    /// 画面更新をリクエストするコールバック
-    var onScreenUpdateRequested: (() -> Void)?
-    
-    /// 画面更新をリクエストする
-    func requestScreenUpdate() {
-        // 画面更新コールバックを呼び出す
-        onScreenUpdateRequested?()
-    }
-    
     /// 画面を描画してCGImageを返す
     func renderScreen() -> CGImage? {
         // テキストモードの場合はテキストレンダラーを使用
@@ -484,5 +478,11 @@ class PC88ScreenBase: ScreenRendering {
         if offset < textVRAM.count {
             textVRAM[offset] = char
         }
+    }
+    
+    /// 画面更新をリクエストする
+    func requestScreenUpdate() {
+        // 画面更新リクエストコールバックを実行
+        onScreenUpdateRequested?()
     }
 }
