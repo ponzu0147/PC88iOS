@@ -55,6 +55,17 @@ struct EmulatorView: View {
             VStack(spacing: 10) {
                 // 上段ボタン行
                 HStack(spacing: 15) {
+                    Button(action: viewModel.startScreenTest) {
+                        VStack {
+                            Image(systemName: "checkerboard.rectangle")
+                                .font(.system(size: 20))
+                            Text("テストモード")
+                                .font(.caption)
+                        }
+                        .frame(minWidth: 70)
+                    }
+                    .buttonStyle(.bordered)
+                    
                     Button(action: viewModel.resetEmulator) {
                         VStack {
                             Image(systemName: "arrow.counterclockwise")
@@ -101,6 +112,8 @@ struct EmulatorView: View {
                         .frame(minWidth: 70)
                     }
                     .buttonStyle(.bordered)
+                    
+
                     
                     // スクロール速度調整ボタン
                     HStack(spacing: 5) {
@@ -603,6 +616,14 @@ class EmulatorViewInternalModel: ObservableObject {
         PC88Logger.app.debug("テキストスクロールテストモードを開始します")
         if let core = emulatorCore as? PC88EmulatorCore {
             core.startTextScrollTestMode()
+        }
+    }
+    
+    /// 画面テストモードを開始
+    func startScreenTest() {
+        PC88Logger.app.debug("画面テストモードを開始します")
+        if let core = emulatorCore as? PC88EmulatorCore {
+            core.startScreenTest()
         }
     }
     

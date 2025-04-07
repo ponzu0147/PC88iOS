@@ -166,6 +166,37 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         PC88Logger.core.debug("テキストスクロールテストモードが開始されました")
     }
     
+    // 画面テスト用のインスタンス
+    private var screenTest: PC88ScreenTest?
+    
+    /// 画面テストモードを開始
+    func startScreenTest() {
+        PC88Logger.core.debug("画面テストモードを開始します")
+        
+        // エミュレータが実行中でない場合は一時的に開始
+        let needsRestart = (state != .running)
+        if needsRestart {
+            start()
+        }
+        
+        // テストモードの初期化
+        guard let pc88Screen = screen as? PC88ScreenBase else {
+            PC88Logger.core.error("画面テストモードの初期化に失敗しました")
+            return
+        }
+        
+        // 画面テストクラスを初期化
+        screenTest = PC88ScreenTest(screen: pc88Screen)
+        
+        // テストを開始
+        screenTest?.displayTestScreen()
+        
+        // 画面更新を強制
+        updateScreen()
+        
+        PC88Logger.core.debug("画面テストモードが開始されました")
+    }
+    
     /// テキストスクロール速度を上げる
     func increaseTextScrollSpeed() {
         guard let test = textScrollTest else {
