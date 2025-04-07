@@ -603,19 +603,6 @@ struct CPIXdInstruction: Z80Instruction {
     }
 }
 
-// MARK: - UInt8拡張
+// MARK: - 注意
 
-// パリティチェック関数（1ビットの数が偶数ならtrue）
-func calculateParity(_ value: UInt8) -> Bool {
-    var count = 0
-    var tempValue = value
-    
-    for _ in 0..<8 {
-        if tempValue & 1 == 1 {
-            count += 1
-        }
-        tempValue >>= 1
-    }
-    
-    return count % 2 == 0
-}
+// calculateParity関数はZ80CBInstructions.swiftで定義されているため、ここでは宣言しません

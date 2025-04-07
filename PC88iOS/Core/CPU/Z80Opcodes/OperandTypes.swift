@@ -8,7 +8,7 @@
 import Foundation
 
 /// レジスタオペランド
-enum RegisterOperand {
+enum RegisterOperand: Equatable {
     case a, b, c, d, e, h, l, f
     case immediate(UInt8)
     case memory
@@ -101,15 +101,16 @@ enum RegisterOperand {
 }
 
 /// レジスタペアオペランド
-enum RegisterPairOperand {
+enum RegisterPairOperand: Equatable {
     case registerAF, registerBC, registerDE, registerHL, registerSP, registerAFAlt
     
-    // 短縮形のプロパティ
-    var af: RegisterPairOperand { return .registerAF }
-    var bc: RegisterPairOperand { return .registerBC }
-    var de: RegisterPairOperand { return .registerDE }
-    var hl: RegisterPairOperand { return .registerHL }
-    var sp: RegisterPairOperand { return .registerSP }
+    // 定数プロパティ
+    static let af: RegisterPairOperand = .registerAF
+    static let bc: RegisterPairOperand = .registerBC
+    static let de: RegisterPairOperand = .registerDE
+    static let hl: RegisterPairOperand = .registerHL
+    static let sp: RegisterPairOperand = .registerSP
+    static let ix: RegisterPairOperand = .registerHL // IXレジスタは実際にはHLと同じように扱う
     
     func read(from registers: Z80Registers) -> UInt16 {
         switch self {

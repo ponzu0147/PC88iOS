@@ -39,9 +39,10 @@ struct Z80Registers {
     var i: UInt8 = 0
     var r: UInt8 = 0
     
-    // 割り込みフラグ
+    // 割り込み関連
     var iff1: Bool = false
     var iff2: Bool = false
+    var interruptMode: UInt8 = 0
     
     /// レジスタペア AF の取得・設定
     var af: UInt16 {

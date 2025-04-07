@@ -150,64 +150,64 @@ class Z80InstructionDecoder {
         case 0x79: return OUTCrInstruction(operand: .a)
             
         // 16ビット算術命令
-        case 0x42: return SBCHLrrInstruction(operand: .bc)
-        case 0x52: return SBCHLrrInstruction(operand: .de)
-        case 0x62: return SBCHLrrInstruction(operand: .hl)
-        case 0x72: return SBCHLrrInstruction(operand: .sp)
+        case 0x42: return SBCHLrrInstruction(operand: RegisterPairOperand.bc)
+        case 0x52: return SBCHLrrInstruction(operand: RegisterPairOperand.de)
+        case 0x62: return SBCHLrrInstruction(operand: RegisterPairOperand.hl)
+        case 0x72: return SBCHLrrInstruction(operand: RegisterPairOperand.sp)
             
-        case 0x4A: return ADCHLrrInstruction(operand: .bc)
-        case 0x5A: return ADCHLrrInstruction(operand: .de)
-        case 0x6A: return ADCHLrrInstruction(operand: .hl)
-        case 0x7A: return ADCHLrrInstruction(operand: .sp)
+        case 0x4A: return ADCHLrrInstruction(operand: RegisterPairOperand.bc)
+        case 0x5A: return ADCHLrrInstruction(operand: RegisterPairOperand.de)
+        case 0x6A: return ADCHLrrInstruction(operand: RegisterPairOperand.hl)
+        case 0x7A: return ADCHLrrInstruction(operand: RegisterPairOperand.sp)
             
         // メモリ操作命令
         case 0x43: // LD (nn),BC
             let addressLow = memory.readByte(at: nextPC + 1)
             let addressHigh = memory.readByte(at: nextPC + 2)
             let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
-            return LDnnrrInstruction(address: address, operand: .bc)
+            return LDnnrrInstruction(address: address, operand: RegisterPairOperand.bc)
             
         case 0x53: // LD (nn),DE
             let addressLow = memory.readByte(at: nextPC + 1)
             let addressHigh = memory.readByte(at: nextPC + 2)
             let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
-            return LDnnrrInstruction(address: address, operand: .de)
+            return LDnnrrInstruction(address: address, operand: RegisterPairOperand.de)
             
         case 0x63: // LD (nn),HL
             let addressLow = memory.readByte(at: nextPC + 1)
             let addressHigh = memory.readByte(at: nextPC + 2)
             let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
-            return LDnnrrInstruction(address: address, operand: .hl)
+            return LDnnrrInstruction(address: address, operand: RegisterPairOperand.hl)
             
         case 0x73: // LD (nn),SP
             let addressLow = memory.readByte(at: nextPC + 1)
             let addressHigh = memory.readByte(at: nextPC + 2)
             let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
-            return LDnnrrInstruction(address: address, operand: .sp)
+            return LDnnrrInstruction(address: address, operand: RegisterPairOperand.sp)
             
         case 0x4B: // LD BC,(nn)
             let addressLow = memory.readByte(at: nextPC + 1)
             let addressHigh = memory.readByte(at: nextPC + 2)
             let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
-            return LDrrnnInstruction(operand: .bc, address: address)
+            return LDrrnnInstruction(operand: RegisterPairOperand.bc, address: address)
             
         case 0x5B: // LD DE,(nn)
             let addressLow = memory.readByte(at: nextPC + 1)
             let addressHigh = memory.readByte(at: nextPC + 2)
             let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
-            return LDrrnnInstruction(operand: .de, address: address)
+            return LDrrnnInstruction(operand: RegisterPairOperand.de, address: address)
             
         case 0x6B: // LD HL,(nn)
             let addressLow = memory.readByte(at: nextPC + 1)
             let addressHigh = memory.readByte(at: nextPC + 2)
             let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
-            return LDrrnnInstruction(operand: .hl, address: address)
+            return LDrrnnInstruction(operand: RegisterPairOperand.hl, address: address)
             
         case 0x7B: // LD SP,(nn)
             let addressLow = memory.readByte(at: nextPC + 1)
             let addressHigh = memory.readByte(at: nextPC + 2)
             let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
-            return LDrrnnInstruction(operand: .sp, address: address)
+            return LDrrnnInstruction(operand: RegisterPairOperand.sp, address: address)
             
         // 特殊命令
         case 0x44, 0x4C, 0x54, 0x5C, 0x64, 0x6C, 0x74, 0x7C: return NEGInstruction()

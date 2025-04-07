@@ -199,6 +199,30 @@ struct Z80InstructionCycles {
     static let addAToReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
     static let addAToVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
     static let addAToHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
+    
+    // CB命令のサイクル
+    static let RLC_R = InstructionCycles.standard(opcodeFetch: true, internalCycles: 1) // 2M, 8T
+    static let RLC_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 1) // 4M, 15T
+    static let RRC_R = InstructionCycles.standard(opcodeFetch: true, internalCycles: 1) // 2M, 8T
+    static let RRC_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 1) // 4M, 15T
+    static let RL_R = InstructionCycles.standard(opcodeFetch: true, internalCycles: 1) // 2M, 8T
+    static let RL_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 1) // 4M, 15T
+    static let RR_R = InstructionCycles.standard(opcodeFetch: true, internalCycles: 1) // 2M, 8T
+    static let RR_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 1) // 4M, 15T
+    static let SLA_R = InstructionCycles.standard(opcodeFetch: true, internalCycles: 1) // 2M, 8T
+    static let SLA_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 1) // 4M, 15T
+    static let SRA_R = InstructionCycles.standard(opcodeFetch: true, internalCycles: 1) // 2M, 8T
+    static let SRA_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 1) // 4M, 15T
+    static let SLL_R = InstructionCycles.standard(opcodeFetch: true, internalCycles: 1) // 2M, 8T
+    static let SLL_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 1) // 4M, 15T
+    static let SRL_R = InstructionCycles.standard(opcodeFetch: true, internalCycles: 1) // 2M, 8T
+    static let SRL_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 1) // 4M, 15T
+    static let BIT_B_R = InstructionCycles.standard(opcodeFetch: true, internalCycles: 1) // 2M, 8T
+    static let BIT_B_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 1) // 3M, 12T
+    static let SET_B_R = InstructionCycles.standard(opcodeFetch: true, internalCycles: 1) // 2M, 8T
+    static let SET_B_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 1) // 4M, 15T
+    static let RES_B_R = InstructionCycles.standard(opcodeFetch: true, internalCycles: 1) // 2M, 8T
+    static let RES_B_HL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 1) // 4M, 15T
     static let addWithCarryAToReg = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
     static let addWithCarryAToVal = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
     static let addWithCarryAToHL = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1) // 2M, 7T
@@ -273,6 +297,26 @@ struct Z80InstructionCycles {
     static let LDIY = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
     static let complementA = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
     static let returnFromSub = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    
+    // EDプレフィックス命令のサイクル
+    static let IN_R_C = InstructionCycles.standard(opcodeFetch: true, ioReads: 1) // 2M, 8T
+    static let OUT_C_R = InstructionCycles.standard(opcodeFetch: true, ioWrites: 1) // 2M, 8T
+    static let SBC_HL_RR = InstructionCycles.standard(opcodeFetch: true, internalCycles: 4) // 2M, 8T
+    static let ADC_HL_RR = InstructionCycles.standard(opcodeFetch: true, internalCycles: 4) // 2M, 8T
+    static let LD_NN_RR = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2, memoryWrites: 2) // 5M, 16T
+    static let LD_RR_NN = InstructionCycles.standard(opcodeFetch: true, memoryReads: 4) // 5M, 16T
+    static let LDI = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 2) // 4M, 16T
+    static let LDIR = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 5) // 5M, 21T
+    static let LDD = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 2) // 4M, 16T
+    static let LDDR = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, memoryWrites: 1, internalCycles: 5) // 5M, 21T
+    static let CPI = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 1) // 3M, 12T
+    static let CPIR = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 4) // 4M, 17T
+    static let CPD = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 1) // 3M, 12T
+    static let CPDR = InstructionCycles.standard(opcodeFetch: true, memoryReads: 1, internalCycles: 4) // 4M, 17T
+    static let NEG = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
+    static let RETN = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    static let RETI = InstructionCycles.standard(opcodeFetch: true, memoryReads: 2) // 3M, 10T
+    static let IM = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T
     
     // プレフィックス命令のサイクル
     static let indexXPrefix = InstructionCycles.standard(opcodeFetch: true) // 1M, 4T

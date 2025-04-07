@@ -7,6 +7,21 @@
 
 import Foundation
 
+// Z80CBInstructions.swiftで定義されているcalculateParity関数を参照
+fileprivate func parityCheck(_ value: UInt8) -> Bool {
+    var count = 0
+    var tempValue = value
+    
+    for _ in 0..<8 {
+        if tempValue & 1 == 1 {
+            count += 1
+        }
+        tempValue >>= 1
+    }
+    
+    return count % 2 == 0
+}
+
 // MARK: - 入出力命令
 
 /// IN r,(C)命令: ポートCからデータを読み込み、レジスタrに格納
@@ -21,7 +36,7 @@ struct INrCInstruction: Z80Instruction {
         registers.setFlag(Z80Registers.Flags.zero, value: value == 0)
         registers.setFlag(Z80Registers.Flags.subtract, value: false)
         registers.setFlag(Z80Registers.Flags.halfCarry, value: false)
-        registers.setFlag(Z80Registers.Flags.parity, value: calculateParity(value))
+        registers.setFlag(Z80Registers.Flags.parity, value: parityCheck(value))
         registers.setFlag(Z80Registers.Flags.sign, value: (value & 0x80) != 0)
         
         // 結果を書き戻し
@@ -105,13 +120,13 @@ struct SBCHLrrInstruction: Z80Instruction {
         
         // オペランドから値を取得
         switch operand {
-        case .bc:
+        case .registerBC:
             value = registers.bc
-        case .de:
+        case .registerDE:
             value = registers.de
-        case .hl:
+        case .registerHL:
             value = registers.hl
-        case .sp:
+        case .registerSP:
             value = registers.sp
         default:
             return cycles
@@ -156,13 +171,13 @@ struct ADCHLrrInstruction: Z80Instruction {
         
         // オペランドから値を取得
         switch operand {
-        case .bc:
+        case .registerBC:
             value = registers.bc
-        case .de:
+        case .registerDE:
             value = registers.de
-        case .hl:
+        case .registerHL:
             value = registers.hl
-        case .sp:
+        case .registerSP:
             value = registers.sp
         default:
             return cycles
@@ -207,13 +222,13 @@ struct LDnnrrInstruction: Z80Instruction {
         
         // オペランドから値を取得
         switch operand {
-        case .bc:
+        case .registerBC:
             value = registers.bc
-        case .de:
+        case .registerDE:
             value = registers.de
-        case .hl:
+        case .registerHL:
             value = registers.hl
-        case .sp:
+        case .registerSP:
             value = registers.sp
         default:
             return cycles
@@ -242,13 +257,13 @@ struct LDrrnnInstruction: Z80Instruction {
         
         // 結果を書き戻し
         switch operand {
-        case .bc:
+        case .registerBC:
             registers.bc = value
-        case .de:
+        case .registerDE:
             registers.de = value
-        case .hl:
+        case .registerHL:
             registers.hl = value
-        case .sp:
+        case .registerSP:
             registers.sp = value
         default:
             break
@@ -581,20 +596,7 @@ struct RETNInstruction: Z80Instruction {
 
 // MARK: - パリティチェック関数
 
-/// パリティチェック（1ビットの数が偶数ならtrue）
-func calculateParity(_ value: UInt8) -> Bool {
-    var count = 0
-    var tempValue = value
-    
-    for _ in 0..<8 {
-        if tempValue & 1 == 1 {
-            count += 1
-        }
-        tempValue >>= 1
-    }
-    
-    return count % 2 == 0
-}
+// parityCheck関数を使用して曖昧さを解消
 /// RETI命令: 割り込みから復帰
 struct RETIInstruction: Z80Instruction {
     func execute(cpu: Z80CPU, registers: inout Z80Registers, memory: MemoryAccessing, inputOutput: IOAccessing) -> Int {
@@ -633,19 +635,4 @@ struct IMInstruction: Z80Instruction {
 
 // MARK: - UInt8拡張
 
-extension UInt8 {
-    /// パリティチェック（1ビットの数が偶数ならtrue）
-    var parity: Bool {
-        var count = 0
-        var value = self
-        
-        for _ in 0..<8 {
-            if value & 1 == 1 {
-                count += 1
-            }
-            value >>= 1
-        }
-        
-        return count % 2 == 0
-    }
-}
+// UInt8拡張は不要になりました
