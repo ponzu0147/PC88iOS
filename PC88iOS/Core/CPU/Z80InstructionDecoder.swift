@@ -3,6 +3,7 @@
 //
 
 import Foundation
+import PC88iOS
 
 class Z80InstructionDecoder {
     
@@ -40,7 +41,7 @@ class Z80InstructionDecoder {
         return nil
     }
     
-    private func decodeBasicGroup1(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+    private func decodeBasicGroup1(_ opcode: UInt8) -> Z80Instruction? {
         // 命令をさらに小さなグループに分割
         if let instruction = decodeBasicGroup1A(opcode, memory: memory, pc: pc) {
             return instruction
@@ -663,3 +664,13 @@ class Z80InstructionDecoder {
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
