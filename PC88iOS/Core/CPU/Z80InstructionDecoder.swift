@@ -87,33 +87,297 @@ class Z80InstructionDecoder {
     private func decodeCBPrefixedInstruction(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         // 次のオペコードを取得
         let nextPC = pc + 1
-        _ = memory.readByte(at: nextPC)
+        let cbOpcode = memory.readByte(at: nextPC)
         
-        // TODO: 実際のCB命令のデコード処理を実装
-        // 現時点では未実装のため、nil（不明な命令）を返す
-        return nil
+        // CBプレフィックス命令をカテゴリごとに分類して処理
+        let highNibble = cbOpcode >> 6
+        let lowNibble = cbOpcode & 0x07
+        let middleNibble = (cbOpcode >> 3) & 0x07
+        
+        // ターゲットレジスタの取得
+        let register = decodeRegister8(lowNibble)
+        let operand = convertToRegisterOperand(register)
+        
+        switch highNibble {
+        case 0: // ローテーション命令 (0x00-0x3F)
+            return decodeRotationInstruction(cbOpcode, operand: operand)
+        case 1: // BIT命令 (0x40-0x7F)
+            return decodeBITInstruction(middleNibble, operand: operand)
+        case 2: // RES命令 (0x80-0xBF)
+            return decodeRESInstruction(middleNibble, operand: operand)
+        case 3: // SET命令 (0xC0-0xFF)
+            return decodeSETInstruction(middleNibble, operand: operand)
+        default:
+            return nil
+        }
     }
     
     // EDプレフィックス命令（拡張命令）
     private func decodeEDPrefixedInstruction(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         // 次のオペコードを取得
         let nextPC = pc + 1
-        _ = memory.readByte(at: nextPC)
+        let edOpcode = memory.readByte(at: nextPC)
         
-        // TODO: 実際のED命令のデコード処理を実装
-        // 現時点では未実装のため、nil（不明な命令）を返す
-        return nil
+        // ED命令のデコード
+        switch edOpcode {
+        // ブロック転送命令
+        case 0xA0: return LDIInstruction()
+        case 0xB0: return LDIRInstruction()
+        case 0xA8: return LDDInstruction()
+        case 0xB8: return LDDRInstruction()
+            
+        // ブロック比較命令
+        case 0xA1: return CPIInstruction()
+        case 0xB1: return CPIRInstruction()
+        case 0xA9: return CPDInstruction()
+        case 0xB9: return CPDRInstruction()
+            
+        // 入出力命令
+        case 0x40: return INrCInstruction(operand: .b)
+        case 0x48: return INrCInstruction(operand: .c)
+        case 0x50: return INrCInstruction(operand: .d)
+        case 0x58: return INrCInstruction(operand: .e)
+        case 0x60: return INrCInstruction(operand: .h)
+        case 0x68: return INrCInstruction(operand: .l)
+        case 0x78: return INrCInstruction(operand: .a)
+            
+        case 0x41: return OUTCrInstruction(operand: .b)
+        case 0x49: return OUTCrInstruction(operand: .c)
+        case 0x51: return OUTCrInstruction(operand: .d)
+        case 0x59: return OUTCrInstruction(operand: .e)
+        case 0x61: return OUTCrInstruction(operand: .h)
+        case 0x69: return OUTCrInstruction(operand: .l)
+        case 0x79: return OUTCrInstruction(operand: .a)
+            
+        // 16ビット算術命令
+        case 0x42: return SBCHLrrInstruction(operand: .bc)
+        case 0x52: return SBCHLrrInstruction(operand: .de)
+        case 0x62: return SBCHLrrInstruction(operand: .hl)
+        case 0x72: return SBCHLrrInstruction(operand: .sp)
+            
+        case 0x4A: return ADCHLrrInstruction(operand: .bc)
+        case 0x5A: return ADCHLrrInstruction(operand: .de)
+        case 0x6A: return ADCHLrrInstruction(operand: .hl)
+        case 0x7A: return ADCHLrrInstruction(operand: .sp)
+            
+        // メモリ操作命令
+        case 0x43: // LD (nn),BC
+            let addressLow = memory.readByte(at: nextPC + 1)
+            let addressHigh = memory.readByte(at: nextPC + 2)
+            let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
+            return LDnnrrInstruction(address: address, operand: .bc)
+            
+        case 0x53: // LD (nn),DE
+            let addressLow = memory.readByte(at: nextPC + 1)
+            let addressHigh = memory.readByte(at: nextPC + 2)
+            let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
+            return LDnnrrInstruction(address: address, operand: .de)
+            
+        case 0x63: // LD (nn),HL
+            let addressLow = memory.readByte(at: nextPC + 1)
+            let addressHigh = memory.readByte(at: nextPC + 2)
+            let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
+            return LDnnrrInstruction(address: address, operand: .hl)
+            
+        case 0x73: // LD (nn),SP
+            let addressLow = memory.readByte(at: nextPC + 1)
+            let addressHigh = memory.readByte(at: nextPC + 2)
+            let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
+            return LDnnrrInstruction(address: address, operand: .sp)
+            
+        case 0x4B: // LD BC,(nn)
+            let addressLow = memory.readByte(at: nextPC + 1)
+            let addressHigh = memory.readByte(at: nextPC + 2)
+            let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
+            return LDrrnnInstruction(operand: .bc, address: address)
+            
+        case 0x5B: // LD DE,(nn)
+            let addressLow = memory.readByte(at: nextPC + 1)
+            let addressHigh = memory.readByte(at: nextPC + 2)
+            let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
+            return LDrrnnInstruction(operand: .de, address: address)
+            
+        case 0x6B: // LD HL,(nn)
+            let addressLow = memory.readByte(at: nextPC + 1)
+            let addressHigh = memory.readByte(at: nextPC + 2)
+            let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
+            return LDrrnnInstruction(operand: .hl, address: address)
+            
+        case 0x7B: // LD SP,(nn)
+            let addressLow = memory.readByte(at: nextPC + 1)
+            let addressHigh = memory.readByte(at: nextPC + 2)
+            let address = UInt16(addressHigh) << 8 | UInt16(addressLow)
+            return LDrrnnInstruction(operand: .sp, address: address)
+            
+        // 特殊命令
+        case 0x44, 0x4C, 0x54, 0x5C, 0x64, 0x6C, 0x74, 0x7C: return NEGInstruction()
+        case 0x45, 0x4D, 0x55, 0x5D, 0x65, 0x6D, 0x75, 0x7D: return RETNInstruction()
+        case 0x4E, 0x6E: return IMInstruction(mode: 0)
+        case 0x56, 0x76: return IMInstruction(mode: 1)
+        case 0x5E, 0x7E: return IMInstruction(mode: 2)
+        case 0x57, 0x5F, 0x67, 0x6F, 0x77, 0x7F: return UnimplementedInstruction(opcode: edOpcode) // LD A,I/R等は実装予定
+            
+        default:
+            return UnimplementedInstruction(opcode: edOpcode)
+        }
     }
     
     // IXプレフィックス命令
     private func decodeIXPrefixedInstruction(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         // 次のオペコードを取得
         let nextPC = pc + 1
-        _ = memory.readByte(at: nextPC)
+        let ddOpcode = memory.readByte(at: nextPC)
         
-        // TODO: 実際のIX命令のデコード処理を実装
-        // 現時点では未実装のため、nil（不明な命令）を返す
-        return nil
+        // IX命令のデコード
+        switch ddOpcode {
+        // IXレジスタ関連命令
+        case 0x21: // LD IX,nn
+            let lowByte = memory.readByte(at: nextPC + 1)
+            let highByte = memory.readByte(at: nextPC + 2)
+            let value = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDIXnnInstruction(value: value)
+            
+        case 0x22: // LD (nn),IX
+            let lowByte = memory.readByte(at: nextPC + 1)
+            let highByte = memory.readByte(at: nextPC + 2)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDnnIXInstruction(address: address)
+            
+        case 0x2A: // LD IX,(nn)
+            let lowByte = memory.readByte(at: nextPC + 1)
+            let highByte = memory.readByte(at: nextPC + 2)
+            let address = UInt16(highByte) << 8 | UInt16(lowByte)
+            return LDIXnnAddrInstruction(address: address)
+            
+        case 0x36: // LD (IX+d),n
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            let value = memory.readByte(at: nextPC + 2)
+            return LDIXdNInstruction(offset: offset, value: value)
+            
+        case 0x70: // LD (IX+d),B
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDIXdRInstruction(offset: offset, source: .b)
+            
+        case 0x71: // LD (IX+d),C
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDIXdRInstruction(offset: offset, source: .c)
+            
+        case 0x72: // LD (IX+d),D
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDIXdRInstruction(offset: offset, source: .d)
+            
+        case 0x73: // LD (IX+d),E
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDIXdRInstruction(offset: offset, source: .e)
+            
+        case 0x74: // LD (IX+d),H
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDIXdRInstruction(offset: offset, source: .h)
+            
+        case 0x75: // LD (IX+d),L
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDIXdRInstruction(offset: offset, source: .l)
+            
+        case 0x77: // LD (IX+d),A
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDIXdRInstruction(offset: offset, source: .a)
+            
+        case 0x46: // LD B,(IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDRIXdInstruction(destination: .b, offset: offset)
+            
+        case 0x4E: // LD C,(IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDRIXdInstruction(destination: .c, offset: offset)
+            
+        case 0x56: // LD D,(IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDRIXdInstruction(destination: .d, offset: offset)
+            
+        case 0x5E: // LD E,(IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDRIXdInstruction(destination: .e, offset: offset)
+            
+        case 0x66: // LD H,(IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDRIXdInstruction(destination: .h, offset: offset)
+            
+        case 0x6E: // LD L,(IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDRIXdInstruction(destination: .l, offset: offset)
+            
+        case 0x7E: // LD A,(IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return LDRIXdInstruction(destination: .a, offset: offset)
+            
+        // IXレジスタの算術命令
+        case 0x09: // ADD IX,BC
+            return ADDIXrrInstruction(operand: .bc)
+            
+        case 0x19: // ADD IX,DE
+            return ADDIXrrInstruction(operand: .de)
+            
+        case 0x29: // ADD IX,IX
+            return ADDIXrrInstruction(operand: .ix)
+            
+        case 0x39: // ADD IX,SP
+            return ADDIXrrInstruction(operand: .sp)
+            
+        case 0x23: // INC IX
+            return INCIXInstruction()
+            
+        case 0x2B: // DEC IX
+            return DECIXInstruction()
+            
+        case 0x34: // INC (IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return INCIXdInstruction(offset: offset)
+            
+        case 0x35: // DEC (IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return DECIXdInstruction(offset: offset)
+            
+        // IXレジスタのスタック操作
+        case 0xE5: // PUSH IX
+            return PUSHIXInstruction()
+            
+        case 0xE1: // POP IX
+            return POPIXInstruction()
+            
+        case 0xE3: // EX (SP),IX
+            return EXSPIXInstruction()
+            
+        case 0xE9: // JP (IX)
+            return JPIXInstruction()
+            
+        // IX+dを使用した算術・論理命令
+        case 0x86: // ADD A,(IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return ADDAIXdInstruction(offset: offset)
+            
+        case 0x96: // SUB (IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return SUBIXdInstruction(offset: offset)
+            
+        case 0xA6: // AND (IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return ANDIXdInstruction(offset: offset)
+            
+        case 0xB6: // OR (IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return ORIXdInstruction(offset: offset)
+            
+        case 0xAE: // XOR (IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return XORIXdInstruction(offset: offset)
+            
+        case 0xBE: // CP (IX+d)
+            let offset = Int8(bitPattern: memory.readByte(at: nextPC + 1))
+            return CPIXdInstruction(offset: offset)
+            
+        default:
+            return UnimplementedInstruction(opcode: ddOpcode)
+        }
     }
     
     // IYプレフィックス命令
@@ -652,6 +916,49 @@ class Z80InstructionDecoder {
         case .l: return .l
         case .f: return .f
         }
+    }
+    
+    // CBプレフィックス命令のデコード処理用ヘルパーメソッド
+    
+    // ローテーション命令のデコード
+    private func decodeRotationInstruction(_ opcode: UInt8, operand: RegisterOperand) -> Z80Instruction? {
+        let operation = (opcode >> 3) & 0x07
+        
+        switch operation {
+        case 0: // RLC r
+            return RLCInstruction(operand: operand)
+        case 1: // RRC r
+            return RRCInstruction(operand: operand)
+        case 2: // RL r
+            return RLInstruction(operand: operand)
+        case 3: // RR r
+            return RRInstruction(operand: operand)
+        case 4: // SLA r
+            return SLAInstruction(operand: operand)
+        case 5: // SRA r
+            return SRAInstruction(operand: operand)
+        case 6: // SWAP r (Z80ではSLL r、ただし非公式命令)
+            return SLLInstruction(operand: operand)
+        case 7: // SRL r
+            return SRLInstruction(operand: operand)
+        default:
+            return nil
+        }
+    }
+    
+    // BIT命令のデコード
+    private func decodeBITInstruction(_ bit: UInt8, operand: RegisterOperand) -> Z80Instruction? {
+        return BITInstruction(bit: bit, operand: operand)
+    }
+    
+    // RES命令のデコード
+    private func decodeRESInstruction(_ bit: UInt8, operand: RegisterOperand) -> Z80Instruction? {
+        return RESInstruction(bit: bit, operand: operand)
+    }
+    
+    // SET命令のデコード
+    private func decodeSETInstruction(_ bit: UInt8, operand: RegisterOperand) -> Z80Instruction? {
+        return SETInstruction(bit: bit, operand: operand)
     }
 }
 
