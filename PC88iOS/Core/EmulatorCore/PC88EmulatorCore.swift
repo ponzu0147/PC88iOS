@@ -16,6 +16,12 @@ import UIKit
 // Swiftではファイルを直接インポートするのではなく、モジュールをインポートします
 // この場合、プロトコルは同じモジュール内にあるので、明示的なインポートは必要ありません
 
+// 画面更新通知の定義
+extension Notification.Name {
+    /// 画面更新が完了したことを通知する
+    static let screenUpdated = Notification.Name("PC88EmulatorScreenUpdated")
+}
+
 /// PC-88エミュレータのコア実装
 class PC88EmulatorCore: EmulatorCoreManaging {
     // MARK: - プロパティ
@@ -28,6 +34,9 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     /// FDDブートが有効かどうか
     private var fddBootEnabled: Bool = false
+    
+    /// デバッグモードが有効かどうか
+    var isDebugMode: Bool = false
     
     /// CPUエミュレーション
     private var cpu: CPUExecuting?
@@ -1291,6 +1300,14 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         if let io = io as? PC88IO {
             io.requestInterrupt(from: .vblank)
         }
+        
+        // VBlank割り込み発生時に画面を更新
+        // これにより、VRAMの変更やOSからの画面更新要求に即座に反応できる
+        updateScreen()
+        
+        if isDebugMode {
+            print("VBlank割り込み発生: フレームカウンタ=\(frameCounter)")
+        }
     }
     
     /// フレームレートを調整し、パフォーマンスメトリクスを収集する
@@ -1458,20 +1475,40 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     }
     
     /// 画面の更新
+    /// 画面の更新処理を行う
+    /// VBlank割り込み発生時または明示的な画面更新要求時に呼び出される
     internal func updateScreen() {
         // フレームスキップの処理
         // frameCounterはemulationLoopで更新される
         if self.frameSkip > 0 && (frameCounter % UInt(self.frameSkip + 1) != 0) {
             // フレームスキップ中は描画をスキップ
+            if isDebugMode {
+                print("フレームスキップ: \(frameCounter) % \(self.frameSkip + 1) = \(frameCounter % UInt(self.frameSkip + 1))")
+            }
             return
         }
         
         if let screen = screen {
+            // 画面更新開始時刻を記録（デバッグ用）
+            let startTime = CFAbsoluteTimeGetCurrent()
+            
             // 画面の描画処理
             screenImage = screen.render()
             
             // メモリとI/Oの状態を画面に反映
             // 画面の更新処理は、PC88Screenのrender()メソッド内で行われる
+            
+            // 画面更新にかかった時間を計測（デバッグ用）
+            if isDebugMode {
+                let endTime = CFAbsoluteTimeGetCurrent()
+                let renderTime = (endTime - startTime) * 1000 // ミリ秒に変換
+                print("画面更新完了: フレーム=\(frameCounter), 所要時間=\(String(format: "%.2f", renderTime))ms")
+            }
+            
+            // 画面更新通知（将来的な拡張のため）
+            NotificationCenter.default.post(name: .screenUpdated, object: self)
+        } else if isDebugMode {
+            print("画面更新スキップ: screen is nil")
         }
     }
     
