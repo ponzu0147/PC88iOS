@@ -352,7 +352,7 @@ class D88DiskImage: DiskImageAccessing {
         
         // セクタサイズの検証と修正
         var sectors: [SectorData] = []
-        var nextOffset = processSectorData(data, track: track, side: side, c: c, h: h, r: r, n: n,
+        let nextOffset = processSectorData(data, track: track, side: side, c: c, h: h, r: r, n: n,
                                            currentOffset: currentOffset, dataOffset: dataOffset,
                                            sectorSize: sectorSize, sectors: &sectors)
         

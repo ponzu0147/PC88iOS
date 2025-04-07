@@ -280,7 +280,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     
     func start() {
         guard state == .initialized || state == .paused else { 
-            PC88Logger.core.warning("エミュレータの状態が開始可能ではありません: \(state)")
+            let message: String = "エミュレータの状態が開始可能ではありません: \(state)"
+            PC88Logger.core.warning("\(message)")
             return 
         }
         
@@ -566,7 +567,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             return
         }
         
-        PC88Logger.cpu.debug("\nクロックモード変更開始: \(currentClockMode) -> \(mode)\n")
+        let message: String = "\nクロックモード変更開始: \(currentClockMode) -> \(mode)\n"
+        PC88Logger.cpu.debug("\(message)")
         
         // 現在の状態を保存
         let wasRunning = state == .running
@@ -1015,8 +1017,7 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         let endAddressHex = String(format: "%04X", endAddress)
         let validDataStr = validData ? "あり" : "なし"
         PC88Logger.disk.debug(
-            "  OSセクタ\(index+1)をメモリにロードしました: 0x\(startAddressHex)-0x\(endAddressHex) " +
-            "(有効データ: \(validDataStr))"
+            "  OSセクタ\(index+1)をメモリにロードしました: 0x\(startAddressHex)-0x\(endAddressHex) (有効データ: \(validDataStr))"
         )
         
         // 最初のセクタの内容を表示
@@ -1039,16 +1040,16 @@ class PC88EmulatorCore: EmulatorCoreManaging {
             let byte = pc88Memory.readByte(at: 0xD000 + UInt16(i))
             memoryContent += String(format: "%02X ", byte)
         }
-        PC88Logger.core.debug(memoryContent)
+        PC88Logger.core.debug("\(memoryContent)")
         
         // ジャンプテーブルを確認
-        PC88Logger.core.debug("OSジャンプテーブル確認 (0xD100-0xD10F):")
+        PC88Logger.core.debug("OSジャンプテーブル確認 (0xD100-0xD10F): ")
         memoryContent = ""
         for i in 0..<16 {
             let byte = pc88Memory.readByte(at: 0xD100 + UInt16(i))
             memoryContent += String(format: "%02X ", byte)
         }
-        PC88Logger.core.debug(memoryContent)
+        PC88Logger.core.debug("\(memoryContent)")
     }
     
     /// ディスクイメージをロードする共通メソッド
@@ -1323,11 +1324,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         cyclesRemainder = 0
         shouldResetMetrics = false
         
-        PC88Logger.core.debug(
-            "クロックモード変更検出: \(currentMode), " +
-            "周波数: \(baseCyclesPerSecond) Hz, " +
-            "サイクル数/フレーム: \(cyclesPerFrame)"
-        )
+        let message: String = "クロックモード変更検出: \(currentMode), 周波数: \(baseCyclesPerSecond) Hz, サイクル数/フレーム: \(cyclesPerFrame)"
+        PC88Logger.core.debug("\(message)")
     }
     
     /// パフォーマンスメトリクスをログに出力
@@ -1381,7 +1379,8 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         var baseCyclesPerSecond: Int = currentMode == .mode4MHz ? 4_000_000 : 8_000_000
         var cyclesPerFrame: Int = Int(Double(baseCyclesPerSecond) / targetFPS)
         
-        PC88Logger.core.debug("クロックモード: \(currentMode), サイクル数/フレーム: \(cyclesPerFrame)")
+        let message: String = "クロックモード: \(currentMode), サイクル数/フレーム: \(cyclesPerFrame)"
+        PC88Logger.core.debug("\(message)")
         
         while !Thread.current.isCancelled {
             // 一時停止中は処理をスキップ
@@ -1638,12 +1637,12 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                             // 従来の方法で初期化
                             // Z80 CPUの初期状態を設定
                             z80.setPC(0xC000)  // プログラムカウンタをIPLの先頭に設定
-                            z80.setRegisterPair(.af, value: 0x0000)  // Aレジスタとフラグをクリア
-                            z80.setRegisterPair(.bc, value: 0x0000)  // BCレジスタをクリア
-                            z80.setRegisterPair(.de, value: 0x0000)  // DEレジスタをクリア
-                            z80.setRegisterPair(.hl, value: 0x0000)  // HLレジスタをクリア
-                            z80.setRegisterPair(.ix, value: 0x0000)  // IXレジスタをクリア
-                            z80.setRegisterPair(.iy, value: 0x0000)  // IYレジスタをクリア
+                            z80.setRegister(.afPair, value: 0x0000)  // Aレジスタとフラグをクリア
+                            z80.setRegister(.bcPair, value: 0x0000)  // BCレジスタをクリア
+                            z80.setRegister(.dePair, value: 0x0000)  // DEレジスタをクリア
+                            z80.setRegister(.hlPair, value: 0x0000)  // HLレジスタをクリア
+                            z80.setRegister(.ixPair, value: 0x0000)  // IXレジスタをクリア
+                            z80.setRegister(.iyPair, value: 0x0000)  // IYレジスタをクリア
                             z80.setSP(0xF000)  // スタックポインタを設定
                             
                             // 割り込みを無効化

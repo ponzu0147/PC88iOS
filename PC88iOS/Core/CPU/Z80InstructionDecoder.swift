@@ -11,9 +11,9 @@ class Z80InstructionDecoder {
             return instruction
         }
         
-        if let instruction = decodeArithmeticInstruction(opcode) {
+        if let instruction = decodeArithmeticInstruction(opcode, memory: memory, pc: pc) {
             return instruction
-        } else if let instruction = decodeLogicalInstruction(opcode) {
+        } else if let instruction = decodeLogicalInstruction(opcode, memory: memory, pc: pc) {
             return instruction
         } else if let instruction = decodeControlInstruction(opcode, memory: memory, pc: pc) {
             return instruction
@@ -29,7 +29,7 @@ class Z80InstructionDecoder {
     
     private func decodeBasicInstruction(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         // 命令をカテゴリごとに分割して処理
-        if let instruction = decodeBasicGroup1(opcode) {
+        if let instruction = decodeBasicGroup1(opcode, memory: memory, pc: pc) {
             return instruction
         } else if let instruction = decodeBasicGroup2(opcode, memory: memory, pc: pc) {
             return instruction
@@ -40,33 +40,105 @@ class Z80InstructionDecoder {
         return nil
     }
     
-    private func decodeBasicGroup1(_ opcode: UInt8) -> Z80Instruction? {
+    private func decodeBasicGroup1(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         // 命令をさらに小さなグループに分割
-        if let instruction = decodeBasicGroup1A(opcode) {
+        if let instruction = decodeBasicGroup1A(opcode, memory: memory, pc: pc) {
             return instruction
-        } else if let instruction = decodeBasicGroup1B(opcode) {
+        } else if let instruction = decodeBasicGroup1B(opcode, memory: memory, pc: pc) {
             return instruction
-        } else if let instruction = decodeBasicGroup1C(opcode) {
+        } else if let instruction = decodeBasicGroup1C(opcode, memory: memory, pc: pc) {
             return instruction
-        } else if let instruction = decodeBasicGroup1D(opcode) {
+        } else if let instruction = decodeBasicGroup1D(opcode, memory: memory, pc: pc) {
             return instruction
         }
         
         return nil
     }
     
+    // 基本命令グループ2: 追加のグループ
+    private func decodeBasicGroup2(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+        // CBプレフィックス命令（ビット操作、シフト、ローテーション）
+        if opcode == 0xCB {
+            return decodeCBPrefixedInstruction(memory: memory, pc: pc)
+        }
+        
+        // EDプレフィックス命令（拡張命令）
+        if opcode == 0xED {
+            return decodeEDPrefixedInstruction(memory: memory, pc: pc)
+        }
+        
+        return nil
+    }
+    
+    // 基本命令グループ3: 追加のグループ
+    private func decodeBasicGroup3(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+        // 特殊命令やその他の命令をデコード
+        switch opcode {
+        case 0xDD: // IXプレフィックス
+            return decodeIXPrefixedInstruction(memory: memory, pc: pc)
+        case 0xFD: // IYプレフィックス
+            return decodeIYPrefixedInstruction(memory: memory, pc: pc)
+        default:
+            return nil
+        }
+    }
+    
+    // CBプレフィックス命令（ビット操作、シフト、ローテーション）
+    private func decodeCBPrefixedInstruction(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+        // 次のオペコードを取得
+        let nextPC = pc + 1
+        _ = memory.readByte(at: nextPC)
+        
+        // TODO: 実際のCB命令のデコード処理を実装
+        // 現時点では未実装のため、nil（不明な命令）を返す
+        return nil
+    }
+    
+    // EDプレフィックス命令（拡張命令）
+    private func decodeEDPrefixedInstruction(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+        // 次のオペコードを取得
+        let nextPC = pc + 1
+        _ = memory.readByte(at: nextPC)
+        
+        // TODO: 実際のED命令のデコード処理を実装
+        // 現時点では未実装のため、nil（不明な命令）を返す
+        return nil
+    }
+    
+    // IXプレフィックス命令
+    private func decodeIXPrefixedInstruction(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+        // 次のオペコードを取得
+        let nextPC = pc + 1
+        _ = memory.readByte(at: nextPC)
+        
+        // TODO: 実際のIX命令のデコード処理を実装
+        // 現時点では未実装のため、nil（不明な命令）を返す
+        return nil
+    }
+    
+    // IYプレフィックス命令
+    private func decodeIYPrefixedInstruction(memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+        // 次のオペコードを取得
+        let nextPC = pc + 1
+        _ = memory.readByte(at: nextPC)
+        
+        // TODO: 実際のIY命令のデコード処理を実装
+        // 現時点では未実装のため、nil（不明な命令）を返す
+        return nil
+    }
+    
     // 基本命令グループ1A: 0x00-0x2F
-    private func decodeBasicGroup1A(_ opcode: UInt8) -> Z80Instruction? {
-        if let instruction = decodeBasicGroup1A1(opcode) {
+    private func decodeBasicGroup1A(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+        if let instruction = decodeBasicGroup1A1(opcode, memory: memory, pc: pc) {
             return instruction
-        } else if let instruction = decodeBasicGroup1A2(opcode) {
+        } else if let instruction = decodeBasicGroup1A2(opcode, memory: memory, pc: pc) {
             return instruction
         }
         return nil
     }
     
     // 基本命令グループ1A1: 0x00-0x17
-    private func decodeBasicGroup1A1(_ opcode: UInt8) -> Z80Instruction? {
+    private func decodeBasicGroup1A1(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         switch opcode {
         case 0x00: // NOP
             return NOPInstruction()
@@ -118,7 +190,7 @@ class Z80InstructionDecoder {
     }
     
     // 基本命令グループ1A2: 0x1A-0x2F
-    private func decodeBasicGroup1A2(_ opcode: UInt8) -> Z80Instruction? {
+    private func decodeBasicGroup1A2(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         switch opcode {
         case 0x1A: // LD A,(DE)
             return LDRegMemInstruction(destination: .a, address: .registerDE)
@@ -160,7 +232,7 @@ class Z80InstructionDecoder {
     }
     
     // 基本命令グループ1B: 0x30-0x76
-    private func decodeBasicGroup1B(_ opcode: UInt8) -> Z80Instruction? {
+    private func decodeBasicGroup1B(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         switch opcode {
         case 0x30: // JR NC,n
             return decodeJR(.notCarry, memory: memory, pc: pc)
@@ -188,17 +260,17 @@ class Z80InstructionDecoder {
     }
     
     // 基本命令グループ1C: 0x98-0xDA
-    private func decodeBasicGroup1C(_ opcode: UInt8) -> Z80Instruction? {
-        if let instruction = decodeBasicGroup1C1(opcode) {
+    private func decodeBasicGroup1C(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
+        if let instruction = decodeBasicGroup1C1(opcode, memory: memory, pc: pc) {
             return instruction
-        } else if let instruction = decodeBasicGroup1C2(opcode) {
+        } else if let instruction = decodeBasicGroup1C2(opcode, memory: memory, pc: pc) {
             return instruction
         }
         return nil
     }
     
     // 基本命令グループ1C1: 0x98-0xCD
-    private func decodeBasicGroup1C1(_ opcode: UInt8) -> Z80Instruction? {
+    private func decodeBasicGroup1C1(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         switch opcode {
         case 0x98: // SBC A,B
             return SBCInstruction(source: .b)
@@ -230,7 +302,7 @@ class Z80InstructionDecoder {
     }
     
     // 基本命令グループ1C2: 0xD0-0xDA
-    private func decodeBasicGroup1C2(_ opcode: UInt8) -> Z80Instruction? {
+    private func decodeBasicGroup1C2(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         switch opcode {
         case 0xD0: // RET NC
             return RETInstruction(condition: .notCarry)
@@ -254,7 +326,7 @@ class Z80InstructionDecoder {
     }
     
     // 基本命令グループ1D: 0xDB-0xFF
-    private func decodeBasicGroup1D(_ opcode: UInt8) -> Z80Instruction? {
+    private func decodeBasicGroup1D(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         switch opcode {
         case 0xDB: // IN A,(n)
             return decodeIN(memory: memory, pc: pc)
@@ -362,7 +434,7 @@ class Z80InstructionDecoder {
     }
     
     
-    private func decodeArithmeticInstruction(_ opcode: UInt8) -> Z80Instruction? {
+    private func decodeArithmeticInstruction(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         if (opcode & 0xF8) == 0x80 {
             let reg = decodeRegister8(opcode & 0x07)
             return ADDInstruction(source: convertToRegisterOperand(reg))
@@ -403,7 +475,7 @@ class Z80InstructionDecoder {
     }
     
     
-    private func decodeLogicalInstruction(_ opcode: UInt8) -> Z80Instruction? {
+    private func decodeLogicalInstruction(_ opcode: UInt8, memory: MemoryAccessing, pc: UInt16) -> Z80Instruction? {
         if (opcode & 0xF8) == 0xA0 {
             let reg = decodeRegister8(opcode & 0x07)
             return ANDInstruction(source: convertToRegisterOperand(reg))
