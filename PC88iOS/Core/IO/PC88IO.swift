@@ -59,6 +59,9 @@ class PC88IO: IOAccessing {
     /// 初期モデル用ビープ音生成
     private var beepSound: PC88BeepSound?
     
+    /// CRTCレジスタ更新時のコールバック
+    var onCRTCUpdated: ((UInt8, UInt8) -> Void)?
+    
     /// キーボード状態
     private var keyboardState = [UInt8](repeating: 0, count: 16)
     
@@ -257,7 +260,14 @@ class PC88IO: IOAccessing {
         case IOPort.crtcData.rawValue:
             // CRTCデータ
             if crtcRegisterSelect < crtcRegisters.count {
+                let oldValue = crtcRegisters[Int(crtcRegisterSelect)]
                 crtcRegisters[Int(crtcRegisterSelect)] = value
+                
+                // 値が変更された場合のみコールバックを呼び出す
+                if oldValue != value {
+                    // CRTC更新コールバックを呼び出す
+                    onCRTCUpdated?(crtcRegisterSelect, value)
+                }
             }
             
         case IOPort.psgRegister.rawValue:

@@ -211,6 +211,12 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         // メモリの初期化
         let pc88Memory = PC88Memory()
         
+        // VRAM更新管理用のプロパティ
+        var vramUpdateCount = 0
+        let vramUpdateThreshold = 5 // 画面更新をトリガーするまでのVRAM更新回数
+        var lastVRAMUpdateTime = CFAbsoluteTimeGetCurrent()
+        let vramUpdateTimeThreshold = 1.0 / 60.0 // 60Hz相当の更新間隔
+        
         // VRAM更新時のコールバックを設定
         pc88Memory.onVRAMUpdated = { [weak self] (address, value, vramType) in
             guard let self = self else { return }
@@ -233,15 +239,50 @@ class PC88EmulatorCore: EmulatorCoreManaging {
                     print("VRAM更新検出: \(vramType), アドレス=0x\(String(format: "%04X", address)), 値=0x\(String(format: "%02X", value))")
                 }
                 
-                // 画面更新をトリガー
-                self.updateScreen()
+                // VRAM更新回数をカウント
+                vramUpdateCount += 1
+                
+                // 画面更新の条件判定
+                let currentTime = CFAbsoluteTimeGetCurrent()
+                let timeElapsed = currentTime - lastVRAMUpdateTime
+                
+                // 以下の条件で画面更新をトリガー
+                // 1. 更新回数が限界値を超えた場合
+                // 2. 前回の更新から一定時間が経過した場合
+                if vramUpdateCount >= vramUpdateThreshold || timeElapsed >= vramUpdateTimeThreshold {
+                    self.updateScreen()
+                    vramUpdateCount = 0
+                    lastVRAMUpdateTime = currentTime
+                    
+                    if self.isDebugMode {
+                        print("VRAM更新による画面更新: 更新回数=\(vramUpdateCount), 経過時間=\(String(format: "%.3f", timeElapsed * 1000))ms")
+                    }
+                }
             }
         }
         
         memory = pc88Memory
         
         // I/Oの初期化
-        io = PC88IO()
+        let pc88IO = PC88IO()
+        
+        // CRTC更新時のコールバックを設定
+        pc88IO.onCRTCUpdated = { [weak self] (register, value) in
+            guard let self = self else { return }
+            
+            // 画面更新をトリガー
+            if let screen = self.screen as? PC88ScreenBase {
+                // デバッグモードの場合はログを出力
+                if self.isDebugMode {
+                    print("CRTC更新検出: レジスタ=\(register), 値=0x\(String(format: "%02X", value))")
+                }
+                
+                // 画面更新をトリガー
+                self.updateScreen()
+            }
+        }
+        
+        io = pc88IO
     }
     
     /// CPUの初期化
@@ -269,6 +310,19 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         
         pc88Screen.connectMemory(memory)
         pc88Screen.connectIO(io)
+        
+        // 画面更新リクエストのコールバックを設定
+        pc88Screen.onScreenUpdateRequested = { [weak self] in
+            guard let self = self else { return }
+            
+            // 画面更新をトリガー
+            self.updateScreen()
+            
+            // デバッグモードの場合はログを出力
+            if self.isDebugMode {
+                print("画面更新リクエストを受信")
+            }
+        }
         
         // フォントデータを設定
         setupFonts(for: pc88Screen)

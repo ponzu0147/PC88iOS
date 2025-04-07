@@ -110,9 +110,18 @@ class PC88ScreenBase: ScreenRendering {
     
     /// テキストVRAMの更新
     func updateTextVRAM(at address: UInt16, value: UInt8) {
-        let offset = Int(address - textVRAMStartAddress)
-        if offset >= 0 && offset < textVRAM.count {
-            textVRAM[offset] = value
+        // 安全なオフセット計算を行う
+        if address >= textVRAMStartAddress {
+            let offset = Int(address - textVRAMStartAddress)
+            if offset < textVRAM.count {
+                textVRAM[offset] = value
+            }
+        } else {
+            // アドレスが範囲外の場合は何もしない
+            // デバッグ情報としてログを出力することも考えられる
+            #if DEBUG
+            print("WARNING: テキストVRAM範囲外のアドレスへのアクセス: 0x\(String(format: "%04X", address))")
+            #endif
         }
     }
     
@@ -199,12 +208,18 @@ class PC88ScreenBase: ScreenRendering {
             // コンポーネントの参照を更新
             updateComponentReferences()
             
+            // 画面更新をトリガー
+            requestScreenUpdate()
+            
         case PC88ScreenConstants.crtLineControlPort: // CRT行数制御ポート (0x31)
             // bit7: 200/400ラインモード (0=200ライン, 1=400ライン)
             settings.is400LineMode = (value & 0x80) != 0
             
             // コンポーネントの参照を更新
             updateComponentReferences()
+            
+            // 画面更新をトリガー
+            requestScreenUpdate()
             
         case PC88ScreenConstants.colorModeControlPort: // カラーモード制御ポート (0x32)
             // bit0: デジタル/アナログモード (0=デジタル, 1=アナログ)
@@ -342,6 +357,15 @@ class PC88ScreenBase: ScreenRendering {
         // PC88TextRendererに渡す前に文字コードごとのフォントデータを設定する必要がある場合はここで処理
         // 現在は単純にtextRendererに渡す
         textRenderer.setFontData(data)
+    }
+    
+    /// 画面更新をリクエストするコールバック
+    var onScreenUpdateRequested: (() -> Void)?
+    
+    /// 画面更新をリクエストする
+    func requestScreenUpdate() {
+        // 画面更新コールバックを呼び出す
+        onScreenUpdateRequested?()
     }
     
     /// 画面を描画してCGImageを返す
