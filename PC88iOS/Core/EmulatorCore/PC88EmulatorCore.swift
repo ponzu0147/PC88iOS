@@ -209,7 +209,36 @@ class PC88EmulatorCore: EmulatorCoreManaging {
     /// メモリとI/Oの初期化
     private func initializeMemoryAndIO() {
         // メモリの初期化
-        memory = PC88Memory()
+        let pc88Memory = PC88Memory()
+        
+        // VRAM更新時のコールバックを設定
+        pc88Memory.onVRAMUpdated = { [weak self] (address, value, vramType) in
+            guard let self = self else { return }
+            
+            // 画面更新をトリガー
+            if let screen = self.screen as? PC88ScreenBase {
+                switch vramType {
+                case .text:
+                    screen.updateTextVRAM(at: address, value: value)
+                case .graphics:
+                    // 現在のグラフィックプレーンを取得
+                    if let pc88Memory = self.memory as? PC88Memory {
+                        let plane = pc88Memory.getCurrentGraphicPlane()
+                        screen.updateGraphicsVRAM(at: address, value: value, plane: plane)
+                    }
+                }
+                
+                // デバッグモードの場合はログを出力
+                if self.isDebugMode {
+                    print("VRAM更新検出: \(vramType), アドレス=0x\(String(format: "%04X", address)), 値=0x\(String(format: "%02X", value))")
+                }
+                
+                // 画面更新をトリガー
+                self.updateScreen()
+            }
+        }
+        
+        memory = pc88Memory
         
         // I/Oの初期化
         io = PC88IO()

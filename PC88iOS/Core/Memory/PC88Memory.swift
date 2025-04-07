@@ -7,6 +7,14 @@
 
 import Foundation
 
+/// VRAMの種類
+enum VRAMType {
+    /// テキストVRAM
+    case text
+    /// グラフィックVRAM
+    case graphics
+}
+
 /// PC-88のメモリ実装
 class PC88Memory: MemoryAccessing {
     // MARK: - 定数
@@ -29,6 +37,11 @@ class PC88Memory: MemoryAccessing {
     /// グラフィックVRAMのサイズ
     private let graphicVRAMSize = 0x4000
     
+    // MARK: - コールバック
+    
+    /// VRAM更新時のコールバック
+    var onVRAMUpdated: ((UInt16, UInt8, VRAMType) -> Void)?
+    
     // MARK: - プロパティ
     
     /// メインメモリ
@@ -48,6 +61,12 @@ class PC88Memory: MemoryAccessing {
     
     /// 現在のグラフィックVRAMプレーン選択
     private var currentGraphicPlane = 0
+    
+    /// 現在のグラフィックプレーンを取得する
+    /// - Returns: 現在選択されているグラフィックプレーンのインデックス (0-2)
+    func getCurrentGraphicPlane() -> Int {
+        return currentGraphicPlane
+    }
     
     /// 拡張RAM
     private var extendedRAM = [UInt8](repeating: 0, count: 0x10000)
@@ -117,6 +136,9 @@ class PC88Memory: MemoryAccessing {
         if addr >= textVRAMBase && addr < textVRAMBase + textVRAMSize {
             let vramOffset = addr - textVRAMBase
             textVRAM[vramOffset] = value
+            
+            // テキストVRAM更新通知
+            onVRAMUpdated?(address, value, .text)
             return
         }
         
@@ -124,6 +146,9 @@ class PC88Memory: MemoryAccessing {
         if addr >= graphicVRAMBase && addr < graphicVRAMBase + graphicVRAMSize {
             let vramOffset = addr - graphicVRAMBase
             graphicVRAM[currentGraphicPlane][vramOffset] = value
+            
+            // グラフィックVRAM更新通知
+            onVRAMUpdated?(address, value, .graphics)
             return
         }
         
