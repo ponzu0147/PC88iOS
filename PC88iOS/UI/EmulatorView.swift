@@ -103,6 +103,18 @@ struct EmulatorView: View {
                     }
                     .buttonStyle(.bordered)
                     
+                    Button(action: { viewModel.isDebugMode.toggle() }) {
+                        VStack {
+                            Image(systemName: viewModel.isDebugMode ? "ladybug.fill" : "ladybug")
+                                .font(.system(size: 20))
+                            Text("デバッグ")
+                                .font(.caption)
+                        }
+                        .frame(minWidth: 70)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(viewModel.isDebugMode ? .green : .gray)
+                    
                     Button(action: viewModel.showKeyboard) {
                         VStack {
                             Image(systemName: "keyboard")
@@ -207,6 +219,7 @@ class EmulatorViewInternalModel: ObservableObject {
     @Published var clockMode: PC88CPUClock.ClockMode = .mode4MHz
     @Published var clockFrequency: String = "4MHz"
     @Published var currentFPS: Int = 30
+    @Published var isDebugMode: Bool = false
     @Published var volume: Float = 0.5 {
         didSet {
             // 音量変更をPC88BeepSoundに反映
@@ -589,6 +602,19 @@ class EmulatorViewInternalModel: ObservableObject {
             screenImage = image
         } else {
             PC88Logger.app.warning("警告: エミュレータコアから画面イメージを取得できませんでした")
+        }
+        
+        // デバッグモードの設定をPC88TextRendererに反映
+        if let core = emulatorCore as? PC88EmulatorCore {
+            core.setTextRendererDebugMode(isDebugMode)
+            
+            // CPUの状態をデバッグ情報として追加
+            if isDebugMode {
+                let cpuState = core.getCPUState()
+                core.addDebugMessage("CPU State: \(cpuState)")
+                core.addDebugMessage("PC: 0x\(String(format: "%04X", core.getCPURegisterPC()))")
+                core.addDebugMessage("Clock: \(clockFrequency)")
+            }
         }
     }
     

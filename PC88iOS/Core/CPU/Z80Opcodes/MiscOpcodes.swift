@@ -67,10 +67,11 @@ struct DJNZInstruction: Z80Instruction {
         registers.b = registers.b &- 1
         
         if registers.b != 0 {
-            registers.pc = UInt16(Int(registers.pc) + Int(offset) + 2)
+            // PCはデコーダ内ですでにインクリメントされているため、オフセットのみを加える
+            registers.pc = UInt16(Int(registers.pc) + Int(offset))
             return 13 // ジャンプする場合
         } else {
-            registers.pc = registers.pc &+ size
+            // ジャンプしない場合はPCを変更しない（デコーダですでに次の命令を指している）
             return 8 // ジャンプしない場合
         }
     }

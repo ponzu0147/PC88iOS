@@ -64,6 +64,40 @@ class PC88EmulatorCore: EmulatorCoreManaging {
         return beepTest
     }
     
+    /// テキストレンダラーのデバッグモードを設定
+    func setTextRendererDebugMode(_ isDebugMode: Bool) {
+        if let pc88Screen = screen as? PC88ScreenBase {
+            pc88Screen.textRenderer.isDebugMode = isDebugMode
+        }
+    }
+    
+    /// デバッグメッセージを追加
+    func addDebugMessage(_ message: String) {
+        if let pc88Screen = screen as? PC88ScreenBase {
+            pc88Screen.textRenderer.addDebugMessage(message)
+        }
+    }
+    
+    /// CPUの状態を取得
+    func getCPUState() -> String {
+        if let z80CPU = cpu as? Z80CPU {
+            let registers = z80CPU.getRegisters()
+            return "A: \(String(format: "%02X", registers.a)) "
+                + "BC: \(String(format: "%04X", registers.bc)) "
+                + "DE: \(String(format: "%04X", registers.de)) "
+                + "HL: \(String(format: "%04X", registers.hl))"
+        }
+        return "CPU not available"
+    }
+    
+    /// CPUのPCレジスタを取得
+    func getCPURegisterPC() -> UInt16 {
+        if let z80CPU = cpu as? Z80CPU {
+            return z80CPU.getPC()
+        }
+        return 0
+    }
+    
     /// 画面の取得
     func getScreen() -> CGImage? {
         // 画面イメージがnullの場合はテスト画面を表示して再生成を試みる

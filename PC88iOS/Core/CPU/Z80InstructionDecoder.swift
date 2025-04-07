@@ -430,6 +430,8 @@ class Z80InstructionDecoder {
             return EXAFInstruction()
         case 0x0A: // LD A,(BC)
             return LDRegMemInstruction(destination: .a, address: .registerBC)
+        case 0x0B: // DEC BC
+            return DECRegPairInstruction(register: RegisterPairOperand.bc)
         case 0x0C: // INC C
             return INCRegInstruction(register: .c)
         case 0x0D: // DEC C

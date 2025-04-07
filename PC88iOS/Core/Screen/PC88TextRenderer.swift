@@ -11,6 +11,11 @@ import UIKit
 
 /// PC-88のテキスト描画を担当するクラス
 class PC88TextRenderer {
+    /// デバッグモードかどうか
+    var isDebugMode = false
+    
+    /// デバッグメッセージ
+    private var debugMessages: [String] = []
     /// テキストVRAM
     private var textVRAM: [UInt8]
     
@@ -90,6 +95,20 @@ class PC88TextRenderer {
         for i in 0..<lineTextModes.count {
             lineTextModes[i] = .character
         }
+    }
+    
+    /// デバッグメッセージを追加
+    func addDebugMessage(_ message: String) {
+        debugMessages.append(message)
+        // 最大10行まで保持
+        if debugMessages.count > 10 {
+            debugMessages.removeFirst()
+        }
+    }
+    
+    /// デバッグメッセージをクリア
+    func clearDebugMessages() {
+        debugMessages.removeAll()
     }
     
     /// テキスト画面を描画
@@ -321,5 +340,46 @@ class PC88TextRenderer {
                 textVRAM[PC88ScreenConstants.textVRAMBytesPerLine * 5 + i] = UInt8(i)
             }
         }
+    }
+    
+    /// デバッグ情報を描画
+    func renderDebugInfo(context: CGContext) {
+        guard isDebugMode else { return }
+        
+        // フォントの高さを設定
+        let fontHeight = settings.is20LineMode ? PC88ScreenConstants.fontHeight20 : PC88ScreenConstants.fontHeight25
+        
+        // 背景を半透明の黒で描画
+        context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 0.7))
+        context.fill(CGRect(x: 10, y: 10, width: 300, height: CGFloat(debugMessages.count + 2) * CGFloat(fontHeight)))
+        
+        // デバッグモードのタイトルを描画
+        drawDebugText(context: context, text: "DEBUG MODE", x: 15, y: 15, color: 0xFFFFFF00)
+        
+        // デバッグメッセージを描画
+        for (index, message) in debugMessages.enumerated() {
+            let y = 15 + (index + 1) * fontHeight
+            drawDebugText(context: context, text: message, x: 15, y: y, color: 0xFFFFFFFF)
+        }
+    }
+    
+    /// デバッグテキストを描画
+    private func drawDebugText(context: CGContext, text: String, x: Int, y: Int, color: UInt32) {
+        // 色を設定
+        let r = CGFloat((color >> 16) & 0xFF) / 255.0
+        let g = CGFloat((color >> 8) & 0xFF) / 255.0
+        let b = CGFloat(color & 0xFF) / 255.0
+        let a = CGFloat((color >> 24) & 0xFF) / 255.0
+        
+        context.setFillColor(CGColor(red: r, green: g, blue: b, alpha: a))
+        
+        // デバッグ用のテキストを描画
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.monospacedSystemFont(ofSize: 12, weight: .regular),
+            .foregroundColor: UIColor(red: r, green: g, blue: b, alpha: a)
+        ]
+        
+        let attributedString = NSAttributedString(string: text, attributes: attributes)
+        attributedString.draw(at: CGPoint(x: x, y: y))
     }
 }

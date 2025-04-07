@@ -157,6 +157,9 @@ class PC88ScreenBase: ScreenRendering {
             textRenderer.renderTextScreen(context: context)
         }
         
+        // デバッグ情報の描画
+        textRenderer.renderDebugInfo(context: context)
+        
         return context.makeImage()
     }
     

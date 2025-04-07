@@ -979,6 +979,11 @@ extension Z80CPU {
     func getSP() -> UInt16 {
         return registers.sp
     }
+    
+    /// レジスタ全体を取得するメソッド
+    func getRegisters() -> Z80Registers {
+        return registers
+    }
 }
 
 /// レジスタタイプ
